@@ -9,6 +9,14 @@ dist/
 web-build/
 expo-env.d.ts
 
+# Security - Environment Variables (KRİTİK BÖLÜM)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
 # Native
 .kotlin/
 *.orig.*
@@ -30,12 +38,9 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
-.env*.local
-
 # typescript
 *.tsbuildinfo
 
-# generated native folders
+# generated native folders (Prebuild yaparsan burası değişebilir ama şimdilik kalsın)
 /ios
 /android

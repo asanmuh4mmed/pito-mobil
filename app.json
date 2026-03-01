@@ -1,29 +1,65 @@
 {
   "expo": {
-    "name": "pito-mobile",
+    "name": "Pito",
     "slug": "pito-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#000000"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.oxpi.pito",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Pito, evcil hayvanınızın fotoğrafını veya videosunu çekmek ve ilan oluşturmak için kameranıza erişmek istiyor.",
+        "NSPhotoLibraryUsageDescription": "Pito, profil fotoğrafı, ilan ve Petsgram gönderileri oluşturmak için galerinize erişmek istiyor.",
+        "NSMicrophoneUsageDescription": "Pito, video kaydı sırasında sesinizi kaydetmek için mikrofona erişmek istiyor."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#000000"
+      },
+      "package": "com.oxpi.pito",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.INTERNET",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "gradleProperties": {
+        "org.gradle.jvmargs": "-Xmx3072m -XX:MaxMetaspaceSize=512m"
       },
       "edgeToEdgeEnabled": true
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-video",
+      "expo-av",
+      "@react-native-community/datetimepicker",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Galeriye erişim izni gerekiyor.",
+          "cameraPermission": "Kameraya erişim izni gerekiyor."
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "65bc3d86-12c6-4a9f-8525-b3a1a80899b8"
+      }
     }
   }
 }
