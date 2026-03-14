@@ -69,10 +69,6 @@ const SplashScreen = ({ navigation }) => {
       <View style={styles.footer}>
         <Text style={styles.poweredBy}>Powered by</Text>
         <View style={styles.brandContainer}>
-            <Image 
-                source={require('../../assets/oxpi.png')} 
-                style={styles.brandLogo} 
-            />
             <Text style={styles.brandName}>OXPİ</Text>
         </View>
       </View>
@@ -132,12 +128,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center'
-  },
-  brandLogo: {
-    width: 60,
-    height: 60,
-    resizeMode: 'contain',
-    marginRight: 10
   },
   brandName: {
     color: '#FFFFFF',

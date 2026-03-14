@@ -39,9 +39,8 @@ const TRANSLATIONS = {
         register: "Kayıt Ol",
         freeAdBtn: "Ücretsiz İlan Ver",
         vetBotBtn: "Senin Veterinerin (AI)",
-        qrCollarBtn: "QR Kodlu Künye Al", 
-        donateBtn: "Mama Bağışla", 
-        donateMenuText: "Mama Bağışı Yap +", 
+        qrCollarBtn: "QR Kodlu Künye Al",  
+       
         home: "Ana Sayfa",
         profile: "Profil",
         menuTitle: "Menü",
@@ -99,8 +98,7 @@ const TRANSLATIONS = {
         freeAdBtn: "Post Free Ad",
         vetBotBtn: "VetBOT (AI)",
         qrCollarBtn: "Buy QR Tag", 
-        donateBtn: "Donate Food", 
-        donateMenuText: "Donate Food +",
+        
         home: "Home",
         profile: "Profile",
         menuTitle: "Menu",
@@ -657,19 +655,7 @@ const HomeScreen = ({ navigation }) => {
                             </TouchableOpacity>
                         </View>
 
-                        {/* MAMA BAĞIŞLA BUTONU */}
-                        <View style={{ marginTop: 10 }}>
-                            <TouchableOpacity 
-                                style={[styles.bigAddButton, { backgroundColor: '#F1C40F' }]} 
-                                onPress={() => { navigation.navigate('Donate'); }}
-                            >
-                                <View style={styles.bigAddButtonContent}>
-                                    <Ionicons name="paw" size={32} color="white" />
-                                    <Text style={styles.bigAddButtonText}>{t.donateBtn}</Text>
-                                </View>
-                                <Ionicons name="add" size={32} color="white" /> 
-                            </TouchableOpacity>
-                        </View>
+                      
                   </View>
 
                   {/* KATEGORİLER */}
@@ -806,11 +792,6 @@ const HomeScreen = ({ navigation }) => {
                         <Text style={[styles.menuItemText, { color: theme.text }]}>{t.language}</Text>
                     </TouchableOpacity>
 
-                    {/* MAMA BAĞIŞI */}
-                    <TouchableOpacity style={styles.menuItem} onPress={() => { playSound('kitty'); setMenuVisible(false); navigation.navigate('Donate'); }}>
-                        <Ionicons name="medkit" size={22} color="#FF5722" />
-                        <Text style={[styles.menuItemText, { color: theme.text }]}>{t.donateMenuText}</Text>
-                    </TouchableOpacity>
 
                     <TouchableOpacity style={styles.menuItem} onPress={() => { playSound('water'); setMenuVisible(false); setContactVisible(true); }}>
                         <Ionicons name="mail-outline" size={22} color={theme.icon} />

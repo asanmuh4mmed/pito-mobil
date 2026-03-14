@@ -8,7 +8,9 @@ export const GAME_IDS = {
     CATCH: '1',
     MEMORY: '2',
     RUNNER: '3',
-    DONATE: 'donate' // Bağış yapıldığında kullanılacak ID
+    FLAPPY: '4', 
+    BUBBLE: '5', 
+    DONATE: 'donate' 
 };
 
 export const GameProvider = ({ children }) => {
@@ -16,7 +18,7 @@ export const GameProvider = ({ children }) => {
 
     const [userPoints, setUserPoints] = useState(0); 
     const [weeklyLeaderboard, setWeeklyLeaderboard] = useState([]); 
-    const [allTimeLeaderboard, setAllTimeLeaderboard] = useState([]); // ✅ YENİ: Genel Sıralama State'i
+    const [allTimeLeaderboard, setAllTimeLeaderboard] = useState([]); 
 
     // --- Kullanıcı Puanını Getir ---
     const fetchUserPoints = async () => {
@@ -35,7 +37,7 @@ export const GameProvider = ({ children }) => {
             }
 
             if (data) {
-                setUserPoints(data.total_score || 0);
+                setUserPoints(parseInt(data.total_score, 10) || 0);
             } else {
                 setUserPoints(0);
             }
@@ -65,11 +67,11 @@ export const GameProvider = ({ children }) => {
         }
     };
 
-    // --- ✅ YENİ: Genel Sıralamayı (Tüm Zamanlar) Getir ---
+    // --- Genel Sıralamayı (Tüm Zamanlar) Getir ---
     const fetchAllTimeLeaderboard = async () => {
         try {
             const { data, error } = await supabase
-                .from('all_time_leaderboard') // Veri tabanındaki genel sıralama view/tablo adı
+                .from('all_time_leaderboard') 
                 .select('*')
                 .limit(10); 
 
@@ -91,9 +93,9 @@ export const GameProvider = ({ children }) => {
         if (!user) return 0;
 
         try {
-            // ✅ Divider (Bölen) mantığı kaldırıldı. 
-            // Tüm oyunlardan saf puan (10, 20, 50 vb.) gelecek ve doğrudan eklenecek.
-            const earnedPoints = rawScore; 
+            // ✅ GÜVENLİK: Gelen skorun kesinlikle Matematiksel Sayı (Integer) olduğundan emin oluyoruz!
+            // (Aksi takdirde yan yana yazıp 10+50 = "1050" gibi hatalı string puanı yapıyordu)
+            const earnedPoints = parseInt(rawScore, 10) || 0; 
 
             if (earnedPoints > 0) {
                 // 1. Supabase'e Yaz
@@ -108,10 +110,13 @@ export const GameProvider = ({ children }) => {
                 if (!error) {
                     console.log(`Skor eklendi! Kazanılan Puan: ${earnedPoints}`);
                     
-                    // ✅ 2. 3 TABLOYU ANINDA GÜNCELLE
-                    setUserPoints(prev => prev + earnedPoints); // Ekranda anında günceller
-                    fetchLeaderboard(); // Haftalık listeyi yenile
-                    fetchAllTimeLeaderboard(); // Genel listeyi yenile
+                    // 2. State'i matematiksel olarak güvenle güncelle
+                    setUserPoints(prev => (parseInt(prev, 10) || 0) + earnedPoints); 
+                    
+                    // 3. Veritabanından kesin doğrulama için puanları tekrar çek ve listeleri yenile
+                    await fetchUserPoints(); 
+                    fetchLeaderboard(); 
+                    fetchAllTimeLeaderboard(); 
                 } else {
                     console.error("Skor insert hatası:", error);
                 }
@@ -127,21 +132,28 @@ export const GameProvider = ({ children }) => {
 
     // --- PUAN HARCAMA (Bağış Yapıldığında Çağırılacak) ---
     const spendPoints = async (amount) => {
-        if (!user || userPoints < amount) return false;
+        const spendAmount = parseInt(amount, 10) || 0;
+        if (!user || userPoints < spendAmount) return false;
 
         try {
             // Veri tabanına eksi (-) skor olarak ekleyerek bakiyeden düşürüyoruz
-            const { error } = await supabase
+            const { error } = await supabase 
                 .from('game_scores')
                 .insert({
                     user_id: user.id,
                     game_id: GAME_IDS.DONATE,
-                    score: -amount 
+                    score: -spendAmount 
                 });
 
             if (!error) {
-                console.log(`Bağış yapıldı! Harcanan Puan: ${amount}`);
-                setUserPoints(prev => prev - amount); // Ekranda anında düşürür
+                console.log(`Bağış yapıldı! Harcanan Puan: ${spendAmount}`);
+                
+                // State'ten düş
+                setUserPoints(prev => (parseInt(prev, 10) || 0) - spendAmount); 
+                
+                // Supabase'den güncel veriyi çekerek eşitle
+                await fetchUserPoints();
+                
                 return true;
             } else {
                 console.error("Puan harcama insert hatası:", error);
@@ -158,7 +170,7 @@ export const GameProvider = ({ children }) => {
         if (user) {
             fetchUserPoints();
             fetchLeaderboard();
-            fetchAllTimeLeaderboard(); // ✅ Başlangıçta genel listeyi de çek
+            fetchAllTimeLeaderboard(); 
         }
     }, [user]);
 
@@ -166,12 +178,12 @@ export const GameProvider = ({ children }) => {
         <GameContext.Provider value={{ 
             userPoints,          
             weeklyLeaderboard,
-            allTimeLeaderboard,  // ✅ Eklendi (Liderlik tablosu ekranına gidecek)
+            allTimeLeaderboard,  
             saveGameScore,
             spendPoints,         
             fetchUserPoints,     
             fetchLeaderboard,    
-            fetchAllTimeLeaderboard, // ✅ Eklendi
+            fetchAllTimeLeaderboard, 
             GAME_IDS
         }}>
             {children}

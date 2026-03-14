@@ -42,6 +42,7 @@ import EndlessRunnerScreen from './src/screens/EndlessRunnerScreen';
 import GameListScreen from './src/screens/GameListScreen';
 import LeaderboardScreen from './src/screens/LeaderboardScreen';
 import GameDonateScreen from './src/screens/GameDonateScreen';
+import BubbleScreen from './src/screens/BubbleScreen';
 
 
 // E-TİCARET, BAĞIŞ VE ROZETLER
@@ -57,7 +58,7 @@ import BadgesScreen from './src/screens/BadgesScreen';
 // ADMIN EKRANLARI
 import AdminPanelScreen from './src/screens/AdminPanelScreen';
 import AdminUsersScreen from './src/screens/AdminUsersScreen'; 
-
+import FlappyPetScreen from './src/screens/FlappyPetScreen';
 const Stack = createNativeStackNavigator();
 
 export default function App() {
@@ -119,6 +120,8 @@ export default function App() {
                             <Stack.Screen name="EndlessRunner" component={EndlessRunnerScreen} />
                             <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
                             <Stack.Screen name="GameDonate" component={GameDonateScreen} />
+                            <Stack.Screen name="FlappyPet" component={FlappyPetScreen} options={{ headerShown: false }} />
+                            <Stack.Screen name="BubbleScreen" component={BubbleScreen} options={{ headerShown: false }} />
                             
                             {/* Mağaza ve Bağış */}
                             <Stack.Screen name="Shop" component={ShopScreen} />

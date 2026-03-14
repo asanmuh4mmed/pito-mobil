@@ -2,13 +2,18 @@ import React, { useContext, useState, useRef, useEffect, useCallback } from 'rea
 import { View, Text, StyleSheet, TouchableOpacity, Image, StatusBar, Animated, Modal, Dimensions, Easing, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native'; // ✅ EKLENDİ (Ekran yenileme için)
+import { useFocusEffect } from '@react-navigation/native'; 
 import { AuthContext } from '../context/AuthContext';
 import { GameContext } from '../context/GameContext';
 import { playSound } from '../utils/SoundManager';
+import { supabase } from '../lib/supabase'; // Supabase bağlantısı
 
 const { width } = Dimensions.get('window');
 const TARGET_POINTS = 10000; 
+
+// 🚨 ÖNEMLİ: Supabase -> Authentication -> Users paneline gir. 
+// petspito@gmail.com kullanıcısının yanındaki "Copy User ID" butonuna basarak kopyaladığın uzun kodu buraya yapıştır!
+const PETSPITO_ADMIN_ID = "BURAYA_PETSPITO_USER_ID_YAPISTIRILACAK";
 
 const TRANSLATIONS = {
     TR: {
@@ -21,6 +26,7 @@ const TRANSLATIONS = {
         donateDesc: "Harika! Hedefe ulaştın. Bağış yaparak bir dostumuzu sevindir!",
         successTitle: "MAMA PAKETİ HAZIR! 🦴",
         successDesc: "Bağışın alındı! Senin sayende bir dostumuzun karnı doyacak.",
+        messageSentText: "Sohbet kutunu kontrol et, sana özel bir teşekkür mesajımız var! 💬",
         close: "Kapat",
         ready: "HAZIR!"
     },
@@ -34,20 +40,22 @@ const TRANSLATIONS = {
         donateDesc: "Great! You hit the goal. Make a donation to feed a friend!",
         successTitle: "FOOD PACK READY! 🦴",
         successDesc: "Donation received! Thanks to you, a friend will be fed.",
+        messageSentText: "Check your inbox, we sent you a special thank you message! 💬",
         close: "Close",
         ready: "READY!"
     }
 };
 
 const GameDonateScreen = ({ navigation }) => {
-    const { country } = useContext(AuthContext);
-    // ✅ fetchUserPoints eklendi
+    const { country, user } = useContext(AuthContext);
     const { userPoints, spendPoints, fetchUserPoints } = useContext(GameContext); 
     const activeLang = country?.code === 'AU' ? 'AU' : 'TR';
     const t = TRANSLATIONS[activeLang];
 
     const [showSuccess, setShowSuccess] = useState(false);
-    const [isDonating, setIsDonating] = useState(false); // ✅ YENİ: Bağış yapılıyor durumu
+    const [isDonating, setIsDonating] = useState(false);
+    const [messageSentStatus, setMessageSentStatus] = useState(false); 
+    
     const currentPoints = userPoints || 0; 
     
     // --- ANİMASYONLAR ---
@@ -57,7 +65,6 @@ const GameDonateScreen = ({ navigation }) => {
     const canDonate = currentPoints >= TARGET_POINTS;
     const progressPercent = Math.min((currentPoints / TARGET_POINTS) * 100, 100);
 
-    // ✅ EKRANA HER GİRİLDİĞİNDE PUANI TAZELE
     useFocusEffect(
         useCallback(() => {
             fetchUserPoints();
@@ -65,7 +72,6 @@ const GameDonateScreen = ({ navigation }) => {
     );
 
     useEffect(() => {
-        // Bar Dolum Animasyonu
         Animated.timing(progressAnim, {
             toValue: progressPercent,
             duration: 1500,
@@ -73,7 +79,6 @@ const GameDonateScreen = ({ navigation }) => {
             useNativeDriver: false
         }).start();
 
-        // Sürekli Aşağı Yukarı Süzülme Animasyonu (Float Effect)
         Animated.loop(
             Animated.sequence([
                 Animated.timing(bounceAnim, { toValue: -15, duration: 2000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
@@ -83,16 +88,47 @@ const GameDonateScreen = ({ navigation }) => {
 
     }, [currentPoints]);
 
+    // ✅ UYGULAMA İÇİ MESAJ GÖNDERME FONKSİYONU
+    const sendInAppThankYouMessage = async () => {
+        if (!user || PETSPITO_ADMIN_ID === "BURAYA_PETSPITO_USER_ID_YAPISTIRILACAK") {
+            console.log("Admin ID girilmediği için mesaj atlanıyor.");
+            return;
+        }
+
+        try {
+            const userName = user?.user_metadata?.full_name || 'Kahraman Hayvansever';
+            const messageContent = `Tebrikler ${userName}! 🎉\n\nPito Games'te 10.000 Puan toplayarak harika bir iş başardın ve 1 paket mama bağışı yaptın. 🐶🦴🐱\n\nSenin sayende bir patili dostumuzun karnı doyacak. Bize katıldığın ve bu iyiliğe ortak olduğun için Pito ailesi olarak sana sonsuz teşekkür ederiz! ❤️`;
+
+            // Veritabanındaki 'messages' tablosuna (kendi tablo adına göre güncelle) mesaj ekliyoruz
+            const { error } = await supabase
+                .from('messages') // 🚨 Kendi sohbet tablonun adını buraya yaz (ör: chats, messages, direct_messages)
+                .insert({
+                    sender_id: PETSPITO_ADMIN_ID,
+                    receiver_id: user.id,
+                    content: messageContent, // 🚨 Kendi tablonun mesaj sütun adını yaz (ör: text, message, content)
+                });
+
+            if (error) throw error;
+            console.log("Uygulama içi teşekkür mesajı başarıyla gönderildi!");
+            setMessageSentStatus(true);
+        } catch (error) {
+            console.error("Mesaj gönderme hatası:", error);
+        }
+    };
+
     const handleAction = async () => {
         if (canDonate) {
-            setIsDonating(true); // ✅ İşlem başladı (Butonu kilitler ve yükleniyor gösterir)
+            setIsDonating(true); 
             const success = await spendPoints(TARGET_POINTS);
-            setIsDonating(false); // ✅ İşlem bitti
             
             if (success) {
+                // ✅ Bağış başarılıysa uygulama içi mesaj at!
+                await sendInAppThankYouMessage();
+                
                 playSound('game_win');
                 setShowSuccess(true);
             }
+            setIsDonating(false); 
         } else {
             navigation.navigate('GameList');
         }
@@ -181,7 +217,6 @@ const GameDonateScreen = ({ navigation }) => {
                     </View>
                 </View>
 
-                {/* ALT BUTON */}
                 <View style={styles.footer}>
                     <TouchableOpacity 
                         style={[
@@ -190,9 +225,8 @@ const GameDonateScreen = ({ navigation }) => {
                         ]}
                         activeOpacity={0.8}
                         onPress={handleAction}
-                        disabled={isDonating} // ✅ İşlem sırasında butonu pasif yap
+                        disabled={isDonating} 
                     >
-                        {/* ✅ Yükleniyor veya Normal Durum Gösterimi */}
                         {isDonating ? (
                             <ActivityIndicator size="small" color="white" />
                         ) : (
@@ -221,6 +255,15 @@ const GameDonateScreen = ({ navigation }) => {
                         </View>
                         <Text style={styles.modalTitle}>{t.successTitle}</Text>
                         <Text style={styles.modalDesc}>{t.successDesc}</Text>
+                        
+                        {/* ✅ YENİ: Mesaj gittiğini belirten ek uyarı */}
+                        {messageSentStatus && (
+                            <View style={styles.mailNoticeContainer}>
+                                <Ionicons name="chatbubble-ellipses" size={24} color="#3b82f6" />
+                                <Text style={styles.mailNoticeText}>{t.messageSentText}</Text>
+                            </View>
+                        )}
+
                         <TouchableOpacity style={styles.modalBtn} onPress={() => setShowSuccess(false)}>
                             <Text style={styles.modalBtnText}>{t.close}</Text>
                         </TouchableOpacity>
@@ -285,7 +328,11 @@ const styles = StyleSheet.create({
     modalContent: { width: '85%', backgroundColor: 'white', borderRadius: 40, padding: 35, alignItems: 'center' },
     successIconCircle: { width: 90, height: 90, borderRadius: 45, backgroundColor: '#10b981', justifyContent: 'center', alignItems: 'center', marginBottom: 20, borderWidth: 5, borderColor: '#d1fae5' },
     modalTitle: { fontSize: 24, fontWeight: '900', color: '#0f172a', marginBottom: 15, textAlign: 'center' },
-    modalDesc: { textAlign: 'center', color: '#475569', fontSize: 16, lineHeight: 24, marginBottom: 30, fontWeight: '500' },
+    modalDesc: { textAlign: 'center', color: '#475569', fontSize: 16, lineHeight: 24, marginBottom: 20, fontWeight: '500' },
+    
+    mailNoticeContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#eff6ff', padding: 15, borderRadius: 15, marginBottom: 25, width: '100%', justifyContent: 'center' },
+    mailNoticeText: { color: '#3b82f6', fontWeight: 'bold', marginLeft: 8, fontSize: 13, textAlign: 'center', flex: 1 },
+
     modalBtn: { backgroundColor: '#1e293b', paddingHorizontal: 40, paddingVertical: 18, borderRadius: 20, width: '100%', alignItems: 'center' },
     modalBtnText: { color: 'white', fontWeight: '900', fontSize: 16 }
 });

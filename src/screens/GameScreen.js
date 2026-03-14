@@ -6,8 +6,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthContext } from '../context/AuthContext'; 
-import { GameContext, GAME_IDS } from '../context/GameContext'; // ✅ GameContext
-import { playSound } from '../utils/SoundManager'; // ✅ Ses Yöneticisi
+import { GameContext, GAME_IDS } from '../context/GameContext'; 
+import { playSound } from '../utils/SoundManager'; 
 
 const { width, height } = Dimensions.get('window');
 const PLAYER_SIZE = 90;
@@ -66,8 +66,8 @@ const FeedbackItem = ({ x, y, text, color, onComplete }) => {
 
     useEffect(() => {
         Animated.parallel([
-            Animated.timing(anim, { toValue: 1, duration: 800, useNativeDriver: true }), // Yukarı çık
-            Animated.timing(anim, { toValue: 1, duration: 800, useNativeDriver: true, easing: Easing.out(Easing.exp) }) // Fade out
+            Animated.timing(anim, { toValue: 1, duration: 800, useNativeDriver: true }), 
+            Animated.timing(anim, { toValue: 1, duration: 800, useNativeDriver: true, easing: Easing.out(Easing.exp) }) 
         ]).start(() => onComplete());
     }, []);
 
@@ -85,7 +85,7 @@ const FeedbackItem = ({ x, y, text, color, onComplete }) => {
 const GameScreen = ({ navigation }) => {
     // --- CONTEXT ---
     const { country } = useContext(AuthContext);
-    const { saveGameScore } = useContext(GameContext); // ✅ Skor Kayıt
+    const { saveGameScore } = useContext(GameContext); 
     const activeLang = country?.code === 'AU' ? 'AU' : 'TR';
     const t = TRANSLATIONS[activeLang];
 
@@ -98,8 +98,8 @@ const GameScreen = ({ navigation }) => {
     const [playerImage, setPlayerImage] = useState(EVOLUTION_STAGES[0].image); 
     const [feedbacks, setFeedbacks] = useState([]); 
 
-    const [isSaving, setIsSaving] = useState(false); // ✅ KAYDETME DURUMU
-    const [isSaved, setIsSaved] = useState(false);   // ✅ BAŞARILI KAYIT DURUMU
+    const [isSaving, setIsSaving] = useState(false); 
+    const [isSaved, setIsSaved] = useState(false);   
 
     // --- REFS ---
     const scoreRef = useRef(0);
@@ -154,18 +154,18 @@ const GameScreen = ({ navigation }) => {
         requestRef.current = requestAnimationFrame(gameLoop);
     };
 
-    // ✅ OYUN BİTİRME VE KAYIT İŞLEMİ (ASYNC)
     const stopGame = async (finalScore = 0) => {
         if (requestRef.current) cancelAnimationFrame(requestRef.current);
         setIsPlaying(false);
         setGameOver(true);
-        playSound('game_over');
+        
+        // ✅ DEĞİŞİKLİK: 3 hak bittiğinde gameover sesi çalacak
+        playSound('gameover');
         
         // Skoru Veri Tabanına Kaydet
         if (finalScore > 0) {
             setIsSaving(true);
             try {
-                // Diğer oyunlardaki sistemin aynısı:
                 await saveGameScore(GAME_IDS.CATCH, finalScore);
                 setIsSaved(true);
             } catch (error) {
@@ -189,7 +189,9 @@ const GameScreen = ({ navigation }) => {
         const stage = [...EVOLUTION_STAGES].reverse().find(s => currentScore >= s.threshold);
         if (stage && stage.image !== playerImage) {
             setPlayerImage(stage.image);
-            playSound('match_success'); 
+            
+            // ✅ DEĞİŞİKLİK: Seviye atlandığında (Hayvan değiştiğinde) gamewin sesi çalacak
+            playSound('gamewin'); 
         }
     };
 
@@ -225,9 +227,13 @@ const GameScreen = ({ navigation }) => {
         itemsRef.current = itemsRef.current.filter(item => {
             item.y += 4 * speedMultiplier.current;
             
-            const playerY = height - FLOOR_HEIGHT - 30;
-            const collisionY = item.y + ITEM_SIZE >= playerY && item.y < playerY + PLAYER_SIZE;
-            const collisionX = item.x + ITEM_SIZE > playerPosRef.current + 20 && item.x < playerPosRef.current + PLAYER_SIZE - 20;
+            // ✅ DEĞİŞİKLİK: Daha hassas ve adil hitbox (Çarpışma Alanı) hesaplaması
+            // Karakterin sadece kafa (üst) kısmı çarpışma sayılır. Bomba alt tarafa (gövdeye) indiyse çarpsan bile yanmazsın.
+            const playerTop = height - FLOOR_HEIGHT - 65; 
+            const playerBottom = playerTop + 45; // Sadece 45px'lik ince bir çarpışma alanı
+            
+            const collisionY = item.y + ITEM_SIZE > playerTop && item.y < playerBottom;
+            const collisionX = item.x + ITEM_SIZE > playerPosRef.current + 25 && item.x < playerPosRef.current + PLAYER_SIZE - 25;
 
             if (collisionY && collisionX) {
                 // ÇARPIŞMA OLDU
@@ -235,24 +241,25 @@ const GameScreen = ({ navigation }) => {
                     scoreRef.current += 10;
                     setScore(scoreRef.current);
                     checkEvolution(scoreRef.current); 
-                    triggerFeedback(item.x, playerY - 50, "+10", "#FFD700"); 
-                    playSound('match_success');
+                    triggerFeedback(item.x, playerTop - 30, "+10", "#FFD700"); 
+                    playSound('score'); // ✅ DEĞİŞİKLİK: Mama alınca score.mp3
                 } else {
                     livesRef.current -= 1;
                     setLives(livesRef.current); 
                     shakeScreen();
-                    triggerFeedback(item.x, playerY - 50, "💔", "#FF4757"); 
-                    playSound('game_over_hit'); 
+                    triggerFeedback(item.x, playerTop - 30, "💔", "#FF4757"); 
+                    
+                    // ✅ DEĞİŞİKLİK: Yasaklı (Bomba) maddeye çarpıldığında error.mp3
+                    playSound('error'); 
                     
                     if (livesRef.current <= 0) {
-                        // Oyun bitti, final skoru parametre olarak yolla
                         stopGame(scoreRef.current);
                         return false; 
                     }
                 }
-                return false; // Listeden sil
+                return false; // Çarpılan eşyayı listeden sil
             }
-            if (item.y > height) return false; // Ekrandan çıktı
+            if (item.y > height) return false; // Ekrandan çıkana kadar silme
             return true; 
         });
 
@@ -337,7 +344,6 @@ const GameScreen = ({ navigation }) => {
                                 <Text style={styles.finalScoreLabel}>{t.finalScore}</Text>
                                 <Text style={[styles.finalScoreValue, {marginBottom: isSaving || isSaved ? 5 : 20}]}>{score}</Text>
 
-                                {/* ✅ YENİ: Kayıt Animasyonu ve Bildirimi */}
                                 {isSaving ? (
                                     <View style={styles.savingContainer}>
                                         <ActivityIndicator size="small" color="#6C5CE7" />
@@ -352,7 +358,6 @@ const GameScreen = ({ navigation }) => {
 
                         <Text style={styles.modalDesc}>{gameOver ? t.tryAgain : t.desc}</Text>
 
-                        {/* Kayıt bitmeden tıklamaları engelle */}
                         <TouchableOpacity 
                             style={[styles.playButton, { backgroundColor: isSaving ? '#ccc' : '#6C5CE7' }]} 
                             onPress={startGame}
@@ -404,7 +409,6 @@ const styles = StyleSheet.create({
     finalScoreLabel: { fontSize: 14, fontWeight: 'bold', color: '#b2bec3', letterSpacing: 1 },
     finalScoreValue: { fontSize: 60, fontWeight: '900', color: '#6C5CE7' },
     
-    // YENİ: Bildirim stilleri
     savingContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
     savingText: { marginLeft: 8, color: '#747d8c', fontWeight: 'bold' },
     savedText: { marginBottom: 15, color: '#00b894', fontWeight: 'bold' },
