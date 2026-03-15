@@ -1,5 +1,5 @@
-import React, { useState, useContext } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Modal, FlatList, ImageBackground } from 'react-native';
+import React, { useState, useContext, useRef, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Modal, FlatList, ImageBackground, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
@@ -28,10 +28,28 @@ const RegisterScreen = ({ navigation }) => {
   const [userCode, setUserCode] = useState(''); 
   const [isVerifying, setIsVerifying] = useState(false); 
 
+  // Başarı Modalı Kontrolleri (YENİ)
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+
   // Yasal Metin Modalları & Checkbox
   const [eulaVisible, setEulaVisible] = useState(false);
   const [privacyVisible, setPrivacyVisible] = useState(false);
-  const [isAgreed, setIsAgreed] = useState(false); // ✅ Yeni Checkbox State'i
+  const [isAgreed, setIsAgreed] = useState(false); 
+
+  // --- ANİMASYON ETKİLEŞİMİ (YENİ) ---
+  useEffect(() => {
+      if (successModalVisible) {
+          Animated.spring(scaleAnim, {
+              toValue: 1,
+              friction: 5,
+              tension: 40,
+              useNativeDriver: true
+          }).start();
+      } else {
+          scaleAnim.setValue(0);
+      }
+  }, [successModalVisible]);
 
   // --- DİL PAKETİ ---
   const TEXTS = {
@@ -50,7 +68,7 @@ const RegisterScreen = ({ navigation }) => {
           errFill: "Lütfen tüm alanları doldurunuz.",
           errSpace: "Kullanıcı adı boşluk içeremez ve küçük harf olmalıdır.",
           errPass: "Girdiğiniz şifreler birbiriyle uyuşmuyor.",
-          errAgreed: "Lütfen kayıt olmak için Kullanım Koşulları ve Gizlilik Politikasını okuyup onaylayınız.", // ✅ Yeni Uyarı
+          errAgreed: "Lütfen kayıt olmak için Kullanım Koşulları ve Gizlilik Politikasını okuyup onaylayınız.", 
           successTitle: "Tebrikler! 🎉",
           successMsg: "Hesabınız başarıyla doğrulandı. Şimdi giriş yapabilirsiniz.",
           modalCity: "İl Seçiniz",
@@ -68,7 +86,8 @@ const RegisterScreen = ({ navigation }) => {
           eula: "Kullanım Koşulları",
           privacy: "Gizlilik Politikası",
           and: " ve ",
-          close: "Kapat"
+          close: "Kapat",
+          goLogin: "Giriş Yap"
       },
       AU: {
           title: "Join Us!",
@@ -85,7 +104,7 @@ const RegisterScreen = ({ navigation }) => {
           errFill: "Please fill in all fields.",
           errSpace: "Username cannot contain spaces.",
           errPass: "Passwords do not match.",
-          errAgreed: "Please read and accept the Terms of Use and Privacy Policy to register.", // ✅ Yeni Uyarı
+          errAgreed: "Please read and accept the Terms of Use and Privacy Policy to register.", 
           successTitle: "Congratulations! 🎉",
           successMsg: "Account verified successfully. You can login now.",
           modalCity: "Select State",
@@ -103,7 +122,8 @@ const RegisterScreen = ({ navigation }) => {
           eula: "Terms of Use",
           privacy: "Privacy Policy",
           and: " and ",
-          close: "Close"
+          close: "Close",
+          goLogin: "Login"
       }
   };
 
@@ -152,7 +172,6 @@ const RegisterScreen = ({ navigation }) => {
 
   // 1️⃣ KAYIT OL
   const handleRegister = async () => {
-    // ✅ Checkbox Kontrolü
     if (!isAgreed) {
         Alert.alert(localCountry === 'TR' ? "Onay Gerekli" : "Agreement Required", t.errAgreed);
         return;
@@ -205,9 +224,8 @@ const RegisterScreen = ({ navigation }) => {
       
       if (result.success) {
           setVerifyModalVisible(false);
-          Alert.alert(t.successTitle, t.successMsg, [
-              { text: localCountry === 'TR' ? 'Giriş Yap' : 'Login', onPress: () => navigation.navigate('Login') }
-          ]);
+          // ✅ Standart Alert yerine modern modal'ı açıyoruz
+          setSuccessModalVisible(true);
       } else {
           Alert.alert(localCountry === 'TR' ? 'Hata' : 'Error', result.message || t.errCode);
       }
@@ -301,7 +319,6 @@ const RegisterScreen = ({ navigation }) => {
                         <TextInput style={styles.input} placeholder="******" placeholderTextColor="#999" secureTextEntry value={confirmPassword} onChangeText={setConfirmPassword} />
                     </View>
 
-                    {/* ✅ CHECKBOX ALANI */}
                     <View style={styles.checkboxContainer}>
                         <TouchableOpacity 
                             style={styles.checkbox} 
@@ -327,7 +344,7 @@ const RegisterScreen = ({ navigation }) => {
                     </View>
 
                     <TouchableOpacity 
-                        style={[styles.button, { opacity: isAgreed ? 1 : 0.6 }]} // Checkbox işaretli değilse soluk görünür
+                        style={[styles.button, { opacity: isAgreed ? 1 : 0.6 }]} 
                         onPress={handleRegister} 
                         disabled={isLoading}
                     >
@@ -395,7 +412,29 @@ const RegisterScreen = ({ navigation }) => {
                 </View>
             </Modal>
 
-            {/* ✅ EULA (KULLANIM KOŞULLARI) MODALI */}
+            {/* ✅ BAŞARI MODALI (YENİ MODERN ANİMASYONLU) */}
+            <Modal visible={successModalVisible} transparent={true} animationType="fade">
+                <View style={styles.modalOverlay}>
+                    <Animated.View style={[styles.successModalContent, { transform: [{ scale: scaleAnim }] }]}>
+                        <View style={styles.successIconContainer}>
+                            <Ionicons name="checkmark-circle" size={80} color="#10b981" />
+                        </View>
+                        <Text style={styles.successModalTitle}>{t.successTitle}</Text>
+                        <Text style={styles.successModalText}>{t.successMsg}</Text>
+                        <TouchableOpacity 
+                            style={styles.successButton}
+                            onPress={() => {
+                                setSuccessModalVisible(false);
+                                navigation.navigate('Login');
+                            }}
+                        >
+                            <Text style={styles.successButtonText}>{t.goLogin}</Text>
+                        </TouchableOpacity>
+                    </Animated.View>
+                </View>
+            </Modal>
+
+            {/* EULA (KULLANIM KOŞULLARI) MODALI */}
             <Modal visible={eulaVisible} transparent={true} animationType="slide">
                 <View style={styles.modalOverlay}>
                     <View style={[styles.modalContent, { height: '80%' }]}>
@@ -444,7 +483,7 @@ Users can delete their accounts at any time. Accounts violating rules may be sus
                 </View>
             </Modal>
 
-            {/* ✅ GİZLİLİK POLİTİKASI MODALI */}
+            {/* GİZLİLİK POLİTİKASI MODALI */}
             <Modal visible={privacyVisible} transparent={true} animationType="slide">
                 <View style={styles.modalOverlay}>
                     <View style={[styles.modalContent, { height: '80%' }]}>
@@ -527,13 +566,60 @@ const styles = StyleSheet.create({
   modalItem: { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#eee' },
   modalItemText: { fontSize: 16 },
   
-  // ✅ YENİ STİLLER (Checkbox ve Yasal Metinler İçin)
   checkboxContainer: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 20, paddingHorizontal: 5 },
   checkbox: { marginRight: 10, marginTop: 2 },
   checkboxTextContainer: { flex: 1 },
   legalText: { fontSize: 12, color: '#666', lineHeight: 18 },
   legalLink: { color: COLORS.primary, fontWeight: 'bold', textDecorationLine: 'underline' },
-  legalModalText: { fontSize: 14, color: '#333', lineHeight: 22 }
+  legalModalText: { fontSize: 14, color: '#333', lineHeight: 22 },
+
+  // ✅ BAŞARI MODALI STİLLERİ (YENİ)
+  successModalContent: {
+      width: '80%',
+      backgroundColor: 'white',
+      borderRadius: 24,
+      padding: 30,
+      alignItems: 'center',
+      elevation: 10,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.15,
+      shadowRadius: 20,
+  },
+  successIconContainer: {
+      marginBottom: 20,
+      backgroundColor: '#d1fae5',
+      borderRadius: 50,
+      padding: 5,
+  },
+  successModalTitle: {
+      fontSize: 24,
+      fontWeight: 'bold',
+      color: '#1f2937',
+      marginBottom: 10,
+      textAlign: 'center',
+  },
+  successModalText: {
+      fontSize: 16,
+      color: '#6b7280',
+      textAlign: 'center',
+      marginBottom: 25,
+      lineHeight: 22,
+  },
+  successButton: {
+      backgroundColor: '#10b981',
+      paddingVertical: 14,
+      paddingHorizontal: 40,
+      borderRadius: 16,
+      width: '100%',
+      alignItems: 'center',
+      elevation: 3,
+  },
+  successButtonText: {
+      color: 'white',
+      fontSize: 18,
+      fontWeight: 'bold',
+  }
 });
 
 export default RegisterScreen;

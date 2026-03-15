@@ -10,6 +10,7 @@ export const GAME_IDS = {
     RUNNER: '3',
     FLAPPY: '4', 
     BUBBLE: '5', 
+    TOWER: '6', 
     DONATE: 'donate' 
 };
 

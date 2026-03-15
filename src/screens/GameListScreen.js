@@ -27,6 +27,9 @@ const TRANSLATIONS = {
         game5_title: "Pito Bubble",
         game5_sub: "KLASİK NİŞANCI",
         game5_desc: "Nişan al, aynı renkleri vur ve baloncukları patlat! 🔵",
+        game6_title: "Mama Kulesi",
+        game6_sub: "KULE DİZME",
+        game6_desc: "Tam üst üste oturt, kuleyi göklere çıkar ve kombo yap! 🥫",
         usePoints: "PUANLARI KULLAN",
         weeklyRank: "Haftalık Sıralama",
         allTimeRank: "Genel Sıralama",
@@ -53,6 +56,9 @@ const TRANSLATIONS = {
         game5_title: "Pito Bubble",
         game5_sub: "CLASSIC SHOOTER",
         game5_desc: "Aim, match colors and pop the bubbles! 🔵",
+        game6_title: "Treat Tower",
+        game6_sub: "TOWER STACK",
+        game6_desc: "Stack them perfectly, build to the sky and make combos! 🥫",
         usePoints: "USE POINTS",
         weeklyRank: "Weekly Rank",
         allTimeRank: "All Time Rank",
@@ -127,6 +133,16 @@ const GameListScreen = ({ navigation }) => {
             color: '#9b59b6', 
             route: 'BubbleScreen', 
             imageType: 'bubble'
+        },
+        {
+            id: '6', 
+            title: t.game6_title,
+            subtitle: t.game6_sub,
+            description: t.game6_desc,
+            color: '#f368e0', // Canlı ve neon hissi veren bir pembe
+            route: 'TowerGame', // App.js içinde verdiğimiz isim
+            imageType: 'emoji',
+            emoji: '🥫' // Mama konserve emojisi
         }
     ];
 
@@ -219,7 +235,7 @@ const GameListScreen = ({ navigation }) => {
                 </TouchableOpacity>
             </View>
 
-            {/* ✅ YENİ: 10.000 Puan Hedefi İlerleme Çubuğu */}
+            {/* Hedefi İlerleme Çubuğu */}
             <View style={styles.goalCard}>
                 <View style={styles.goalHeader}>
                     <Ionicons name="mail-open" size={20} color="#00cec9" />
@@ -283,7 +299,7 @@ const styles = StyleSheet.create({
     usePointsButton: { backgroundColor: 'white', paddingHorizontal: 15, paddingVertical: 10, borderRadius: 25, flexDirection: 'row', alignItems: 'center', elevation: 5 },
     usePointsText: { color: '#2d3436', fontWeight: 'bold', fontSize: 12 },
 
-    // YENİ: Hedef Kartı (10.000 Puan Maili İçin)
+    // Hedef Kartı 
     goalCard: { backgroundColor: 'rgba(0, 206, 201, 0.1)', marginHorizontal: 20, borderRadius: 15, padding: 15, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(0, 206, 201, 0.3)' },
     goalHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 5 },
     goalTitle: { color: '#00cec9', fontSize: 14, fontWeight: 'bold', marginLeft: 8 },

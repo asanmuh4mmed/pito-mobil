@@ -36,6 +36,8 @@ import VetBotScreen from './src/screens/VetBotScreen';
 import PetsgramScreen from './src/screens/PetsgramScreen';
 import ShopScreen from './src/screens/ShopScreen';
 import VaccineReportScreen from './src/screens/VaccineReportScreen';
+
+// OYUN EKRANLARI
 import GameScreen from './src/screens/GameScreen';
 import MemoryGameScreen from './src/screens/MemoryGameScreen';
 import EndlessRunnerScreen from './src/screens/EndlessRunnerScreen';
@@ -43,7 +45,8 @@ import GameListScreen from './src/screens/GameListScreen';
 import LeaderboardScreen from './src/screens/LeaderboardScreen';
 import GameDonateScreen from './src/screens/GameDonateScreen';
 import BubbleScreen from './src/screens/BubbleScreen';
-
+import FlappyPetScreen from './src/screens/FlappyPetScreen';
+import TowerGameScreen from './src/screens/TowerGameScreen';
 
 // E-TİCARET, BAĞIŞ VE ROZETLER
 import ProductDetailScreen from './src/screens/ProductDetailScreen';
@@ -55,10 +58,11 @@ import AddReviewScreen from './src/screens/AddReviewScreen';
 import AllReviewsScreen from './src/screens/AllReviewsScreen';
 import DonateScreen from './src/screens/DonateScreen';
 import BadgesScreen from './src/screens/BadgesScreen';
+
 // ADMIN EKRANLARI
 import AdminPanelScreen from './src/screens/AdminPanelScreen';
 import AdminUsersScreen from './src/screens/AdminUsersScreen'; 
-import FlappyPetScreen from './src/screens/FlappyPetScreen';
+
 const Stack = createNativeStackNavigator();
 
 export default function App() {
@@ -122,7 +126,8 @@ export default function App() {
                             <Stack.Screen name="GameDonate" component={GameDonateScreen} />
                             <Stack.Screen name="FlappyPet" component={FlappyPetScreen} options={{ headerShown: false }} />
                             <Stack.Screen name="BubbleScreen" component={BubbleScreen} options={{ headerShown: false }} />
-                            
+                            <Stack.Screen name="TowerGame" component={TowerGameScreen} options={{ headerShown: false }} />
+
                             {/* Mağaza ve Bağış */}
                             <Stack.Screen name="Shop" component={ShopScreen} />
                             <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />

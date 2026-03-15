@@ -80,7 +80,7 @@ const AddListingScreen = ({ route, navigation }) => {
   const [age, setAge] = useState('');
   const [breed, setBreed] = useState('');
   const [gender, setGender] = useState('Erkek');
-  const [petType, setPetType] = useState(null); // 🆕 Hayvan Türü State'i
+  const [petType, setPetType] = useState(null); 
 
   // İşletme Bilgileri
   const [shopName, setShopName] = useState(''); 
@@ -88,6 +88,10 @@ const AddListingScreen = ({ route, navigation }) => {
   const [phone, setPhone] = useState(''); 
   const [address, setAddress] = useState(''); 
   const [price, setPrice] = useState(''); 
+
+  // Bakıcı Bilgileri (YENİ)
+  const [sitterName, setSitterName] = useState(user?.user_metadata?.full_name || ''); 
+  const [experience, setExperience] = useState(''); 
 
   // Modal State
   const [modalVisible, setModalVisible] = useState(false);
@@ -105,11 +109,10 @@ const AddListingScreen = ({ route, navigation }) => {
 
   const displayCategory = getLocalizedCategory(category);
 
-  // 🆕 Hayvan Türleri Listesi
   const ANIMAL_TYPES = [
       { label: 'Kedi', icon: 'paw' },
       { label: 'Köpek', icon: 'paw' },
-      { label: 'Kuş', icon: 'airplane' }, // Kuş için uygun ikon
+      { label: 'Kuş', icon: 'airplane' }, 
       { label: 'Balık', icon: 'water' },
       { label: 'Kemirgen', icon: 'leaf' },
       { label: 'Diğer', icon: 'ellipsis-horizontal' }
@@ -121,7 +124,7 @@ const AddListingScreen = ({ route, navigation }) => {
           photoLabel: "Kapak Fotoğrafı Ekle",
           photoSubLabel: "(En az 1, en fazla 3 fotoğraf)",
           descLabel: isServiceListing ? "Hizmet Detayları" : "Açıklama & Hikaye",
-          typeLabel: "Hayvan Türü", // 🆕
+          typeLabel: "Hayvan Türü", 
           cityLabel: "İl",
           distLabel: "İlçe",
           select: "Seçiniz",
@@ -138,9 +141,11 @@ const AddListingScreen = ({ route, navigation }) => {
           phonePlace: "0555 ...",
           address: "Açık Adres",
           price: "Ücret (TL)",
+          sitterName: "İsim Soyisim", // 🆕 YENİ
+          experience: "Deneyim (Yıl)", // 🆕 YENİ
           alertTitle: "Eksik Bilgi",
           alertMsg: "Lütfen fotoğraf, konum ve tüm zorunlu alanları doldurunuz.",
-          typeAlert: "Lütfen hayvan türünü seçiniz.", // 🆕
+          typeAlert: "Lütfen hayvan türünü seçiniz.", 
           successTitle: "Başarılı",
           successMsg: "İlanınız başarıyla yayınlandı!",
           limitTitle: "Limit",
@@ -153,7 +158,7 @@ const AddListingScreen = ({ route, navigation }) => {
           photoLabel: "Add Cover Photo",
           photoSubLabel: "(Min 1, Max 3 photos)",
           descLabel: "Description & Details",
-          typeLabel: "Animal Type", // 🆕
+          typeLabel: "Animal Type", 
           cityLabel: "State",
           distLabel: "Suburb",
           select: "Select",
@@ -170,9 +175,11 @@ const AddListingScreen = ({ route, navigation }) => {
           phonePlace: "0400 ...",
           address: "Full Address",
           price: "Price (AUD)",
+          sitterName: "Full Name", // 🆕 YENİ
+          experience: "Experience (Years)", // 🆕 YENİ
           alertTitle: "Missing Info",
           alertMsg: "Please fill in photo, location and all required fields.",
-          typeAlert: "Please select an animal type.", // 🆕
+          typeAlert: "Please select an animal type.", 
           successTitle: "Success",
           successMsg: "Listing posted successfully!",
           limitTitle: "Limit",
@@ -247,8 +254,8 @@ const AddListingScreen = ({ route, navigation }) => {
           return;
       }
 
-      // 🆕 Hayvan Türü Kontrolü (Hizmet ilanı değilse)
-      if (!isServiceListing && !petType) {
+      // 🆕 Hayvan Türü Kontrolü (Hizmet ilanı VEYA Bakıcı ilanı değilse sorulacak)
+      if (!isServiceListing && !isSitter && !petType) {
           Alert.alert(t.alertTitle, t.typeAlert);
           return;
       }
@@ -270,11 +277,15 @@ const AddListingScreen = ({ route, navigation }) => {
               }
           }
 
-          // İlan İsmi Belirleme
-          const finalName = isServiceListing ? shopName : (isSitter ? user?.fullname : petName);
+          // İlan İsmi Belirleme (Bakıcıysa sitterName, Değilse petName veya shopName)
+          const finalName = isServiceListing ? shopName : (isSitter ? sitterName : petName);
           
           const numericPrice = price && price.trim() !== '' ? parseFloat(price) : 0;
-          const numericAge = age && age.trim() !== '' ? parseFloat(age) : 0;
+          
+          // Bakıcı ise deneyimi, hayvan ise yaşı alır. Veritabanında hata vermemesi için age kolonunda tutulur.
+          const numericAge = isSitter 
+              ? (experience && experience.trim() !== '' ? parseFloat(experience) : 0)
+              : (age && age.trim() !== '' ? parseFloat(age) : 0);
 
           // 3. DOĞRUDAN SUPABASE INSERT
           const { error } = await supabase
@@ -292,7 +303,7 @@ const AddListingScreen = ({ route, navigation }) => {
                   breed: breed,
                   age: numericAge, 
                   gender: gender,
-                  pet_type: petType, // 🆕 Yeni kolon: Hayvan Türü
+                  pet_type: petType, 
                   img: uploadedUrls.length > 0 ? uploadedUrls[0] : null, 
                   images: uploadedUrls, 
                   is_found: false,
@@ -358,8 +369,8 @@ const AddListingScreen = ({ route, navigation }) => {
                     </View>
                 </View>
 
-                {/* 🆕 HAYVAN TÜRÜ SEÇİMİ (Sadece hizmet olmayan ilanlarda) */}
-                {!isServiceListing && (
+                {/* 🆕 HAYVAN TÜRÜ SEÇİMİ (Hizmet VEYA Bakıcı ilanı DEĞİLSE sorulacak) */}
+                {!isServiceListing && !isSitter && (
                     <View style={[styles.sectionContainer, {backgroundColor: theme.cardBg, paddingVertical: 15}]}>
                         <View style={styles.sectionHeader}>
                             <Ionicons name="paw-outline" size={20} color={COLORS.primary} />
@@ -409,6 +420,12 @@ const AddListingScreen = ({ route, navigation }) => {
                         </>
                     ) : isSitter ? (
                         <>
+                            <Text style={[styles.fieldLabel, {color: theme.subText}]}>{t.sitterName}</Text>
+                            <ModernInput theme={theme} icon="person-outline" placeholder={t.sitterName} value={sitterName} onChangeText={setSitterName} />
+                            
+                            <Text style={[styles.fieldLabel, {color: theme.subText}]}>{t.experience}</Text>
+                            <ModernInput theme={theme} icon="time-outline" placeholder="Örn: 3" keyboardType="numeric" value={experience} onChangeText={setExperience} />
+
                             <Text style={[styles.fieldLabel, {color: theme.subText}]}>{t.price}</Text>
                             <ModernInput theme={theme} icon="wallet-outline" placeholder="0" keyboardType="numeric" value={price} onChangeText={setPrice} />
                             
