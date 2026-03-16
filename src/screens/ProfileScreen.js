@@ -124,7 +124,7 @@ const ProfileScreen = ({ navigation, route }) => {
     const { user, logout, allUsers, removeFollower, deleteNotification, updateUser, country } = useContext(AuthContext); 
     const { urgentList, mateList, vetList, sitterList, deleteListing, updateListing, fetchListings } = useContext(ListingContext);
     const { getUnreadCount } = useContext(ChatContext);
-    const { theme } = useContext(ThemeContext);
+    const { theme, isDarkMode } = useContext(ThemeContext);
     const { posts, savedPostIds } = useContext(SocialContext);
     const { orders, products, favorites } = useContext(ShopContext);
 
@@ -164,10 +164,10 @@ const ProfileScreen = ({ navigation, route }) => {
     // ✅ DİNAMİK ROZET HESAPLAYICI
     const calculateDynamicBadge = (points) => {
         const p = points || 0;
-        if (p >= 50) return { name: t.badgeDiamond, icon: 'diamond', color: '#00cec9' };
-        if (p >= 15) return { name: t.badgeGold, icon: 'star', color: '#f1c40f' };
-        if (p >= 5) return { name: t.badgeSilver, icon: 'medal', color: '#bdc3c7' };
-        if (p >= 1) return { name: t.badgeBronze, icon: 'paw', color: '#e17055' };
+        if (p >= 50) return { name: t.badgeDiamond, icon: 'diamond', color: '#00E5FF' }; // Siyan Mavi
+        if (p >= 15) return { name: t.badgeGold, icon: 'star', color: '#FDCB6E' }; // Sıcak Sarı
+        if (p >= 5) return { name: t.badgeSilver, icon: 'medal', color: '#A55EEA' }; // Mor/Gümüş
+        if (p >= 1) return { name: t.badgeBronze, icon: 'paw', color: '#FD79A8' }; // Pembe
         return null; 
     };
 
@@ -198,7 +198,7 @@ const ProfileScreen = ({ navigation, route }) => {
     const myFavoriteProducts = products.filter(p => favorites.some(fav => (typeof fav === 'object' ? (fav.userId === viewUser.id && fav.productId === p.id) : fav === p.id)));
 
     const getLocalizedStatus = (status) => { if (!status) return t.order_preparing; if (status.includes('Onaylandı') || status.includes('Confirmed')) return t.order_confirmed; if (status.includes('Hazırlanıyor') || status.includes('Preparing')) return t.order_preparing; if (status.includes('Kargoya') || status.includes('Shipped')) return t.order_shipped; if (status.includes('Teslim') || status.includes('Delivered')) return t.order_delivered; if (status.includes('İptal') || status.includes('Cancelled')) return t.order_cancelled; return status; };
-    const getStatusColor = (status) => { if (!status) return '#FF9800'; if (status.includes('İptal') || status.includes('Cancelled')) return '#FF3B30'; if (status.includes('Teslim') || status.includes('Delivered')) return '#4CAF50'; if (status.includes('Kargo') || status.includes('Shipped')) return '#2196F3'; return '#FF9800'; };
+    const getStatusColor = (status) => { if (!status) return '#6C5CE7'; if (status.includes('İptal') || status.includes('Cancelled')) return '#FF4D4D'; if (status.includes('Teslim') || status.includes('Delivered')) return '#00E5FF'; if (status.includes('Kargo') || status.includes('Shipped')) return '#5B4BC4'; return '#6C5CE7'; };
     const getLocalizedCategoryName = (catName) => { if (!catName) return ''; if (activeLang === 'TR') return catName; if (catName.includes('Eş')) return 'Find Mate'; if (catName.includes('Sahiplendirme')) return 'Adoption'; if (catName.includes('Veteriner')) return 'Vet Clinics'; if (catName.includes('Bakıcı')) return 'Pet Sitter'; return catName; };
 
     const handleLogout = () => { Alert.alert(t.logoutTitle, t.logoutMsg, [{ text: t.cancel, style: "cancel" }, { text: t.yesExit, style: "destructive", onPress: () => { logout(); navigation.reset({ index: 0, routes: [{ name: 'Login' }] }); }}]); };
@@ -326,8 +326,8 @@ const ProfileScreen = ({ navigation, route }) => {
                     <Text style={[styles.cardName, { color: theme.text }]} numberOfLines={1}>{item.name}</Text>
                     <Text style={[styles.cardSub, { color: theme.subText }]} numberOfLines={1}>{getLocalizedCategoryName(item.category)}</Text>
                     
-                    <View style={[styles.statusBadge, { backgroundColor: item.is_found ? '#4CAF50' : '#E3FCEC' }]}>
-                        <Text style={[styles.statusText, { color: item.is_found ? 'white' : '#28C76F' }]}>
+                    <View style={[styles.statusBadge, { backgroundColor: item.is_found ? '#6C5CE7' : 'rgba(108, 92, 231, 0.1)' }]}>
+                        <Text style={[styles.statusText, { color: item.is_found ? 'white' : '#6C5CE7' }]}>
                             {item.is_found ? t.completed : t.active}
                         </Text>
                     </View>
@@ -381,7 +381,7 @@ const ProfileScreen = ({ navigation, route }) => {
                                 style={styles.avatar} 
                             />
                         ) : (
-                            <View style={[styles.avatar, {backgroundColor: COLORS.primary, justifyContent:'center', alignItems:'center'}]}>
+                            <View style={[styles.avatar, {backgroundColor: '#6C5CE7', justifyContent:'center', alignItems:'center'}]}>
                                 <Text style={styles.avatarText}>{viewUser.fullname?.charAt(0)}</Text>
                             </View>
                         )}
@@ -398,7 +398,7 @@ const ProfileScreen = ({ navigation, route }) => {
                             <Ionicons 
                                 name="checkmark-circle" 
                                 size={22} 
-                                color="#1DA1F2" 
+                                color="#00E5FF" 
                                 style={{ marginLeft: 6, marginTop: 4 }} 
                             />
                         )}
@@ -427,18 +427,18 @@ const ProfileScreen = ({ navigation, route }) => {
 
                 {/* TAB MENÜSÜ */}
                 <View style={[styles.tabBar, { borderBottomColor: theme.border }]}>
-                    <TouchableOpacity style={[styles.tabItem, activeTab === 'listings' && { borderBottomColor: COLORS.primary, borderBottomWidth: 3 }]} onPress={() => setActiveTab('listings')}>
-                        <Ionicons name="grid" size={24} color={activeTab === 'listings' ? COLORS.primary : theme.subText} />
-                        <Text style={[styles.tabText, {color: activeTab === 'listings' ? COLORS.primary : theme.subText}]}>{t.tabListings}</Text>
+                    <TouchableOpacity style={[styles.tabItem, activeTab === 'listings' && { borderBottomColor: '#6C5CE7', borderBottomWidth: 3 }]} onPress={() => setActiveTab('listings')}>
+                        <Ionicons name="grid" size={24} color={activeTab === 'listings' ? '#6C5CE7' : theme.subText} />
+                        <Text style={[styles.tabText, {color: activeTab === 'listings' ? '#6C5CE7' : theme.subText}]}>{t.tabListings}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.tabItem, activeTab === 'petsgram' && { borderBottomColor: COLORS.primary, borderBottomWidth: 3 }]} onPress={() => setActiveTab('petsgram')}>
-                        <Ionicons name="videocam" size={24} color={activeTab === 'petsgram' ? COLORS.primary : theme.subText} />
-                        <Text style={[styles.tabText, {color: activeTab === 'petsgram' ? COLORS.primary : theme.subText}]}>{t.tabPetsgram}</Text>
+                    <TouchableOpacity style={[styles.tabItem, activeTab === 'petsgram' && { borderBottomColor: '#6C5CE7', borderBottomWidth: 3 }]} onPress={() => setActiveTab('petsgram')}>
+                        <Ionicons name="videocam" size={24} color={activeTab === 'petsgram' ? '#6C5CE7' : theme.subText} />
+                        <Text style={[styles.tabText, {color: activeTab === 'petsgram' ? '#6C5CE7' : theme.subText}]}>{t.tabPetsgram}</Text>
                     </TouchableOpacity>
                     {isMyProfile && (
-                        <TouchableOpacity style={[styles.tabItem, activeTab === 'shop' && { borderBottomColor: COLORS.primary, borderBottomWidth: 3 }]} onPress={() => { setActiveTab('shop'); setShopSubTab(null); }}>
-                            <Ionicons name="bag-handle" size={24} color={activeTab === 'shop' ? COLORS.primary : theme.subText} />
-                            <Text style={[styles.tabText, {color: activeTab === 'shop' ? COLORS.primary : theme.subText}]}>{t.tabShop}</Text>
+                        <TouchableOpacity style={[styles.tabItem, activeTab === 'shop' && { borderBottomColor: '#6C5CE7', borderBottomWidth: 3 }]} onPress={() => { setActiveTab('shop'); setShopSubTab(null); }}>
+                            <Ionicons name="bag-handle" size={24} color={activeTab === 'shop' ? '#6C5CE7' : theme.subText} />
+                            <Text style={[styles.tabText, {color: activeTab === 'shop' ? '#6C5CE7' : theme.subText}]}>{t.tabShop}</Text>
                         </TouchableOpacity>
                     )}
                 </View>
@@ -471,26 +471,26 @@ const ProfileScreen = ({ navigation, route }) => {
                         {!shopSubTab ? (
                             <View>
                                 <TouchableOpacity style={[styles.shopOptionCard, {backgroundColor: theme.cardBg}]} onPress={() => setShopSubTab('orders')} activeOpacity={0.8}>
-                                    <View style={[styles.iconCircle, {backgroundColor:'#E3F2FD'}]}><Ionicons name="cube" size={26} color="#2196F3" /></View>
+                                    <View style={[styles.iconCircle, {backgroundColor:'rgba(108, 92, 231, 0.1)'}]}><Ionicons name="cube" size={26} color="#6C5CE7" /></View>
                                     <Text style={[styles.shopOptionText, {color: theme.text}]}>{t.myOrders}</Text>
                                     <Ionicons name="chevron-forward" size={22} color={theme.subText} />
                                 </TouchableOpacity>
                                 <TouchableOpacity style={[styles.shopOptionCard, {backgroundColor: theme.cardBg}]} onPress={() => setShopSubTab('favorites')} activeOpacity={0.8}>
-                                    <View style={[styles.iconCircle, {backgroundColor:'#FFEBEE'}]}><Ionicons name="heart" size={26} color="#F44336" /></View>
+                                    <View style={[styles.iconCircle, {backgroundColor:'rgba(253, 121, 168, 0.1)'}]}><Ionicons name="heart" size={26} color="#FD79A8" /></View>
                                     <Text style={[styles.shopOptionText, {color: theme.text}]}>{t.myFavs}</Text>
                                     <Ionicons name="chevron-forward" size={22} color={theme.subText} />
                                 </TouchableOpacity>
                                 
                                 {/* ✅ BAĞIŞ VE ROZETLER İLERLEME ÇUBUĞU */}
                                 <TouchableOpacity style={[styles.shopOptionCard, {backgroundColor: theme.cardBg}]} onPress={() => navigation.navigate('Badges')} activeOpacity={0.8}>
-                                    <View style={[styles.iconCircle, {backgroundColor:'#FFF3E0'}]}><Ionicons name="trophy" size={26} color="#FF9800" /></View>
+                                    <View style={[styles.iconCircle, {backgroundColor:'rgba(253, 203, 110, 0.1)'}]}><Ionicons name="trophy" size={26} color="#FDCB6E" /></View>
                                     <View style={{flex:1}}>
                                         <Text style={[styles.shopOptionText, {color: theme.text}]}>{t.donationPoints}</Text>
                                         <Text style={{fontSize:12, color:theme.subText}}>{t.totalPoints} {user?.donation_points || 0} {t.points}</Text>
                                         
                                         {/* Progress Bar (Gelişim Çubuğu) */}
-                                        <View style={{marginTop: 8, height: 6, backgroundColor: 'rgba(0,0,0,0.1)', borderRadius: 3, overflow: 'hidden', width: '90%'}}>
-                                            <View style={{width: `${badgeProgressPercent}%`, height: '100%', backgroundColor: '#FF9800'}} />
+                                        <View style={{marginTop: 8, height: 6, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 3, overflow: 'hidden', width: '90%'}}>
+                                            <View style={{width: `${badgeProgressPercent}%`, height: '100%', backgroundColor: '#FDCB6E'}} />
                                         </View>
                                         <Text style={{fontSize: 10, color: theme.subText, marginTop: 4, fontWeight: 'bold'}}>
                                             {badgeProgressInfo.max ? t.maxBadge : `${t.nextBadge} (${badgeProgressInfo.name}): ${badgeProgressInfo.current} / ${badgeProgressInfo.next}`}
@@ -500,26 +500,26 @@ const ProfileScreen = ({ navigation, route }) => {
                                 </TouchableOpacity>
                                 
                                 <TouchableOpacity style={[styles.shopOptionCard, {backgroundColor: theme.cardBg}]} onPress={() => navigation.navigate('Shop')} activeOpacity={0.8}>
-                                    <View style={[styles.iconCircle, {backgroundColor:'#E8F5E9'}]}><Ionicons name="storefront" size={26} color="#4CAF50" /></View>
+                                    <View style={[styles.iconCircle, {backgroundColor:'rgba(0, 229, 255, 0.1)'}]}><Ionicons name="storefront" size={26} color="#00E5FF" /></View>
                                     <Text style={[styles.shopOptionText, {color: theme.text}]}>{t.goToShop}</Text>
                                     <Ionicons name="arrow-forward" size={22} color={theme.subText} />
                                 </TouchableOpacity>
 
-                                {/* ADMIN PANELİ BUTONU (Supabase & Mail Kontrollü) */}
+                                {/* ADMIN PANELİ BUTONU */}
                                 {user && (user.is_admin || user.is_founder || KURUCU_EMAILLER.includes(user.email)) && (
                                     <TouchableOpacity 
-                                        style={[styles.shopOptionCard, {backgroundColor: '#ffebee', borderWidth: 1, borderColor: '#D32F2F'}]} 
+                                        style={[styles.shopOptionCard, {backgroundColor: 'rgba(91, 75, 196, 0.05)', borderWidth: 1, borderColor: '#5B4BC4'}]} 
                                         onPress={() => navigation.navigate('AdminPanel')} 
                                         activeOpacity={0.8}
                                     >
-                                        <View style={[styles.iconCircle, {backgroundColor:'#FFCDD2'}]}>
-                                            <Ionicons name="shield-checkmark" size={26} color="#D32F2F" />
+                                        <View style={[styles.iconCircle, {backgroundColor:'rgba(91, 75, 196, 0.1)'}]}>
+                                            <Ionicons name="shield-checkmark" size={26} color="#5B4BC4" />
                                         </View>
                                         <View style={{flex:1}}>
-                                            <Text style={[styles.shopOptionText, {color: '#D32F2F'}]}>{t.adminPanel}</Text>
+                                            <Text style={[styles.shopOptionText, {color: '#5B4BC4'}]}>{t.adminPanel}</Text>
                                             <Text style={{fontSize:12, color:theme.subText}}>{t.adminDesc}</Text>
                                         </View>
-                                        <Ionicons name="lock-open" size={22} color="#D32F2F" />
+                                        <Ionicons name="lock-open" size={22} color="#5B4BC4" />
                                     </TouchableOpacity>
                                 )}
 
@@ -541,7 +541,7 @@ const ProfileScreen = ({ navigation, route }) => {
                                                 </View>
                                                 <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center'}}>
                                                     <Text style={{color:theme.subText, fontSize:12}}>{order.date ? new Date(order.date).toLocaleDateString() : ''}</Text>
-                                                    <Text style={{fontWeight:'bold', color:COLORS.primary, fontSize:16}}>{order.totalPrice || order.total_price} {activeLang === 'AU' ? 'AUD' : 'TL'}</Text>
+                                                    <Text style={{fontWeight:'bold', color:'#6C5CE7', fontSize:16}}>{order.totalPrice || order.total_price} {activeLang === 'AU' ? 'AUD' : 'TL'}</Text>
                                                 </View>
                                             </TouchableOpacity>
                                         );
@@ -560,7 +560,7 @@ const ProfileScreen = ({ navigation, route }) => {
                                                 <TouchableOpacity key={item.id} style={[styles.favItem, {backgroundColor: theme.cardBg}]} onPress={() => navigation.navigate('ProductDetail', { product: item })}>
                                                     <Image source={{ uri: item.img }} style={{width:'100%', height:120, borderRadius:10, marginBottom:5}} resizeMode="cover" />
                                                     <Text numberOfLines={1} style={{fontWeight:'bold', color:theme.text}}>{item.name}</Text>
-                                                    <Text style={{color:COLORS.primary, fontWeight:'bold'}}>{item.price}</Text>
+                                                    <Text style={{color:'#6C5CE7', fontWeight:'bold'}}>{item.price}</Text>
                                                 </TouchableOpacity>
                                             ))}
                                     </View>
@@ -571,7 +571,7 @@ const ProfileScreen = ({ navigation, route }) => {
                 )}
 
                 {isMyProfile && activeTab === 'listings' && (
-                    <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}><Text style={{color:'red', fontWeight:'bold'}}>{t.logout}</Text></TouchableOpacity>
+                    <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}><Text style={{color:'#FF4D4D', fontWeight:'bold'}}>{t.logout}</Text></TouchableOpacity>
                 )}
             </ScrollView>
 
@@ -594,7 +594,7 @@ const ProfileScreen = ({ navigation, route }) => {
                                     <View style={{flexDirection:'row', alignItems:'center', marginTop:5}}>
                                         <Ionicons name="time-outline" size={14} color={theme.subText} style={{marginRight:5}} />
                                         <Text style={{fontSize:12, color:theme.subText}}>
-                                            {t.estDelivery} <Text style={{fontWeight:'bold', color:COLORS.primary}}>{getEstimatedDeliveryDate(selectedOrder.date)}</Text>
+                                            {t.estDelivery} <Text style={{fontWeight:'bold', color:'#6C5CE7'}}>{getEstimatedDeliveryDate(selectedOrder.date)}</Text>
                                         </Text>
                                     </View>
                                 </View>
@@ -742,7 +742,7 @@ const ProfileScreen = ({ navigation, route }) => {
                                             <TouchableOpacity style={[styles.notificationItem, { borderBottomColor: theme.border, backgroundColor: theme.cardBg }]} onPress={() => handleNotificationClick(item)}>
                                                 {!item.read && <View style={styles.unreadDot} />}
                                                 <View style={{marginRight:15}}>
-                                                    {item.fromUserAvatar ? <Image source={{ uri: item.fromUserAvatar }} style={{width:40, height:40, borderRadius:20}} /> : <View style={{width:40, height:40, borderRadius:20, justifyContent:'center', alignItems:'center', backgroundColor:'#E3F2FD'}}><Ionicons name="notifications" size={20} color="#2196F3" /></View>}
+                                                    {item.fromUserAvatar ? <Image source={{ uri: item.fromUserAvatar }} style={{width:40, height:40, borderRadius:20}} /> : <View style={{width:40, height:40, borderRadius:20, justifyContent:'center', alignItems:'center', backgroundColor:'rgba(108, 92, 231, 0.1)'}}><Ionicons name="notifications" size={20} color="#6C5CE7" /></View>}
                                                 </View>
                                                 <View style={{ flex: 1 }}>
                                                     <Text style={{color: theme.text, fontSize:14, fontWeight: !item.read ? 'bold' : 'normal'}}>{item.message}</Text>
@@ -772,17 +772,17 @@ const styles = StyleSheet.create({
     header: { flexDirection: 'row', justifyContent: 'space-between', padding: 15, paddingTop: 50, alignItems: 'center' },
     headerTitle: { fontSize: 18, fontWeight: 'bold' },
     iconBtn: { padding: 8, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.05)', marginLeft: 5 },
-    badge: { position: 'absolute', top: 5, right: 5, backgroundColor: 'red', borderRadius: 8, width: 16, height: 16, justifyContent: 'center', alignItems: 'center' },
+    badge: { position: 'absolute', top: 5, right: 5, backgroundColor: '#FF4D4D', borderRadius: 8, width: 16, height: 16, justifyContent: 'center', alignItems: 'center' },
     badgeText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
     profileSection: { alignItems: 'center', padding: 25, borderRadius: 25, margin: 15, elevation: 4, shadowColor: '#000', shadowOffset:{width:0, height:3}, shadowOpacity:0.15 },
     avatarContainer: { marginBottom: 15, shadowColor: '#000', shadowOffset:{width:0, height:4}, shadowOpacity:0.25, shadowRadius:6, position: 'relative' },
     avatar: { width: 90, height: 90, borderRadius: 45 },
-    avatarText: { fontSize: 40, fontWeight: 'bold', color: COLORS.primary },
-    premiumBadgeAvatar: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#2196F3', borderRadius: 15, padding: 2, borderWidth: 2, borderColor: 'white' },
+    avatarText: { fontSize: 40, fontWeight: 'bold', color: 'white' },
+    premiumBadgeAvatar: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#00E5FF', borderRadius: 15, padding: 2, borderWidth: 2, borderColor: 'white' },
     userName: { fontSize: 24, fontWeight: 'bold', marginTop: 5 },
     userEmail: { fontSize: 14, marginTop: 2, marginBottom: 10 },
     userBio: { textAlign: 'center', marginHorizontal: 20, marginTop: 10, fontStyle: 'italic', lineHeight: 20 },
-    editBtnModern: { flexDirection: 'row', alignItems: 'center', marginTop: 15, paddingVertical: 12, paddingHorizontal: 35, borderRadius: 25, backgroundColor: COLORS.primary, shadowColor: COLORS.primary, shadowOffset:{width:0, height:4}, shadowOpacity:0.3, shadowRadius:5 },
+    editBtnModern: { flexDirection: 'row', alignItems: 'center', marginTop: 15, paddingVertical: 12, paddingHorizontal: 35, borderRadius: 25, backgroundColor: '#6C5CE7', shadowColor: '#6C5CE7', shadowOffset:{width:0, height:4}, shadowOpacity:0.3, shadowRadius:5 },
     editBtnTextModern: { color: 'white', fontWeight: 'bold', fontSize: 14 },
     crownIconBox: { width: 50, height: 50, borderRadius: 25, backgroundColor: 'rgba(255,215,0,0.2)', justifyContent: 'center', alignItems: 'center' },
     tabBar: { flexDirection: 'row', marginTop: 20, borderBottomWidth: 1, borderBottomColor: '#eee' },
@@ -798,8 +798,8 @@ const styles = StyleSheet.create({
     shopOptionCard: { flexDirection: 'row', alignItems: 'center', padding: 20, borderRadius: 20, marginBottom: 15, elevation: 3, shadowColor: '#000', shadowOffset:{width:0, height:3}, shadowOpacity:0.15 },
     iconCircle: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
     shopOptionText: { flex: 1, fontSize: 18, fontWeight: '600' },
-    orderCard: { padding: 15, borderRadius: 15, marginBottom: 15, borderLeftWidth: 5, borderLeftColor: COLORS.primary, elevation: 2 },
-    trackCargoBtn: { backgroundColor: COLORS.primary, padding: 12, borderRadius: 10, alignItems: 'center', marginTop: 15, flexDirection: 'row', justifyContent: 'center' },
+    orderCard: { padding: 15, borderRadius: 15, marginBottom: 15, borderLeftWidth: 5, borderLeftColor: '#6C5CE7', elevation: 2 },
+    trackCargoBtn: { backgroundColor: '#6C5CE7', padding: 12, borderRadius: 10, alignItems: 'center', marginTop: 15, flexDirection: 'row', justifyContent: 'center' },
     favItem: { width: '48%', padding: 10, borderRadius: 15, marginBottom: 15, elevation: 3, shadowColor: '#000', shadowOffset:{width:0, height:2}, shadowOpacity:0.15 },
     logoutBtn: { alignSelf: 'center', marginTop: 30, padding: 10 },
     card: { flexDirection: 'row', borderRadius: 20, marginBottom: 15, padding: 15, alignItems: 'center', elevation: 3, marginHorizontal: 20, shadowColor: '#000', shadowOffset:{width:0, height:2}, shadowOpacity:0.15 },
@@ -808,10 +808,10 @@ const styles = StyleSheet.create({
     cardName: { fontSize: 18, fontWeight: 'bold' },
     cardSub: { fontSize: 13, marginTop: 4 },
     deleteAction: { backgroundColor: '#FF4D4D', justifyContent: 'center', alignItems: 'center', width: 90, borderTopRightRadius: 20, borderBottomRightRadius: 20, height: 110, marginBottom: 15 },
-    foundAction: { backgroundColor: '#4CAF50', justifyContent: 'center', alignItems: 'center', width: 110, borderTopLeftRadius: 20, borderBottomLeftRadius: 20, height: 110, marginBottom: 15 },
+    foundAction: { backgroundColor: '#6C5CE7', justifyContent: 'center', alignItems: 'center', width: 110, borderTopLeftRadius: 20, borderBottomLeftRadius: 20, height: 110, marginBottom: 15 },
     actionText: { color: 'white', fontWeight: 'bold', fontSize: 12, marginTop: 5 },
     foundOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 10, borderRadius: 20 },
-    foundText: { color: '#4CAF50', fontWeight: 'bold', fontSize: 18, borderWidth: 3, borderColor: '#4CAF50', padding: 8, borderRadius: 8, transform: [{ rotate: '-15deg' }] },
+    foundText: { color: '#6C5CE7', fontWeight: 'bold', fontSize: 18, borderWidth: 3, borderColor: '#6C5CE7', padding: 8, borderRadius: 8, transform: [{ rotate: '-15deg' }] },
     statusBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, marginTop: 5 },
     statusText: { fontSize: 10, fontWeight: 'bold' },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
@@ -822,18 +822,18 @@ const styles = StyleSheet.create({
     accountMenu: { position: 'absolute', top: 60, right: 20, width: 200, borderRadius: 15, padding: 15, elevation: 10 },
     menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
     userListItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1, paddingHorizontal: 20 },
-    listAvatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', marginRight: 15, overflow: 'hidden' },
+    listAvatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#6C5CE7', justifyContent: 'center', alignItems: 'center', marginRight: 15, overflow: 'hidden' },
     listName: { fontSize: 16, fontWeight: '600' },
     notificationItem: { flexDirection: 'row', padding: 15, borderBottomWidth: 1, alignItems: 'center', position: 'relative' },
-    unreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: 'red', position: 'absolute', top: 15, left: 5, zIndex: 10 }, 
-    userInfoSection: { backgroundColor: '#F9FAFB', padding: 15, borderRadius: 10, marginBottom: 15 },
+    unreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FF4D4D', position: 'absolute', top: 15, left: 5, zIndex: 10 }, 
+    userInfoSection: { backgroundColor: 'rgba(108, 92, 231, 0.05)', padding: 15, borderRadius: 10, marginBottom: 15 },
     sectionHeader: { fontSize: 16, fontWeight: 'bold', marginBottom: 10 },
     infoText: { fontSize: 14, marginBottom: 5 },
     divider: { height: 1, backgroundColor: '#EEE', marginVertical: 15 },
-    cargoLinkBox: { backgroundColor: '#E3F2FD', padding: 15, borderRadius: 10, marginBottom: 15, alignItems: 'center' },
-    cargoLinkText: { color: '#2196F3', fontWeight: 'bold', textDecorationLine: 'underline' },
+    cargoLinkBox: { backgroundColor: 'rgba(0, 229, 255, 0.1)', padding: 15, borderRadius: 10, marginBottom: 15, alignItems: 'center' },
+    cargoLinkText: { color: '#00E5FF', fontWeight: 'bold', textDecorationLine: 'underline' },
     warningTitle: { fontSize: 20, fontWeight: 'bold', marginTop: 20 },
-    loginBtn: { backgroundColor: COLORS.primary, paddingVertical: 15, paddingHorizontal: 50, borderRadius: 30, marginTop: 20 },
+    loginBtn: { backgroundColor: '#6C5CE7', paddingVertical: 15, paddingHorizontal: 50, borderRadius: 30, marginTop: 20 },
     loginBtnText: { color: 'white', fontWeight: 'bold', fontSize: 18 },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
     modalTitle: { fontSize: 20, fontWeight: 'bold' }

@@ -14,7 +14,7 @@ import { supabase } from '../lib/supabase';
 // theme prop olarak dışarıdan alınıyor, böylece her harf yazışta klavye kapanmayacak.
 const ModernInput = ({ icon, placeholder, value, onChangeText, keyboardType = 'default', multiline = false, theme }) => (
     <View style={[styles.inputContainer, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
-        {icon && <Ionicons name={icon} size={20} color={COLORS.primary} style={styles.inputIcon} />}
+        {icon && <Ionicons name={icon} size={20} color="#6C5CE7" style={styles.inputIcon} />}
         <TextInput
             style={[styles.input, { color: theme.text, height: multiline ? 100 : 50 }]}
             placeholder={placeholder}
@@ -32,7 +32,7 @@ const AddListingScreen = ({ route, navigation }) => {
   const { category } = route.params; 
   const { fetchListings } = useContext(ListingContext);
   const { user, country } = useContext(AuthContext);
-  const { theme } = useContext(ThemeContext);
+  const { theme, isDarkMode } = useContext(ThemeContext);
 
   const activeLang = country?.code || 'TR';
 
@@ -328,11 +328,11 @@ const AddListingScreen = ({ route, navigation }) => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: isDarkMode ? '#121212' : '#F8F9FA' }]}>
       
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.cardBg, borderBottomColor: theme.border }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+      <View style={[styles.header, { backgroundColor: theme.cardBg }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, {backgroundColor: isDarkMode ? '#333' : '#F0F0F0'}]}>
           <Ionicons name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.text }]}>{t.headerTitle}</Text>
@@ -345,23 +345,23 @@ const AddListingScreen = ({ route, navigation }) => {
             <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
                 
                 {/* Medya Yükleme Alanı */}
-                <View style={[styles.sectionContainer, {backgroundColor: theme.cardBg}]}>
+                <View style={[styles.sectionContainer, {backgroundColor: theme.cardBg, shadowColor: isDarkMode ? '#000' : '#6C5CE7'}]}>
                     <View style={styles.sectionHeader}>
-                        <Ionicons name="images-outline" size={20} color={COLORS.primary} />
+                        <Ionicons name="images-outline" size={20} color="#6C5CE7" />
                         <Text style={[styles.label, { color: theme.text, marginLeft: 8 }]}>{t.photoLabel} <Text style={styles.subLabel}>{t.photoSubLabel}</Text></Text>
                     </View>
                     
                     <View style={styles.mediaRow}>
-                        <TouchableOpacity style={[styles.addMediaBtn, { borderColor: COLORS.primary }]} onPress={pickMedia}>
-                            <Ionicons name="add" size={32} color={COLORS.primary} />
-                            <Text style={[styles.addMediaText, {color: COLORS.primary}]}>Ekle</Text>
+                        <TouchableOpacity style={[styles.addMediaBtn, { borderColor: '#6C5CE7', backgroundColor: isDarkMode ? 'rgba(108, 92, 231, 0.1)' : 'rgba(108, 92, 231, 0.05)' }]} onPress={pickMedia}>
+                            <Ionicons name="add" size={32} color="#6C5CE7" />
+                            <Text style={[styles.addMediaText, {color: '#6C5CE7'}]}>Ekle</Text>
                         </TouchableOpacity>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{alignItems: 'center'}}>
                             {mediaList.map((item, index) => (
                                 <View key={index} style={styles.mediaItem}>
                                     <Image source={{ uri: item.uri }} style={styles.mediaImage} />
                                     <TouchableOpacity style={styles.removeMedia} onPress={() => removeMedia(index)}>
-                                        <Ionicons name="close-circle" size={22} color="#FF3B30" />
+                                        <Ionicons name="close-circle" size={22} color="#FF4D4D" />
                                     </TouchableOpacity>
                                 </View>
                             ))}
@@ -371,9 +371,9 @@ const AddListingScreen = ({ route, navigation }) => {
 
                 {/* 🆕 HAYVAN TÜRÜ SEÇİMİ (Hizmet VEYA Bakıcı ilanı DEĞİLSE sorulacak) */}
                 {!isServiceListing && !isSitter && (
-                    <View style={[styles.sectionContainer, {backgroundColor: theme.cardBg, paddingVertical: 15}]}>
+                    <View style={[styles.sectionContainer, {backgroundColor: theme.cardBg, paddingVertical: 15, shadowColor: isDarkMode ? '#000' : '#6C5CE7'}]}>
                         <View style={styles.sectionHeader}>
-                            <Ionicons name="paw-outline" size={20} color={COLORS.primary} />
+                            <Ionicons name="paw-outline" size={20} color="#6C5CE7" />
                             <Text style={[styles.label, { color: theme.text, marginLeft: 8 }]}>{t.typeLabel}</Text>
                         </View>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -382,10 +382,11 @@ const AddListingScreen = ({ route, navigation }) => {
                                     key={index} 
                                     style={[
                                         styles.typeChip, 
-                                        petType === type.label && { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+                                        petType === type.label && { backgroundColor: '#6C5CE7', borderColor: '#6C5CE7' },
                                         { borderColor: theme.border }
                                     ]}
                                     onPress={() => setPetType(type.label)}
+                                    activeOpacity={0.8}
                                 >
                                     <Ionicons name={type.icon} size={16} color={petType === type.label ? 'white' : theme.subText} style={{marginRight: 5}} />
                                     <Text style={[
@@ -402,7 +403,7 @@ const AddListingScreen = ({ route, navigation }) => {
                 )}
 
                 {/* Form Alanları */}
-                <View style={[styles.sectionContainer, {backgroundColor: theme.cardBg, paddingBottom: 10}]}>
+                <View style={[styles.sectionContainer, {backgroundColor: theme.cardBg, paddingBottom: 10, shadowColor: isDarkMode ? '#000' : '#6C5CE7'}]}>
                     
                     {isServiceListing ? (
                         <>
@@ -450,13 +451,13 @@ const AddListingScreen = ({ route, navigation }) => {
 
                             <Text style={[styles.fieldLabel, {color: theme.subText}]}>{t.gender}</Text>
                             <View style={styles.genderContainer}>
-                                <TouchableOpacity style={[styles.genderBtn, gender === 'Erkek' && { backgroundColor: '#E3F2FD', borderColor: '#2196F3' }, { borderColor: theme.border }]} onPress={() => setGender('Erkek')}>
-                                    <Ionicons name="male" size={20} color={gender === 'Erkek' ? '#2196F3' : theme.subText} />
-                                    <Text style={[styles.genderText, { color: gender === 'Erkek' ? '#2196F3' : theme.subText }]}>{t.male}</Text>
+                                <TouchableOpacity style={[styles.genderBtn, gender === 'Erkek' && { backgroundColor: 'rgba(91, 75, 196, 0.1)', borderColor: '#5B4BC4' }, { borderColor: theme.border }]} onPress={() => setGender('Erkek')} activeOpacity={0.8}>
+                                    <Ionicons name="male" size={20} color={gender === 'Erkek' ? '#5B4BC4' : theme.subText} />
+                                    <Text style={[styles.genderText, { color: gender === 'Erkek' ? '#5B4BC4' : theme.subText }]}>{t.male}</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity style={[styles.genderBtn, gender === 'Dişi' && { backgroundColor: '#FCE4EC', borderColor: '#E91E63' }, { borderColor: theme.border }]} onPress={() => setGender('Dişi')}>
-                                    <Ionicons name="female" size={20} color={gender === 'Dişi' ? '#E91E63' : theme.subText} />
-                                    <Text style={[styles.genderText, { color: gender === 'Dişi' ? '#E91E63' : theme.subText }]}>{t.female}</Text>
+                                <TouchableOpacity style={[styles.genderBtn, gender === 'Dişi' && { backgroundColor: 'rgba(253, 121, 168, 0.1)', borderColor: '#FD79A8' }, { borderColor: theme.border }]} onPress={() => setGender('Dişi')} activeOpacity={0.8}>
+                                    <Ionicons name="female" size={20} color={gender === 'Dişi' ? '#FD79A8' : theme.subText} />
+                                    <Text style={[styles.genderText, { color: gender === 'Dişi' ? '#FD79A8' : theme.subText }]}>{t.female}</Text>
                                 </TouchableOpacity>
                             </View>
                         </>
@@ -466,7 +467,7 @@ const AddListingScreen = ({ route, navigation }) => {
                     <View style={styles.row}>
                         <View style={{ flex: 1, marginRight: 10 }}>
                             <Text style={[styles.fieldLabel, {color: theme.subText}]}>{t.cityLabel}</Text>
-                            <TouchableOpacity style={[styles.selectorBtn, { backgroundColor: theme.background, borderColor: theme.border }]} onPress={() => { setSelectionType('city'); setModalVisible(true); }}>
+                            <TouchableOpacity style={[styles.selectorBtn, { backgroundColor: theme.background, borderColor: theme.border }]} onPress={() => { setSelectionType('city'); setModalVisible(true); }} activeOpacity={0.8}>
                                 <Text style={{ color: city ? theme.text : theme.subText, flex: 1 }}>{city || t.select}</Text>
                                 <Ionicons name="chevron-down" size={18} color={theme.subText} />
                             </TouchableOpacity>
@@ -476,7 +477,7 @@ const AddListingScreen = ({ route, navigation }) => {
                             <TouchableOpacity style={[styles.selectorBtn, { backgroundColor: theme.background, borderColor: theme.border }]} onPress={() => { 
                                 if (!city) Alert.alert("Warning", t.cityWarning); 
                                 else { setSelectionType('district'); setModalVisible(true); }
-                            }}>
+                            }} activeOpacity={0.8}>
                                 <Text style={{ color: district ? theme.text : theme.subText, flex: 1 }}>{district || t.select}</Text>
                                 <Ionicons name="chevron-down" size={18} color={theme.subText} />
                             </TouchableOpacity>
@@ -495,7 +496,7 @@ const AddListingScreen = ({ route, navigation }) => {
                             <ActivityIndicator color="white" />
                         ) : (
                             <>
-                                <Ionicons name="checkmark-circle-outline" size={24} color="white" style={{marginRight: 8}} />
+                                <Ionicons name="checkmark-circle" size={24} color="white" style={{marginRight: 8}} />
                                 <Text style={styles.submitBtnText}>{t.btnPost}</Text>
                             </>
                         )}
@@ -545,56 +546,56 @@ const AddListingScreen = ({ route, navigation }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 15, borderBottomWidth: 1, elevation: 2, shadowColor: '#000', shadowOffset: {width:0, height:2}, shadowOpacity:0.05 },
-  headerTitle: { fontSize: 18, fontWeight: 'bold' },
-  backButton: { padding: 8, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.05)' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 18, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, borderBottomLeftRadius: 25, borderBottomRightRadius: 25, zIndex: 10 },
+  headerTitle: { fontSize: 19, fontWeight: '800' },
+  backButton: { padding: 8, borderRadius: 14 },
   scrollContent: { padding: 20, paddingBottom: 100 },
   
   // Section Styles
-  sectionContainer: { borderRadius: 20, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset:{width:0, height:2}, shadowOpacity:0.05, elevation: 2 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
-  label: { fontSize: 16, fontWeight: 'bold' },
-  subLabel: { fontSize: 12, fontWeight: 'normal', color: '#888' },
-  fieldLabel: { fontSize: 13, marginBottom: 6, fontWeight: '600', marginLeft: 4 },
+  sectionContainer: { borderRadius: 24, padding: 20, marginBottom: 20, shadowOffset:{width:0, height:4}, shadowOpacity:0.05, shadowRadius:8, elevation: 3 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
+  label: { fontSize: 16, fontWeight: '800' },
+  subLabel: { fontSize: 11, fontWeight: '500', color: '#999' },
+  fieldLabel: { fontSize: 13, marginBottom: 6, fontWeight: '700', marginLeft: 4, letterSpacing: 0.5 },
 
   // Media Styles
   mediaRow: { flexDirection: 'row', alignItems: 'center' },
-  addMediaBtn: { width: 80, height: 80, borderRadius: 16, borderWidth: 2, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', marginRight: 15, backgroundColor: 'rgba(0,0,0,0.02)' },
+  addMediaBtn: { width: 80, height: 80, borderRadius: 18, borderWidth: 2, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
   addMediaText: { fontSize: 12, fontWeight: 'bold', marginTop: 4 },
   mediaItem: { position: 'relative', marginRight: 12 },
-  mediaImage: { width: 80, height: 80, borderRadius: 16 },
-  removeMedia: { position: 'absolute', top: -8, right: -8, backgroundColor: 'white', borderRadius: 12 },
+  mediaImage: { width: 80, height: 80, borderRadius: 18 },
+  removeMedia: { position: 'absolute', top: -8, right: -8, backgroundColor: 'white', borderRadius: 12, padding: 1 },
 
-  // 🆕 Type Chip Styles
-  typeChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 25, borderWidth: 1, marginRight: 10, backgroundColor: 'transparent' },
+  // Type Chip Styles
+  typeChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 25, borderWidth: 1, marginRight: 10, backgroundColor: 'transparent' },
   typeChipText: { fontSize: 14, fontWeight: '600' },
 
   // Input Styles
-  inputContainer: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, borderWidth: 1, paddingHorizontal: 15, marginBottom: 15 },
+  inputContainer: { flexDirection: 'row', alignItems: 'center', borderRadius: 16, borderWidth: 1, paddingHorizontal: 15, marginBottom: 18 },
   inputIcon: { marginRight: 10 },
-  input: { flex: 1, fontSize: 15, paddingVertical: 14 },
+  input: { flex: 1, fontSize: 15, paddingVertical: 15 },
   row: { flexDirection: 'row', justifyContent: 'space-between' },
   
   // Selectors
-  selectorBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 15, paddingVertical: 14, borderRadius: 14, borderWidth: 1, marginBottom: 15 },
+  selectorBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 15, paddingVertical: 16, borderRadius: 16, borderWidth: 1, marginBottom: 18 },
   
   // Gender Styles
-  genderContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
-  genderBtn: { flex: 0.48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 14, borderWidth: 1, backgroundColor: 'transparent' },
+  genderContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 18 },
+  genderBtn: { flex: 0.48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 16, borderWidth: 1, backgroundColor: 'transparent' },
   genderText: { marginLeft: 8, fontWeight: 'bold', fontSize: 15 },
 
   // Submit Button
-  submitBtn: { flexDirection: 'row', backgroundColor: COLORS.primary, paddingVertical: 18, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginTop: 10, shadowColor: COLORS.primary, shadowOffset: {width:0, height:4}, shadowOpacity:0.3, shadowRadius: 8, elevation: 6 },
-  submitBtnText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
+  submitBtn: { flexDirection: 'row', backgroundColor: '#6C5CE7', paddingVertical: 20, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginTop: 10, shadowColor: '#6C5CE7', shadowOffset: {width:0, height:5}, shadowOpacity:0.3, shadowRadius: 10, elevation: 6 },
+  submitBtnText: { color: 'white', fontSize: 18, fontWeight: '800', letterSpacing: 0.5 },
 
   // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { height: '60%', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 25 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  modalContent: { height: '65%', borderTopLeftRadius: 35, borderTopRightRadius: 35, padding: 25, shadowColor: '#000', shadowOffset: {width: 0, height: -5}, shadowOpacity: 0.1, shadowRadius: 10, elevation: 20 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 },
   modalTitle: { fontSize: 20, fontWeight: 'bold' },
-  closeModalBtn: { padding: 5, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 20 },
-  modalItem: { paddingVertical: 16, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  modalItemText: { fontSize: 16, fontWeight: '500' }
+  closeModalBtn: { padding: 6, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 20 },
+  modalItem: { paddingVertical: 18, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  modalItemText: { fontSize: 16, fontWeight: '600' }
 });
 
 export default AddListingScreen;

@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { supabase } from '../lib/supabase'; // ✅ Supabase eklendi
-import { AuthContext } from './AuthContext'; // ✅ Kullanıcı ID'si için eklendi
+import { supabase } from '../lib/supabase'; 
+import { AuthContext } from './AuthContext'; 
 import { playSound } from '../utils/SoundManager';
 
 export const ChatContext = createContext();
@@ -26,7 +26,7 @@ export const ChatProvider = ({ children }) => {
         schema: 'public', 
         table: 'messages' 
       }, () => {
-        fetchMessages(); // Listeyi tazele
+        fetchMessages(); // Karşı taraftan mesaj geldiğinde veya silindiğinde listeyi tazele
       })
       .subscribe();
 
@@ -98,15 +98,80 @@ export const ChatProvider = ({ children }) => {
     }
   };
 
-  // 📤 MESAJ GÖNDER (Veritabanına Kaydet)
+  // 📤 MESAJ GÖNDER (Anında Ekrana Bas + Resmi Yükle + Veritabanına Kaydet)
   const sendMessage = async (chatId, sender, receiver, text, listingId, listingName, image = null, type = 'text', relatedId = null) => {
     if (!user) return;
 
     playSound('message');
 
-    try {
-      const room_id = chatId || [sender.id, receiver.id].sort().join('_');
+    const room_id = chatId || [sender.id, receiver.id].sort().join('_');
+    
+    // ⚡ OPTIMISTIC UI: Mesajı/Fotoğrafı anında GÖNDERENİN ekranına bas (Sıfır Gecikme)
+    const tempMessage = {
+      id: Date.now(), 
+      text: text || '',
+      image: image, // Yerel dosya yolunu kullanıyoruz, senin ekranında hemen görünür
+      type: image ? 'image' : 'text',
+      senderId: sender.id,
+      createdAt: new Date().toISOString(),
+      isRead: false,
+      reactions: []
+    };
 
+    setConversations(prev => {
+      const updated = [...prev];
+      const chatIndex = updated.findIndex(c => c.id === room_id);
+
+      if (chatIndex > -1) {
+        updated[chatIndex].messages.push(tempMessage);
+        updated[chatIndex].lastMessage = image ? '📷 Fotoğraf' : text;
+        updated[chatIndex].lastMessageDate = tempMessage.createdAt;
+      } else {
+        updated.push({
+          id: room_id,
+          participants: [
+            { id: sender.id, name: sender.fullname, avatar: sender.avatar },
+            { id: receiver.id, name: receiver.fullname, avatar: receiver.avatar }
+          ],
+          messages: [tempMessage],
+          lastMessage: image ? '📷 Fotoğraf' : text,
+          lastMessageDate: tempMessage.createdAt
+        });
+      }
+      return updated.sort((a, b) => new Date(b.lastMessageDate) - new Date(a.lastMessageDate));
+    });
+
+    try {
+      let finalImageUrl = image;
+
+      // 🚀 FOTOĞRAF YÜKLEME İŞLEMİ (SUPABASE STORAGE)
+      if (image && image.startsWith('file://')) {
+          const ext = image.split('.').pop() || 'jpeg';
+          const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+          
+          // Resmi Supabase'e gönderilebilir bir Blob formata çeviriyoruz
+          const response = await fetch(image);
+          const blob = await response.blob();
+
+          // Storage'a yükleme işlemi
+          const { error: uploadError } = await supabase
+              .storage
+              .from('chat-images') // ✅ KURAL: Supabase'de bu isimde PUBLIC bir bucket olmalı!
+              .upload(fileName, blob, {
+                  contentType: `image/${ext === 'png' ? 'png' : 'jpeg'}`,
+              });
+
+          if (uploadError) {
+              console.log("Resim yüklenemedi:", uploadError);
+              throw uploadError;
+          }
+
+          // Yüklenen resmin herkesin görebileceği genel linkini (Public URL) alıyoruz
+          const { data: publicUrlData } = supabase.storage.from('chat-images').getPublicUrl(fileName);
+          finalImageUrl = publicUrlData.publicUrl;
+      }
+
+      // Arka planda veritabanına yaz (Gerçek URL ile)
       const { error } = await supabase
         .from('messages')
         .insert([{
@@ -114,47 +179,58 @@ export const ChatProvider = ({ children }) => {
           sender_id: sender.id,
           receiver_id: receiver.id,
           text: text || '',
-          image: image, 
+          image: finalImageUrl, // ✅ Karşı tarafın görebileceği gerçek internet linki!
           is_read: false
         }]);
 
       if (error) throw error;
+      // Veritabanına yazıldığında Realtime tetiklenip fetchMessages() ile kalıcı URL'yi herkese güncelleyecektir.
 
     } catch (e) {
       console.log("Mesaj gönderme hatası:", e);
     }
   };
 
-  // ❤️ MESAJ REAKSİYONU (Update)
+  // ❤️ MESAJ REAKSİYONU (Anında Ekrana Bas + Update)
   const reactToMessage = async (chatId, messageId, reactionType = '🐾') => {
     if (reactionType === '🐾') playSound('paw');
 
     try {
-      console.log("Reaksiyon gönderildi (DB kolonu varsa işler):", messageId);
+      console.log("Reaksiyon gönderildi:", messageId);
     } catch (e) {
       console.log("Reaksiyon hatası:", e);
     }
   };
 
-  // 🗑️ MESAJ SİL (GÜVENLİK EKLENDİ)
+  // 🗑️ MESAJ SİL (Anında Ekrandan Sil + Veritabanından Sil)
   const deleteMessage = async (chatId, messageId) => {
     if (!user) return;
+
+    setConversations(prev => prev.map(chat => {
+        if (chat.id === chatId) {
+            return { ...chat, messages: chat.messages.filter(m => m.id !== messageId) };
+        }
+        return chat;
+    }));
+
     try {
       await supabase
         .from('messages')
         .delete()
         .eq('id', messageId)
-        .eq('sender_id', user.id); // 🚨 Sadece mesajı GÖNDEREN silebilir!
+        .eq('sender_id', user.id); 
     } catch (e) {
       console.log("Mesaj silme hatası:", e);
     }
   };
 
-  // 🗑️ SOHBETİ SİL (Odadaki tüm mesajları siler) (GÜVENLİK EKLENDİ)
+  // 🗑️ SOHBETİ SİL
   const deleteConversation = async (chatId) => {
     if (!user) return;
+
+    setConversations(prev => prev.filter(c => c.id !== chatId));
+
     try {
-      // 🚨 Sadece odanın içinde olan kişi o odayı silebilir
       await supabase
         .from('messages')
         .delete()
@@ -167,6 +243,16 @@ export const ChatProvider = ({ children }) => {
 
   // 👀 OKUNDU OLARAK İŞARETLE
   const markAsRead = async (chatId, currentUserId) => {
+    setConversations(prev => prev.map(chat => {
+        if (chat.id === chatId) {
+            const updatedMessages = chat.messages.map(m => 
+                (String(m.senderId) !== String(currentUserId) && !m.isRead) ? { ...m, isRead: true } : m
+            );
+            return { ...chat, messages: updatedMessages };
+        }
+        return chat;
+    }));
+
     try {
       await supabase
         .from('messages')

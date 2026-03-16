@@ -39,7 +39,7 @@ const TRANSLATIONS = {
         register: "Kayıt Ol",
         freeAdBtn: "Ücretsiz İlan Ver",
         vetBotBtn: "Senin Veterinerin (AI)",
-        petIdBtn: "Hayvanının Cinsini Aİ'ya sor", // YENİ EKLENDİ
+        petIdBtn: "Hayvanının Cinsini Aİ'ya sor", 
         qrCollarBtn: "QR Kodlu Künye Al",  
        
         home: "Ana Sayfa",
@@ -100,7 +100,7 @@ const TRANSLATIONS = {
         register: "Sign Up",
         freeAdBtn: "Post Free Ad",
         vetBotBtn: "VetBOT (AI)",
-        petIdBtn: "What Breed? (AI)", // YENİ EKLENDİ
+        petIdBtn: "What Breed? (AI)", 
         qrCollarBtn: "Buy QR Tag", 
         
         home: "Home",
@@ -140,7 +140,7 @@ const TRANSLATIONS = {
         shop: "Popular Products",
         social: "Petsgram Feed",
         noData: "No content yet.",
-        copyright: "© 2024 Pito. All Rights Reserved.",
+        copyright: "© 2026 Pito. All Rights Reserved.",
         loginRequiredTitle: "Login Required",
         loginRequiredMsg: "Please login or register to use this feature.",
         cancel: "Cancel",
@@ -191,6 +191,15 @@ const HomeScreen = ({ navigation }) => {
       })();
   }, []);
 
+  // --- YENİ EKLENDİ: GENEL BİLDİRİM SESİ ---
+  useEffect(() => {
+      const subscription = Notifications.addNotificationReceivedListener(notification => {
+          // Bildirim ekrana düştüğünde game_start sesini çalar
+          playSound('game_start');
+      });
+      return () => subscription.remove();
+  }, []);
+
   const loadAllData = async () => {
       if(fetchListings) await fetchListings();
       if(fetchProducts) await fetchProducts(); 
@@ -221,7 +230,6 @@ const HomeScreen = ({ navigation }) => {
       if (user) {
           action();
       } else {
-          playSound('water'); 
           Alert.alert(t.loginRequiredTitle, t.loginRequiredMsg, [
               { text: t.cancel, style: 'cancel' },
               { text: t.login, onPress: () => navigation.navigate('Login') }
@@ -260,7 +268,6 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const handleUserSelect = (selectedUser) => {
-      playSound('water');
       checkAuth(() => {
           if (selectedUser.id === user.id) {
               navigation.navigate('Profile');
@@ -279,7 +286,6 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const handleNotificationPress = () => {
-      playSound('water');
       checkAuth(() => {
           setNotificationsVisible(true);
           markNotificationsAsRead(); 
@@ -287,7 +293,6 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const handleNotificationItemClick = (notification) => {
-      playSound('water');
       setNotificationsVisible(false);
       
       if (notification.type === 'follow' && notification.fromUserId) {
@@ -302,14 +307,13 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const renderRightActions = (id) => (
-      <TouchableOpacity style={styles.deleteAction} onPress={() => { playSound('water'); deleteNotification(id); }}>
+      <TouchableOpacity style={styles.deleteAction} onPress={() => { deleteNotification(id); }}>
           <Ionicons name="trash-outline" size={24} color="white" />
           <Text style={{color:'white', fontSize:10, fontWeight:'bold'}}>{activeLang === 'TR' ? 'Sil' : 'Del'}</Text>
       </TouchableOpacity>
   );
 
   const changeCountry = (newCountry) => {
-      playSound('water');
       if (user && user.country && user.country !== newCountry.code) {
           Alert.alert(t.regionRestrictedTitle, t.regionRestrictedMsg);
           return; 
@@ -320,12 +324,10 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const sendEmail = () => {
-      playSound('water');
       Linking.openURL('mailto:petspito@gmail.com');
   };
 
   const goToContactFromAbout = () => {
-      playSound('water');
       setAboutVisible(false);
       setTimeout(() => {
           setContactVisible(true);
@@ -333,7 +335,6 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const handleProfilePress = () => {
-      playSound('water');
       if (user) {
           navigation.navigate('Profile');
       } else {
@@ -342,20 +343,17 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const handleLogout = () => {
-    playSound('water');
     setMenuVisible(false);
     logout();
     Alert.alert(t.logoutAlertTitle, t.logoutAlertMsg);
   };
 
   const goToSettings = () => {
-      playSound('water');
       setMenuVisible(false);
       navigation.navigate('Settings');
   };
 
   const navigateToAdd = (categoryName) => {
-      playSound('water');
       setModalVisible(false); 
       let backendCategoryName = categoryName;
       if (categoryName === 'Find Mate') backendCategoryName = 'Eş Arayanlar';
@@ -368,7 +366,6 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const handleCategoryPress = (item) => {
-    playSound('water');
     if (item.type === 'vaccine') {
         checkAuth(() => navigation.navigate('VaccineReport'));
     } else {
@@ -415,7 +412,7 @@ const HomeScreen = ({ navigation }) => {
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>{title}</Text>
-        <TouchableOpacity onPress={() => { playSound('water'); navigation.navigate('AllListings', { title: title, data: dataList }); }}>
+        <TouchableOpacity onPress={() => { navigation.navigate('AllListings', { title: title, data: dataList }); }}>
           <Text style={styles.seeAll}>{t.seeAll}</Text>
         </TouchableOpacity>
       </View>
@@ -427,7 +424,7 @@ const HomeScreen = ({ navigation }) => {
             <TouchableOpacity 
                 key={item.id} 
                 style={[styles.card, { backgroundColor: theme.cardBg, opacity: item.is_found ? 0.8 : 1 }]} 
-                onPress={() => { playSound('water'); navigation.navigate('ListingDetail', { item }); }}
+                onPress={() => { navigation.navigate('ListingDetail', { item }); }}
             >
               <Image source={{ uri: item.img }} style={styles.cardImage} />
               
@@ -453,7 +450,7 @@ const HomeScreen = ({ navigation }) => {
   const renderProductCard = ({ item }) => (
     <TouchableOpacity 
         style={[styles.card, { backgroundColor: theme.cardBg }]}
-        onPress={() => { playSound('water'); navigation.navigate('ProductDetail', { product: item }); }}
+        onPress={() => { navigation.navigate('ProductDetail', { product: item }); }}
     >
         <Image source={{ uri: item.img }} style={styles.cardImage} />
         <View style={styles.cardInfo}>
@@ -510,7 +507,7 @@ const HomeScreen = ({ navigation }) => {
           <View style={[styles.headerContainer, { backgroundColor: theme.cardBg }]}>
               <View style={styles.headerRow}>
                   
-                  <TouchableOpacity onPress={() => { playSound('water'); setMenuVisible(true); }} style={{ padding: 5 }}>
+                  <TouchableOpacity onPress={() => { setMenuVisible(true); }} style={{ padding: 5 }}>
                     <Ionicons name="menu" size={30} color={theme.icon} />
                   </TouchableOpacity>
 
@@ -524,7 +521,7 @@ const HomeScreen = ({ navigation }) => {
                         onChangeText={handleSearch} 
                       />
                       {searchQuery.length > 0 && (
-                          <TouchableOpacity onPress={() => { playSound('water'); handleSearch(''); }}>
+                          <TouchableOpacity onPress={() => { handleSearch(''); }}>
                               <Ionicons name="close-circle" size={18} color={theme.subText} />
                           </TouchableOpacity>
                       )}
@@ -544,7 +541,7 @@ const HomeScreen = ({ navigation }) => {
                                 </View>
                             </TouchableOpacity>
 
-                            <TouchableOpacity onPress={() => { playSound('water'); checkAuth(() => navigation.navigate('ChatList')); }} style={{ padding: 5, marginLeft: 2 }}>
+                            <TouchableOpacity onPress={() => { checkAuth(() => navigation.navigate('ChatList')); }} style={{ padding: 5, marginLeft: 2 }}>
                                 <View>
                                     <Ionicons name="paper-plane-outline" size={28} color={theme.text} />
                                     {unreadMsgCount > 0 && (
@@ -557,10 +554,10 @@ const HomeScreen = ({ navigation }) => {
                         </View>
                     ) : (
                         <View style={[styles.authButtonsContainer, { backgroundColor: isDarkMode ? '#333' : '#F0F0F0' }]}>
-                            <TouchableOpacity onPress={() => { playSound('water'); navigation.navigate('Login'); }} style={styles.authBtn}>
+                            <TouchableOpacity onPress={() => { navigation.navigate('Login'); }} style={styles.authBtn}>
                                 <Text style={styles.authBtnText}>{t.login}</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={() => { playSound('water'); navigation.navigate('Register'); }} style={styles.authBtn}>
+                            <TouchableOpacity onPress={() => { navigation.navigate('Register'); }} style={styles.authBtn}>
                                 <Text style={styles.authBtnText}>{t.register}</Text>
                             </TouchableOpacity>
                         </View>
@@ -578,13 +575,13 @@ const HomeScreen = ({ navigation }) => {
                 contentContainerStyle={{ paddingBottom: 120 }}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} />}
               >
-                  {/* ✅ MODERN KARE HİKAYELER */}
+                  {/* MODERN KARE HİKAYELER */}
                   <View style={styles.storySection}>
                       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{paddingHorizontal: 20}}>
                           {/* Hikaye Ekle Butonu */}
                           <TouchableOpacity 
                               style={styles.storyContainer}
-                              onPress={() => { playSound('water'); checkAuth(() => navigation.navigate('Petsgram')); }}
+                              onPress={() => { checkAuth(() => navigation.navigate('Petsgram')); }}
                           >
                               <View style={[styles.storySquare, { borderColor: '#ddd', borderStyle: 'dashed' }]}>
                                   <Ionicons name="add" size={30} color="#6C5CE7" />
@@ -596,7 +593,7 @@ const HomeScreen = ({ navigation }) => {
                               <TouchableOpacity 
                                   key={item.id} 
                                   style={styles.storyContainer}
-                                  onPress={() => { playSound('water'); checkAuth(() => navigation.navigate('Petsgram', { initialPostId: item.id })); }}
+                                  onPress={() => { checkAuth(() => navigation.navigate('Petsgram', { initialPostId: item.id })); }}
                               >
                                   <Image source={{ uri: item.image }} style={[styles.storySquare, { borderColor: '#FD79A8' }]} />
                                   <Text style={[styles.storyText, { color: theme.text }]} numberOfLines={1}>{item.user ? item.user.split(' ')[0] : 'User'}</Text>
@@ -606,8 +603,9 @@ const HomeScreen = ({ navigation }) => {
                   </View>
 
                   <View style={[styles.bigAddButtonContainer, { paddingHorizontal: 20, marginBottom: 20 }]}>
+                        {/* YENİ NESİL BÜTÜNLEŞİK BUTON RENKLERİ */}
                         {/* İLAN EKLEME BUTONU */}
-                        <TouchableOpacity style={styles.bigAddButton} onPress={handleAddPress}>
+                        <TouchableOpacity style={[styles.bigAddButton, { backgroundColor: '#6C5CE7' }]} onPress={handleAddPress}>
                             <View style={styles.bigAddButtonContent}>
                                 <Ionicons name="add-circle" size={32} color="white" />
                                 <Text style={styles.bigAddButtonText}>{t.freeAdBtn}</Text>
@@ -615,14 +613,14 @@ const HomeScreen = ({ navigation }) => {
                             <Ionicons name="chevron-forward" size={24} color="white" />
                         </TouchableOpacity>
 
-                        {/* ✅ OYUN DÜNYASI BUTONU (GAME LIST) */}
+                        {/* OYUN DÜNYASI BUTONU */}
                         <TouchableOpacity 
-                            style={[styles.gameWorldButton, { marginTop: 12 }]} 
-                            onPress={() => { playSound('water'); navigation.navigate('GameList'); }}
+                            style={[styles.gameWorldButton, { backgroundColor: '#5B4BC4', marginTop: 12 }]} 
+                            onPress={() => { navigation.navigate('GameList'); }}
                         >
                             <View style={styles.bigAddButtonContent}>
                                 <View style={styles.gameIconBox}>
-                                    <Ionicons name="game-controller" size={30} color="white" />
+                                    <Ionicons name="game-controller" size={30} color="#5B4BC4" />
                                 </View>
                                 <View style={{marginLeft: 15}}>
                                     <Text style={styles.bigAddButtonText}>{t.gameBtn}</Text>
@@ -630,48 +628,48 @@ const HomeScreen = ({ navigation }) => {
                                 </View>
                             </View>
                             <Ionicons name="play-circle" size={32} color="white" style={{opacity: 0.8}} />
-                            <Ionicons name="paw" size={80} color="rgba(255,255,255,0.1)" style={styles.bgIconDecor} />
+                            <Ionicons name="paw" size={80} color="rgba(255,255,255,0.05)" style={styles.bgIconDecor} />
                         </TouchableOpacity>
 
                         {/* VETERİNER BOT BUTONU */}
-                        <View style={{ marginTop: 10 }}>
+                        <View style={{ marginTop: 12 }}>
                             <TouchableOpacity 
-                                style={[styles.bigAddButton, { backgroundColor: '#4ECDC4' }]} 
-                                onPress={() => { playSound('water'); navigation.navigate('VetBot'); }}
+                                style={[styles.bigAddButton, { backgroundColor: '#4A3BA1' }]} 
+                                onPress={() => { navigation.navigate('VetBot'); }}
                             >
                                 <View style={styles.bigAddButtonContent}>
                                     <Ionicons name="medical" size={32} color="white" />
                                     <Text style={styles.bigAddButtonText}>{t.vetBotBtn}</Text>
                                 </View>
-                                <Ionicons name="chatbubbles" size={24} color="white" />
+                                <Ionicons name="chatbubbles" size={24} color="white" style={{opacity: 0.8}} />
                             </TouchableOpacity>
                         </View>
 
-                        {/* ✅ YENİ: YAPAY ZEKA CİNS TAHMİNİ BUTONU */}
-                        <View style={{ marginTop: 10 }}>
+                        {/* YAPAY ZEKA CİNS TAHMİNİ BUTONU */}
+                        <View style={{ marginTop: 12 }}>
                             <TouchableOpacity 
-                                style={[styles.bigAddButton, { backgroundColor: '#FF6B6B' }]} 
-                                onPress={() => { playSound('water'); navigation.navigate('PetIdentifier'); }}
+                                style={[styles.bigAddButton, { backgroundColor: '#3A2B7E' }]} 
+                                onPress={() => { navigation.navigate('PetIdentifier'); }}
                             >
                                 <View style={styles.bigAddButtonContent}>
                                     <Ionicons name="scan-circle" size={32} color="white" />
                                     <Text style={styles.bigAddButtonText}>{t.petIdBtn}</Text>
                                 </View>
-                                <Ionicons name="sparkles" size={24} color="white" />
+                                <Ionicons name="sparkles" size={24} color="white" style={{opacity: 0.8}} />
                             </TouchableOpacity>
                         </View>
 
                         {/* QR KOD KOLYESİ BUTONU */}
-                        <View style={{ marginTop: 10 }}>
+                        <View style={{ marginTop: 12 }}>
                             <TouchableOpacity 
-                                style={[styles.bigAddButton, { backgroundColor: '#8854d0' }]} 
-                                onPress={() => { playSound('water'); navigation.navigate('Shop'); }}
+                                style={[styles.bigAddButton, { backgroundColor: '#291C5B' }]} 
+                                onPress={() => { navigation.navigate('Shop'); }}
                             >
                                 <View style={styles.bigAddButtonContent}>
                                     <Ionicons name="qr-code" size={32} color="white" />
                                     <Text style={styles.bigAddButtonText}>{t.qrCollarBtn}</Text>
                                 </View>
-                                <Ionicons name="cart" size={24} color="white" />
+                                <Ionicons name="cart" size={24} color="white" style={{opacity: 0.8}} />
                             </TouchableOpacity>
                         </View>
 
@@ -701,7 +699,7 @@ const HomeScreen = ({ navigation }) => {
                   <View style={styles.section}>
                       <View style={styles.sectionHeader}>
                           <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.shop}</Text>
-                          <TouchableOpacity onPress={() => { playSound('water'); navigation.navigate('Shop'); }}>
+                          <TouchableOpacity onPress={() => { navigation.navigate('Shop'); }}>
                             <Text style={styles.seeAll}>{t.seeAll}</Text>
                           </TouchableOpacity>
                       </View>
@@ -730,7 +728,7 @@ const HomeScreen = ({ navigation }) => {
       {/* BOTTOM BAR (MODERN APERTURE BUTON) */}
       <View style={[styles.bottomBar, { backgroundColor: theme.cardBg }]}>
         
-        <TouchableOpacity style={styles.tabItem} onPress={() => { playSound('water'); setSearchQuery(''); }}>
+        <TouchableOpacity style={styles.tabItem} onPress={() => { setSearchQuery(''); }}>
             <Ionicons name="home-outline" size={26} color={COLORS.primary} />
             <Text style={[styles.tabText, { color: COLORS.primary }]}>{t.home}</Text>
         </TouchableOpacity>
@@ -738,7 +736,7 @@ const HomeScreen = ({ navigation }) => {
         {/* Petsgram - Modern Aperture Icon */}
         <TouchableOpacity 
             style={styles.tabItem} 
-            onPress={() => { playSound('water'); checkAuth(() => navigation.navigate('Petsgram')); }}
+            onPress={() => { checkAuth(() => navigation.navigate('Petsgram')); }}
             activeOpacity={0.9}
         >
             <View style={styles.modernApertureContainer}>
@@ -747,7 +745,7 @@ const HomeScreen = ({ navigation }) => {
             <Text style={styles.petsgramTabText}>Petsgram</Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.tabItem} onPress={() => { playSound('water'); checkAuth(() => navigation.navigate('Profile')); }}>
+        <TouchableOpacity style={styles.tabItem} onPress={() => { checkAuth(() => navigation.navigate('Profile')); }}>
             {user && user.avatar ? (
                 <Image source={{ uri: user.avatar }} style={styles.bottomBarAvatar} />
             ) : (
@@ -759,20 +757,37 @@ const HomeScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* MENÜ MODALI */}
+      {/* YENİ NESİL ŞIK MENÜ MODALI */}
       <Modal animationType="fade" transparent={true} visible={menuVisible} onRequestClose={() => setMenuVisible(false)}>
          <TouchableOpacity style={styles.menuOverlay} activeOpacity={1} onPress={() => setMenuVisible(false)}>
             <View style={[styles.sideMenu, { backgroundColor: theme.cardBg }]}>
-                <View style={styles.menuHeader}>
-                    <Text style={styles.menuTitle}>{t.menuTitle}</Text>
-                    <TouchableOpacity onPress={() => setMenuVisible(false)}>
-                        <Ionicons name="close" size={24} color={theme.icon} />
+                
+                {/* Modern Menü Header'ı */}
+                <View style={styles.modernMenuHeader}>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                        {user && user.avatar ? (
+                            <Image source={{ uri: user.avatar }} style={styles.menuAvatar} />
+                        ) : (
+                            <View style={styles.menuAvatarPlaceholder}>
+                                <Ionicons name="person" size={24} color="white" />
+                            </View>
+                        )}
+                        <View style={{justifyContent: 'center'}}>
+                            <Text style={[styles.menuTitle, {color: theme.text}]}>
+                                {user ? (user.fullname || user.username) : t.menuTitle}
+                            </Text>
+                            {user && <Text style={{color: theme.subText, fontSize: 13, marginTop: 2}}>@{user.username}</Text>}
+                        </View>
+                    </View>
+                    <TouchableOpacity onPress={() => setMenuVisible(false)} style={[styles.closeMenuBtn, {backgroundColor: theme.background}]}>
+                        <Ionicons name="close" size={22} color={theme.icon} />
                     </TouchableOpacity>
                 </View>
-                <ScrollView showsVerticalScrollIndicator={false}>
+
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{paddingBottom: 30}}>
                     
                     <Text style={styles.menuSectionTitle}>{t.regionLang}</Text>
-                    <TouchableOpacity style={styles.menuItem} onPress={() => { playSound('water'); setMenuVisible(false); setCountryModalVisible(true); }}>
+                    <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setCountryModalVisible(true); }}>
                         <Text style={{fontSize:22, marginRight:15}}>{country?.flag || '🇹🇷'}</Text>
                         <Text style={[styles.menuItemText, { color: theme.text }]}>
                             {country?.name || 'Türkiye'} ({country?.code || 'TR'})
@@ -784,46 +799,45 @@ const HomeScreen = ({ navigation }) => {
 
                     <Text style={styles.menuSectionTitle}>{t.appSection}</Text>
                     
-                    {/* ✅ OYUN BUTONU (HAMBURGER MENÜ) */}
-                    <TouchableOpacity style={styles.menuItem} onPress={() => { playSound('water'); setMenuVisible(false); navigation.navigate('GameList'); }}>
-                        <Ionicons name="game-controller-outline" size={22} color="#6C5CE7" />
+                    <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); navigation.navigate('GameList'); }}>
+                        <Ionicons name="game-controller-outline" size={24} color="#6C5CE7" />
                         <Text style={[styles.menuItemText, { color: theme.text }]}>{t.Oyunlar}</Text>
                         <View style={styles.newBadge}>
                             <Text style={styles.newBadgeText}>YENİ</Text>
                         </View>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.menuItem} onPress={() => { playSound('water'); setMenuVisible(false); navigation.navigate('Shop'); }}>
-                        <Ionicons name="storefront-outline" size={22} color={theme.icon} />
+                    <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); navigation.navigate('Shop'); }}>
+                        <Ionicons name="storefront-outline" size={24} color={theme.icon} />
                         <Text style={[styles.menuItemText, { color: theme.text }]}>{t.menuShop}</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.menuItem} onPress={() => { playSound('water'); setMenuVisible(false); checkAuth(() => navigation.navigate('Profile')); }}>
-                        <Ionicons name="person-outline" size={22} color={theme.icon} />
+                    <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); checkAuth(() => navigation.navigate('Profile')); }}>
+                        <Ionicons name="person-outline" size={24} color={theme.icon} />
                         <Text style={[styles.menuItemText, { color: theme.text }]}>{t.profile}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.menuItem} onPress={goToSettings}>
-                        <Ionicons name="settings-outline" size={22} color={theme.icon} />
+                        <Ionicons name="settings-outline" size={24} color={theme.icon} />
                         <Text style={[styles.menuItemText, { color: theme.text }]}>{t.settings}</Text>
                     </TouchableOpacity>
                     
-                    <TouchableOpacity style={styles.menuItem} onPress={() => { playSound('water'); setMenuVisible(false); navigation.navigate('Settings'); }}>
-                        <Ionicons name="globe-outline" size={22} color={theme.icon} />
+                    <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); navigation.navigate('Settings'); }}>
+                        <Ionicons name="globe-outline" size={24} color={theme.icon} />
                         <Text style={[styles.menuItemText, { color: theme.text }]}>{t.language}</Text>
                     </TouchableOpacity>
 
 
-                    <TouchableOpacity style={styles.menuItem} onPress={() => { playSound('water'); setMenuVisible(false); setContactVisible(true); }}>
-                        <Ionicons name="mail-outline" size={22} color={theme.icon} />
+                    <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setContactVisible(true); }}>
+                        <Ionicons name="mail-outline" size={24} color={theme.icon} />
                         <Text style={[styles.menuItemText, { color: theme.text }]}>{t.contactUs}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={styles.menuItem} onPress={() => { playSound('water'); setMenuVisible(false); setAboutVisible(true); }}>
-                        <Ionicons name="information-circle-outline" size={22} color={theme.icon} />
+                    <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setAboutVisible(true); }}>
+                        <Ionicons name="information-circle-outline" size={24} color={theme.icon} />
                         <Text style={[styles.menuItemText, { color: theme.text }]}>{t.aboutUs}</Text>
                     </TouchableOpacity>
                     {user && (
-                        <TouchableOpacity style={[styles.menuItem, { marginTop: 20 }]} onPress={handleLogout}>
-                            <Ionicons name="log-out-outline" size={22} color="#FF4D4D" />
+                        <TouchableOpacity style={[styles.menuItem, { marginTop: 20, backgroundColor: '#FF4D4D15' }]} onPress={handleLogout}>
+                            <Ionicons name="log-out-outline" size={24} color="#FF4D4D" />
                             <Text style={[styles.menuItemText, { color: '#FF4D4D' }]}>{t.logout}</Text>
                         </TouchableOpacity>
                     )}
@@ -832,7 +846,7 @@ const HomeScreen = ({ navigation }) => {
          </TouchableOpacity>
       </Modal>
 
-      {/* DİĞER MODALLAR (About/Contact/Country/Notif) */}
+      {/* DİĞER MODALLAR (About/Contact/Country) */}
       <Modal animationType="slide" transparent={true} visible={aboutVisible} onRequestClose={() => setAboutVisible(false)}>
         <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { height: '80%', backgroundColor: theme.cardBg }]}>
@@ -916,12 +930,13 @@ const HomeScreen = ({ navigation }) => {
         </View>
       </Modal>
 
+      {/* YENİ NESİL ŞIK BİLDİRİM MODALI */}
       <Modal animationType="fade" transparent={true} visible={notificationsVisible} onRequestClose={() => setNotificationsVisible(false)}>
         <GestureHandlerRootView style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { height: '60%', backgroundColor: theme.cardBg }]}>
+            <View style={[styles.modalContent, { height: '70%', backgroundColor: theme.background }]}>
                 <View style={styles.modalHeader}>
                     <Text style={[styles.modalTitle, { color: theme.text }]}>{t.notifications}</Text>
-                    <TouchableOpacity onPress={() => setNotificationsVisible(false)}>
+                    <TouchableOpacity onPress={() => setNotificationsVisible(false)} style={styles.closeMenuBtn}>
                         <Ionicons name="close" size={24} color={theme.icon} />
                     </TouchableOpacity>
                 </View>
@@ -929,33 +944,34 @@ const HomeScreen = ({ navigation }) => {
                     <FlatList 
                         data={user.notifications}
                         keyExtractor={(item) => item.id.toString()}
+                        contentContainerStyle={{ paddingBottom: 20 }}
                         renderItem={({ item }) => (
                             <Swipeable renderRightActions={() => renderRightActions(item.id)}>
-                                <TouchableOpacity style={[styles.notificationItem, { borderBottomColor: theme.border, backgroundColor: theme.cardBg }]} onPress={() => handleNotificationItemClick(item)}>
+                                <TouchableOpacity style={[styles.notificationItem, { backgroundColor: theme.cardBg }]} onPress={() => handleNotificationItemClick(item)}>
                                     <View style={styles.notifIconContainer}>
                                             {item.fromUserAvatar ? (
                                                 <Image source={{ uri: item.fromUserAvatar }} style={styles.notifAvatar} />
                                             ) : (
                                                 <View style={[styles.notifIconPlaceholder, { backgroundColor: item.type === 'follow' ? '#E3F2FD' : '#FFF3E0' }]}>
-                                                    <Ionicons name={item.type === 'follow' ? 'person-add' : 'notifications'} size={20} color={item.type === 'follow' ? '#2196F3' : '#FF9800'} />
+                                                    <Ionicons name={item.type === 'follow' ? 'person-add' : 'notifications'} size={22} color={item.type === 'follow' ? '#2196F3' : '#FF9800'} />
                                                 </View>
                                             )}
                                     </View>
                                     <View style={{ flex: 1 }}>
                                             <Text style={[styles.notifText, { color: theme.text }]}>{item.message}</Text>
-                                            <Text style={{ fontSize: 10, color: theme.subText, marginTop: 3 }}>
+                                            <Text style={{ fontSize: 11, color: theme.subText, marginTop: 4 }}>
                                                 {new Date(item.date).toLocaleDateString()} • {new Date(item.date).toLocaleTimeString().slice(0,5)}
                                             </Text>
                                     </View>
-                                    <Ionicons name="chevron-forward" size={16} color={theme.subText} />
+                                    <Ionicons name="chevron-forward" size={18} color={theme.subText} style={{marginLeft: 10}} />
                                 </TouchableOpacity>
                             </Swipeable>
                         )}
                     />
                 ) : (
-                    <View style={{ alignItems: 'center', marginTop: 50 }}>
-                        <Ionicons name="notifications-off-outline" size={50} color={theme.subText} />
-                        <Text style={{ marginTop: 10, color: theme.subText }}>{t.noNotif}</Text>
+                    <View style={{ alignItems: 'center', marginTop: 80 }}>
+                        <Ionicons name="notifications-off-outline" size={60} color={theme.subText} style={{opacity: 0.5}} />
+                        <Text style={{ marginTop: 15, color: theme.subText, fontSize: 16 }}>{t.noNotif}</Text>
                     </View>
                 )}
             </View>
@@ -1020,7 +1036,6 @@ const styles = StyleSheet.create({
 
   bigAddButtonContainer: { marginTop: 5 },
   bigAddButton: {
-      backgroundColor: COLORS.primary,
       borderRadius: 20,
       paddingVertical: 18,
       paddingHorizontal: 20,
@@ -1034,11 +1049,11 @@ const styles = StyleSheet.create({
       shadowRadius: 3.84,
   },
   bigAddButtonContent: { flexDirection: 'row', alignItems: 'center' },
-  bigAddButtonText: { color: 'white', fontSize: 18, fontWeight: 'bold', marginLeft: 15 },
+  bigAddButtonText: { color: 'white', fontSize: 17, fontWeight: 'bold', marginLeft: 15 },
 
   // Modern Game Button
-  gameWorldButton: { backgroundColor: '#6C5CE7', borderRadius: 20, paddingVertical: 18, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', elevation: 8, shadowColor: '#6C5CE7', shadowOpacity: 0.4, overflow: 'hidden' },
-  gameIconBox: { backgroundColor: '#FDCB6E', padding: 8, borderRadius: 12 },
+  gameWorldButton: { borderRadius: 20, paddingVertical: 18, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', elevation: 8, shadowColor: '#000', shadowOpacity: 0.3, overflow: 'hidden' },
+  gameIconBox: { backgroundColor: 'white', padding: 8, borderRadius: 12 },
   gameSubText: { color: 'rgba(255,255,255,0.8)', fontSize: 11, fontWeight: '600' },
   bgIconDecor: { position: 'absolute', right: -15, bottom: -20, opacity: 0.15 },
 
@@ -1094,32 +1109,37 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 10, marginTop: 4, fontWeight: '700' },
   bottomBarAvatar: { width: 26, height: 26, borderRadius: 13, borderWidth: 1.5, borderColor: '#6C5CE7' },
   
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 20, paddingBottom: 40 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  modalContent: { borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 20, paddingBottom: 40, elevation: 20, shadowColor: '#000', shadowOffset: {width: 0, height: -5}, shadowOpacity: 0.1 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 20, fontWeight: 'bold' },
   optionBtn: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1 },
   iconBox: { width: 50, height: 50, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
   optionText: { flex: 1, fontSize: 16, fontWeight: '600' },
   
-  // Menu Styles
-  sideMenu: { width: '78%', height: '100%', padding: 25, paddingTop: 50 },
-  menuTitle: { fontSize: 24, fontWeight: 'bold', color: '#6C5CE7' },
-  menuSectionTitle: { fontSize: 14, color: COLORS.gray, fontWeight: 'bold', marginTop: 15, marginBottom: 10, textTransform: 'uppercase' },
-  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16 },
-  menuItemText: { fontSize: 16, marginLeft: 15, fontWeight: '600' },
-  menuDivider: { height: 1, marginVertical: 15 },
-  newBadge: { backgroundColor: '#FDCB6E', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, marginLeft: 10 },
+  // Yeni Nesil Menü Stilleri
+  sideMenu: { width: '80%', height: '100%', padding: 25, paddingTop: 50, borderTopRightRadius: 40, borderBottomRightRadius: 40, shadowColor: '#000', shadowOffset: {width: 10, height: 0}, shadowOpacity: 0.15, shadowRadius: 20, elevation: 25 },
+  modernMenuHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 35 },
+  menuAvatar: { width: 56, height: 56, borderRadius: 28, marginRight: 15, borderWidth: 2, borderColor: '#6C5CE7' },
+  menuAvatarPlaceholder: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#6C5CE7', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+  closeMenuBtn: { padding: 6, borderRadius: 20 },
+  menuTitle: { fontSize: 18, fontWeight: 'bold' },
+  menuSectionTitle: { fontSize: 12, color: COLORS.gray, fontWeight: 'bold', marginTop: 10, marginBottom: 15, textTransform: 'uppercase', letterSpacing: 1 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 15, borderRadius: 16, marginBottom: 5 },
+  menuItemText: { fontSize: 15, marginLeft: 15, fontWeight: '600' },
+  menuDivider: { height: 1, marginVertical: 20, opacity: 0.5 },
+  newBadge: { backgroundColor: '#FDCB6E', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12, marginLeft: 'auto' },
   newBadgeText: { color: '#000', fontSize: 10, fontWeight: 'bold' },
   
   aboutText: { fontSize: 16, lineHeight: 24, textAlign: 'center', marginBottom: 10 },
   
-  notificationItem: { flexDirection: 'row', padding: 15, borderBottomWidth: 1, alignItems: 'center' },
+  // Yeni Nesil Bildirim Stilleri
+  notificationItem: { flexDirection: 'row', padding: 18, alignItems: 'center', borderRadius: 20, marginBottom: 15, elevation: 3, shadowColor: '#000', shadowOffset: {width: 0, height: 3}, shadowOpacity: 0.08, shadowRadius: 5 },
   notifIconContainer: { marginRight: 15 },
-  notifAvatar: { width: 40, height: 40, borderRadius: 20 },
-  notifIconPlaceholder: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-  notifText: { fontSize: 14, fontWeight: '500' },
-  deleteAction: { backgroundColor: '#FF4D4D', justifyContent: 'center', alignItems: 'center', width: 70, height: '100%' },
+  notifAvatar: { width: 48, height: 48, borderRadius: 24 },
+  notifIconPlaceholder: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
+  notifText: { fontSize: 14, fontWeight: '600', lineHeight: 20 },
+  deleteAction: { backgroundColor: '#FF4D4D', justifyContent: 'center', alignItems: 'center', width: 80, height: '80%', borderRadius: 20, marginTop: 5, marginLeft: 10 },
   
   oxpiContainer: { marginTop: 20, padding: 15, borderWidth: 1, borderColor: '#eee', borderRadius: 15, alignItems: 'center', marginBottom: 20 },
   oxpiHeader: { fontWeight: 'bold', marginBottom: 10 },

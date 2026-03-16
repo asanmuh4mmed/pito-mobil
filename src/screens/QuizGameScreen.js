@@ -20,7 +20,7 @@ const CATEGORIES = [
     { id: 'animals', icon: 'paw', color: '#f59e0b', tr: 'Hayvanlar Alemi', au: 'Animal World' },
     { id: 'general', icon: 'earth', color: '#3b82f6', tr: 'Genel Kültür', au: 'General Knowledge' },
     { id: 'science', icon: 'flask', color: '#10b981', tr: 'Bilim & Doğa', au: 'Science & Nature' },
-    { id: 'health', icon: 'medkit', color: '#ef4444', tr: 'Sağlık', au: 'Health' } // ✅ Sağlık Eklendi
+    { id: 'health', icon: 'medkit', color: '#ef4444', tr: 'Sağlık', au: 'Health' }
 ];
 
 // --- ZEKA SEVİYELERİ ---
@@ -35,11 +35,14 @@ const getIntelligenceRank = (level, isAU) => {
     return isAU ? { title: "Galactic Chimp 🦍", desc: "Unstoppable Professor Brain!" } : { title: "Galaktik Şempanze 🦍", desc: "Karşımızda duran bir profesör!" };
 };
 
-// Yedek (Fallback) Sorular - Bilmeceler Çıkarıldı, Sağlık Eklendi
+// Yedek (Fallback) Sorular 
 const FALLBACK_QUESTIONS = [
     { cat: 'animals', difficulty: 1, tr: { q: "Kediler günün ortalama yüzde kaçını uyuyarak geçirir?", opts: ["%30", "%50", "%70", "%90"], ans: 2 }, au: { q: "Cats spend roughly what percentage of their day sleeping?", opts: ["30%", "50%", "70%", "90%"], ans: 2 } },
+    { cat: 'animals', difficulty: 1, tr: { q: "Hangi hayvanın kalbi kafasındadır?", opts: ["Yengeç", "Karides", "Kalamar", "Denizatları"], ans: 1 }, au: { q: "Which animal has its heart in its head?", opts: ["Crab", "Shrimp", "Squid", "Seahorse"], ans: 1 } },
     { cat: 'general', difficulty: 1, tr: { q: "Dünyanın en uzun nehri hangisidir?", opts: ["Amazon", "Nil", "Yangtze", "Mississippi"], ans: 1 }, au: { q: "What is the longest river in the world?", opts: ["Amazon", "Nile", "Yangtze", "Mississippi"], ans: 1 } },
+    { cat: 'general', difficulty: 1, tr: { q: "Mona Lisa tablosu hangi müzede sergilenmektedir?", opts: ["British Museum", "Prado", "Louvre", "Hermitage"], ans: 2 }, au: { q: "In which museum is the Mona Lisa displayed?", opts: ["British Museum", "Prado", "Louvre", "Hermitage"], ans: 2 } },
     { cat: 'science', difficulty: 1, tr: { q: "Suyun kimyasal formülü nedir?", opts: ["CO2", "H2O", "O2", "NaCl"], ans: 1 }, au: { q: "What is the chemical formula for water?", opts: ["CO2", "H2O", "O2", "NaCl"], ans: 1 } },
+    { cat: 'science', difficulty: 1, tr: { q: "Güneş sistemindeki en büyük gezegen hangisidir?", opts: ["Mars", "Satürn", "Venüs", "Jüpiter"], ans: 3 }, au: { q: "What is the largest planet in our solar system?", opts: ["Mars", "Saturn", "Venus", "Jupiter"], ans: 3 } },
     { cat: 'health', difficulty: 1, tr: { q: "İnsan vücudundaki en büyük organ hangisidir?", opts: ["Kalp", "Mide", "Deri", "Beyin"], ans: 2 }, au: { q: "What is the largest organ in the human body?", opts: ["Heart", "Stomach", "Skin", "Brain"], ans: 2 } },
     { cat: 'health', difficulty: 2, tr: { q: "C vitamini eksikliğinde hangi hastalık görülür?", opts: ["Raşitizm", "İskorbüt", "Anemi", "Guatr"], ans: 1 }, au: { q: "Which disease is caused by Vitamin C deficiency?", "opts": ["Rickets", "Scurvy", "Anemia", "Goiter"], "ans": 1 } }
 ];
@@ -93,7 +96,7 @@ const QuizGameScreen = ({ navigation }) => {
     const [bestScore, setBestScore] = useState(0);
     const [level, setLevel] = useState(1);
     const [correctCount, setCorrectCount] = useState(0); 
-    const [lives, setLives] = useState(3); // ✅ 3 CAN SİSTEMİ
+    const [lives, setLives] = useState(3); 
     
     const [timeLeft, setTimeLeft] = useState(QUESTION_TIME);
     const [selectedAnswer, setSelectedAnswer] = useState(null);
@@ -109,10 +112,9 @@ const QuizGameScreen = ({ navigation }) => {
     const cardScaleAnim = useRef(new Animated.Value(0.9)).current;
     const timerRef = useRef(null);
     
-    // Asenkron işlemlerde güncel kalmaları için Referanslar
     const levelRef = useRef(1);
     const livesRef = useRef(3);
-    const usedQuestionsRef = useRef([]); // ✅ ÇIKAN SORULARI TUTAN HAFIZA
+    const usedQuestionsRef = useRef([]); 
 
     useEffect(() => {
         loadBestScore();
@@ -133,10 +135,15 @@ const QuizGameScreen = ({ navigation }) => {
                 .eq('category', catId);
                 
             let loadedData = [];
-            if (error || !data || data.length === 0) {
-                console.log("Supabase'den çekilemedi, yedek sorular kullanılıyor.");
+            
+            if (error) {
+                console.error("❌ Supabase Hatası:", error.message);
+                loadedData = FALLBACK_QUESTIONS.filter(q => q.cat === catId);
+            } else if (!data || data.length === 0) {
+                console.warn("⚠️ Tablo boş döndü! Lütfen Supabase'den RLS (Row Level Security) ayarını kapatın.");
                 loadedData = FALLBACK_QUESTIONS.filter(q => q.cat === catId);
             } else {
+                console.log(`✅ Supabase'den '${catId}' kategorisinde ${data.length} soru başarıyla çekildi!`);
                 loadedData = data;
             }
             
@@ -144,6 +151,7 @@ const QuizGameScreen = ({ navigation }) => {
             startGame(loadedData);
 
         } catch (err) {
+            console.error("Bilinmeyen Hata:", err);
             const fallbackData = FALLBACK_QUESTIONS.filter(q => q.cat === catId);
             setAllQuestions(fallbackData);
             startGame(fallbackData);
@@ -162,7 +170,7 @@ const QuizGameScreen = ({ navigation }) => {
         setCorrectCount(0);
         setLives(3);
         livesRef.current = 3;
-        usedQuestionsRef.current = []; // Hafızayı sıfırla
+        usedQuestionsRef.current = []; 
         setIsSaved(false);
         setGameState('PLAYING');
         
@@ -170,69 +178,81 @@ const QuizGameScreen = ({ navigation }) => {
     };
 
     const loadNextQuestion = (currentLevel, directData = null) => {
-        setIsAnswered(false);
-        setSelectedAnswer(null);
-        setTimeLeft(QUESTION_TIME);
-        
-        const sourceData = directData || allQuestions;
+        try {
+            setIsAnswered(false);
+            setSelectedAnswer(null);
+            setTimeLeft(QUESTION_TIME);
+            
+            const sourceData = directData || allQuestions;
 
-        // ✅ 1. KURAL: ÇIKAN SORULARI FİLTRELE
-        const unusedQuestions = sourceData.filter(q => {
-            const identifier = q.id || q.tr.q; // ID yoksa soru metnini baz al
-            return !usedQuestionsRef.current.includes(identifier);
-        });
-
-        // Eğer o kategorideki tüm sorular bittiyse (Harika oynadı!)
-        if (unusedQuestions.length === 0) {
-            triggerGameOver(currentLevel, true);
-            return;
-        }
-
-        // ✅ 2. KURAL: ZORLUK SEVİYESİNE GÖRE FİLTRELE
-        let targetDifficulty = 1; 
-        if (currentLevel >= 6 && currentLevel <= 10) targetDifficulty = 2; 
-        if (currentLevel > 10) targetDifficulty = 3; 
-
-        let availableQuestions = unusedQuestions.filter(q => q.difficulty === targetDifficulty);
-        
-        // Eğer o zorlukta soru kalmadıysa, kalanlardan rastgele ver
-        if (availableQuestions.length === 0) {
-            availableQuestions = unusedQuestions;
-        }
-
-        // Rastgele seç ve Hafızaya Kaydet
-        const randomQ = availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
-        setActiveQuestion(randomQ);
-        
-        const qIdentifier = randomQ.id || randomQ.tr.q;
-        usedQuestionsRef.current.push(qIdentifier);
-        
-        cardScaleAnim.setValue(0.8);
-        Animated.spring(cardScaleAnim, { toValue: 1, friction: 5, tension: 40, useNativeDriver: true }).start();
-
-        timerAnimWidth.setValue(SCREEN_WIDTH - 40);
-        Animated.timing(timerAnimWidth, {
-            toValue: 0,
-            duration: QUESTION_TIME * 1000,
-            easing: Easing.linear,
-            useNativeDriver: false
-        }).start();
-
-        clearInterval(timerRef.current);
-        timerRef.current = setInterval(() => {
-            setTimeLeft(prev => {
-                if (prev <= 1) {
-                    clearInterval(timerRef.current);
-                    setIsAnswered(true); // Tıklamayı engelle
-                    handleWrongAnswer(); // Süre bitince yanlış sayılır
-                    return 0;
-                }
-                return prev - 1;
+            let unusedQuestions = sourceData.filter(q => {
+                if (!q) return false;
+                const identifier = q.id || q.tr?.q || JSON.stringify(q); 
+                return !usedQuestionsRef.current.includes(identifier);
             });
-        }, 1000);
+
+            // ✅ EĞER SORU HAVUZU BİTTİYSE HAFIZAYI SIFIRLA VE BAŞA SAR!
+            if (unusedQuestions.length === 0 && sourceData.length > 0) {
+                console.log("♻️ Tüm sorular bitti, sorular baştan karıştırılıyor!");
+                usedQuestionsRef.current = [];
+                unusedQuestions = sourceData;
+            }
+
+            if (unusedQuestions.length === 0) {
+                triggerGameOver(currentLevel, true);
+                return;
+            }
+
+            let targetDifficulty = 1; 
+            if (currentLevel >= 6 && currentLevel <= 10) targetDifficulty = 2; 
+            if (currentLevel > 10) targetDifficulty = 3; 
+
+            let availableQuestions = unusedQuestions.filter(q => q && q.difficulty === targetDifficulty);
+            
+            if (availableQuestions.length === 0) {
+                availableQuestions = unusedQuestions;
+            }
+
+            const randomQ = availableQuestions[Math.floor(Math.random() * availableQuestions.length)];
+            if (!randomQ) {
+                 triggerGameOver(currentLevel, true);
+                 return;
+            }
+
+            setActiveQuestion(randomQ);
+            
+            const qIdentifier = randomQ.id || randomQ.tr?.q || JSON.stringify(randomQ);
+            usedQuestionsRef.current.push(qIdentifier);
+            
+            cardScaleAnim.setValue(0.8);
+            Animated.spring(cardScaleAnim, { toValue: 1, friction: 5, tension: 40, useNativeDriver: true }).start();
+
+            timerAnimWidth.setValue(SCREEN_WIDTH - 40);
+            Animated.timing(timerAnimWidth, {
+                toValue: 0,
+                duration: QUESTION_TIME * 1000,
+                easing: Easing.linear,
+                useNativeDriver: false
+            }).start();
+
+            clearInterval(timerRef.current);
+            timerRef.current = setInterval(() => {
+                setTimeLeft(prev => {
+                    if (prev <= 1) {
+                        clearInterval(timerRef.current);
+                        setIsAnswered(true); 
+                        handleWrongAnswer(); 
+                        return 0;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+        } catch(e) {
+            console.log("Soru yükleme hatası:", e);
+            triggerGameOver(currentLevel, true);
+        }
     };
 
-    // ✅ CAN KAYBETME MANTIĞI
     const handleWrongAnswer = () => {
         livesRef.current -= 1;
         setLives(livesRef.current);
@@ -241,7 +261,7 @@ const QuizGameScreen = ({ navigation }) => {
             playSound('gameover');
             setTimeout(() => triggerGameOver(levelRef.current), 1000);
         } else {
-            playSound('bubble_pop'); // Yanlış bildi, canı gitti sesi
+            playSound('bubble_pop'); 
             setTimeout(() => loadNextQuestion(levelRef.current), 1200);
         }
     };
@@ -253,12 +273,14 @@ const QuizGameScreen = ({ navigation }) => {
         timerAnimWidth.stopAnimation();
 
         setSelectedAnswer(index);
-        const correctIndex = isAU ? activeQuestion.au.ans : activeQuestion.tr.ans;
+        
+        const correctIndex = parseInt(isAU ? activeQuestion.au?.ans : activeQuestion.tr?.ans, 10);
 
         if (index === correctIndex) {
             playSound('success1'); 
-            const newScore = score + 10;
-            setScore(newScore);
+            
+            // ✅ PUAN SİSTEMİ GÜNCELLENDİ (10 yerine 5)
+            setScore(prev => prev + 5);
             
             const newCorrectCount = correctCount + 1;
             setCorrectCount(newCorrectCount);
@@ -271,19 +293,20 @@ const QuizGameScreen = ({ navigation }) => {
                 levelRef.current = nextLevel;
                 showLevelUpAnimation();
                 playSound('success2'); 
-                setScore(s => s + 50); 
+                
+                // ✅ SEVİYE ATLAMA BONUSU GÜNCELLENDİ (50 yerine 25)
+                setScore(prev => prev + 25); 
             }
 
             setTimeout(() => loadNextQuestion(nextLevel), 1200);
 
         } else {
-            handleWrongAnswer(); // Yanlış cevabı işleyen yeni fonksiyon
+            handleWrongAnswer(); 
         }
     };
 
     const triggerGameOver = async (finalLevel, isWin = false) => {
         setIntelRank(getIntelligenceRank(finalLevel, isAU));
-        // Eğer tüm soruları bilip kazanırsa farklı bir state kullanılabilir, şimdilik Gameover ekranı
         setGameState('GAMEOVER');
         
         if (score > bestScore) {
@@ -317,7 +340,6 @@ const QuizGameScreen = ({ navigation }) => {
     const renderCategorySelect = () => (
         <View style={styles.centerContainer}>
             
-            {/* ✅ ANA EKRAN REKOR GÖSTERİMİ */}
             <View style={styles.bestScoreContainer}>
                 <Ionicons name="trophy" size={24} color="#f59e0b" />
                 <View style={{ marginLeft: 10 }}>
@@ -371,7 +393,6 @@ const QuizGameScreen = ({ navigation }) => {
                         <Ionicons name="close" size={26} color="white" />
                     </TouchableOpacity>
                     
-                    {/* ✅ CAN (KALP) GÖSTERGESİ */}
                     <View style={styles.livesContainer}>
                         {[1, 2, 3].map((heart) => (
                             <Ionicons 
@@ -404,16 +425,17 @@ const QuizGameScreen = ({ navigation }) => {
                 </Animated.View>
 
                 <Animated.View style={[styles.questionCard, { transform: [{ scale: cardScaleAnim }] }]}>
-                    <Text style={styles.questionText}>{qData.q}</Text>
+                    <Text style={styles.questionText}>{qData?.q}</Text>
                 </Animated.View>
 
                 <ScrollView contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
-                    {qData.opts.map((opt, index) => {
+                    {qData?.opts?.map((opt, index) => {
                         let btnStyle = styles.optionBtn;
                         let textStyle = styles.optionText;
                         
                         if (isAnswered) {
-                            if (index === qData.ans) {
+                            const correctAns = parseInt(qData.ans, 10);
+                            if (index === correctAns) {
                                 btnStyle = [styles.optionBtn, styles.optionCorrect]; 
                                 textStyle = [styles.optionText, { color: 'white' }];
                             } else if (index === selectedAnswer) {
@@ -431,8 +453,8 @@ const QuizGameScreen = ({ navigation }) => {
                                 onPress={() => handleAnswer(index)}
                             >
                                 <Text style={textStyle}>{opt}</Text>
-                                {isAnswered && index === qData.ans && <Ionicons name="checkmark-circle" size={24} color="white" style={{position:'absolute', right: 20}} />}
-                                {isAnswered && index === selectedAnswer && index !== qData.ans && <Ionicons name="close-circle" size={24} color="white" style={{position:'absolute', right: 20}} />}
+                                {isAnswered && index === parseInt(qData.ans, 10) && <Ionicons name="checkmark-circle" size={24} color="white" style={{position:'absolute', right: 20}} />}
+                                {isAnswered && index === selectedAnswer && index !== parseInt(qData.ans, 10) && <Ionicons name="close-circle" size={24} color="white" style={{position:'absolute', right: 20}} />}
                             </TouchableOpacity>
                         );
                     })}
@@ -510,7 +532,6 @@ const styles = StyleSheet.create({
 
     centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
     
-    // YENİ: Rekor Gösterimi
     bestScoreContainer: { flexDirection: 'row', backgroundColor: 'rgba(245, 158, 11, 0.15)', padding: 15, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.4)', position: 'absolute', top: 50, alignItems: 'center' },
     bestScoreLabel: { color: '#f59e0b', fontSize: 12, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 1 },
     bestScoreValue: { color: 'white', fontSize: 24, fontWeight: '900' },
@@ -526,7 +547,6 @@ const styles = StyleSheet.create({
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 10 },
     iconBtn: { width: 45, height: 45, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
     
-    // YENİ: Can Göstergesi
     livesContainer: { flexDirection: 'row', alignItems: 'center', alignSelf: 'center', marginTop: 8 },
 
     statsContainer: { alignItems: 'flex-end' },

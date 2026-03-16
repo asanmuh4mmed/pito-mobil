@@ -66,7 +66,7 @@ const AllListingsScreen = ({ navigation, route }) => {
   const { title, data } = route.params;
   const { reviews } = useContext(ListingContext);
   const { country } = useContext(AuthContext);
-  const { theme } = useContext(ThemeContext);
+  const { theme, isDarkMode } = useContext(ThemeContext);
 
   // Dil Seçimi
   const activeCountryCode = country?.code || 'TR';
@@ -164,7 +164,7 @@ const AllListingsScreen = ({ navigation, route }) => {
     return (
       <Animated.View style={{ opacity, transform: [{ translateY }] }}>
           <TouchableOpacity 
-            style={[styles.card, { backgroundColor: theme.cardBg }]} 
+            style={[styles.card, { backgroundColor: theme.cardBg, shadowColor: isDarkMode ? '#000' : '#6C5CE7' }]} 
             onPress={() => navigation.navigate('ListingDetail', { item })}
             activeOpacity={0.9}
           >
@@ -173,12 +173,12 @@ const AllListingsScreen = ({ navigation, route }) => {
                 <View style={styles.badgesContainer}>
                     {isService && avgRating && (
                         <View style={styles.ratingBadge}>
-                            <Ionicons name="star" size={10} color="white" />
+                            <Ionicons name="star" size={10} color="#FDCB6E" />
                             <Text style={styles.ratingText}>{avgRating}</Text>
                         </View>
                     )}
                     {item.gender && (
-                        <View style={[styles.genderBadge, { backgroundColor: item.gender === 'Dişi' || item.gender === 'Female' ? '#FF6B6B' : '#2196F3' }]}>
+                        <View style={[styles.genderBadge, { backgroundColor: item.gender === 'Dişi' || item.gender === 'Female' ? '#FD79A8' : '#5B4BC4' }]}>
                             <Ionicons name={item.gender === 'Dişi' || item.gender === 'Female' ? "female" : "male"} size={12} color="white" />
                         </View>
                     )}
@@ -220,6 +220,7 @@ const AllListingsScreen = ({ navigation, route }) => {
                       key={type}
                       style={[styles.typeBtn, selectedType === type && styles.typeBtnActive, {borderColor: theme.border}]}
                       onPress={() => setSelectedType(selectedType === type ? null : type)}
+                      activeOpacity={0.8}
                   >
                       <Text style={[styles.typeBtnText, selectedType === type && {color: 'white'}]}>{typeLabels[type]}</Text>
                   </TouchableOpacity>
@@ -229,14 +230,14 @@ const AllListingsScreen = ({ navigation, route }) => {
           {/* Konum Seçimi */}
           <Text style={[styles.filterLabel, {color: theme.text}]}>{t.location}</Text>
           <View style={{flexDirection:'row', justifyContent:'space-between', marginBottom:20}}>
-              <TouchableOpacity style={[styles.selector, {borderColor: theme.border}]} onPress={() => setSelectionMode('city')}>
+              <TouchableOpacity style={[styles.selector, {borderColor: theme.border}]} onPress={() => setSelectionMode('city')} activeOpacity={0.8}>
                   <Text style={{color: selectedCity ? theme.text : theme.subText}}>{selectedCity || t.selectCity}</Text>
                   <Ionicons name="chevron-forward" size={16} color={theme.subText} />
               </TouchableOpacity>
               <TouchableOpacity style={[styles.selector, {borderColor: theme.border}]} onPress={() => { 
                   if(!selectedCity) alert(t.cityWarning); 
                   else setSelectionMode('district');
-              }}>
+              }} activeOpacity={0.8}>
                   <Text style={{color: selectedDistrict ? theme.text : theme.subText}}>{selectedDistrict || t.selectDistrict}</Text>
                   <Ionicons name="chevron-forward" size={16} color={theme.subText} />
               </TouchableOpacity>
@@ -266,6 +267,7 @@ const AllListingsScreen = ({ navigation, route }) => {
                       key={g} 
                       style={[styles.genderBtn, selectedGender === g && styles.genderBtnActive, {borderColor: theme.border}]}
                       onPress={() => setSelectedGender(selectedGender === g ? null : g)}
+                      activeOpacity={0.8}
                   >
                       <Ionicons name={g === 'Erkek' ? 'male' : 'female'} size={18} color={selectedGender === g ? 'white' : theme.subText} />
                       <Text style={[styles.genderText, selectedGender === g && {color:'white'}]}>{genderLabels[g]}</Text>
@@ -273,10 +275,10 @@ const AllListingsScreen = ({ navigation, route }) => {
               ))}
           </View>
 
-          <TouchableOpacity style={styles.applyBtn} onPress={() => setFilterModalVisible(false)}>
+          <TouchableOpacity style={styles.applyBtn} onPress={() => setFilterModalVisible(false)} activeOpacity={0.8}>
               <Text style={styles.applyBtnText}>{t.apply} ({activeFilterCount})</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.clearBtn} onPress={clearFilters}>
+          <TouchableOpacity style={styles.clearBtn} onPress={clearFilters} activeOpacity={0.8}>
               <Text style={{color: theme.subText}}>{t.clearAll}</Text>
           </TouchableOpacity>
       </ScrollView>
@@ -290,7 +292,7 @@ const AllListingsScreen = ({ navigation, route }) => {
 
       return (
           <View style={{flex: 1}}>
-              <TouchableOpacity onPress={() => setSelectionMode(null)} style={{flexDirection:'row', alignItems:'center', marginBottom:15, paddingVertical:5}}>
+              <TouchableOpacity onPress={() => setSelectionMode(null)} style={{flexDirection:'row', alignItems:'center', marginBottom:15, paddingVertical:5}} activeOpacity={0.8}>
                   <Ionicons name="arrow-back" size={24} color={theme.text} />
                   <Text style={{marginLeft:10, fontSize:16, fontWeight:'bold', color: theme.text}}>
                       {selectionMode === 'city' ? t.backToCities : t.backToFilters}
@@ -305,9 +307,9 @@ const AllListingsScreen = ({ navigation, route }) => {
                       <TouchableOpacity style={[styles.selectionItem, {borderBottomColor: theme.border}]} onPress={() => {
                           if (selectionMode === 'city') { setSelectedCity(item); setSelectedDistrict(null); } else { setSelectedDistrict(item); }
                           setSelectionMode(null); 
-                      }}>
+                      }} activeOpacity={0.8}>
                           <Text style={[styles.selectionText, {color: theme.text}]}>{item}</Text>
-                          <Ionicons name="checkmark" size={20} color={COLORS.primary} style={{opacity: (selectedCity === item || selectedDistrict === item) ? 1 : 0}} />
+                          <Ionicons name="checkmark" size={20} color="#6C5CE7" style={{opacity: (selectedCity === item || selectedDistrict === item) ? 1 : 0}} />
                       </TouchableOpacity>
                   )}
               />
@@ -316,21 +318,21 @@ const AllListingsScreen = ({ navigation, route }) => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: '#F8F9FA' }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: isDarkMode ? '#121212' : '#F8F9FA' }]}>
       
       {/* HEADER */}
       <View style={[styles.header, { backgroundColor: theme.cardBg, borderBottomColor: theme.border }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.iconBtn, {backgroundColor: isDarkMode ? '#333' : '#F0F0F0'}]}>
             <Ionicons name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
         
         <View style={{alignItems:'center'}}>
             <Text style={[styles.headerTitle, { color: theme.text }]}>{title}</Text>
-            <Text style={{fontSize:11, color: theme.subText, fontWeight:'500'}}>{displayedData.length} {t.listingsFound}</Text>
+            <Text style={{fontSize:11, color: '#6C5CE7', fontWeight:'600'}}>{displayedData.length} {t.listingsFound}</Text>
         </View>
 
-        <TouchableOpacity onPress={() => setFilterModalVisible(true)} style={[styles.iconBtn, activeFilterCount > 0 && {backgroundColor: COLORS.primary + '15'}]}>
-            <Ionicons name="options" size={24} color={activeFilterCount > 0 ? COLORS.primary : theme.text} />
+        <TouchableOpacity onPress={() => setFilterModalVisible(true)} style={[styles.iconBtn, activeFilterCount > 0 ? {backgroundColor: 'rgba(108, 92, 231, 0.15)'} : {backgroundColor: isDarkMode ? '#333' : '#F0F0F0'}]}>
+            <Ionicons name="options" size={24} color={activeFilterCount > 0 ? '#6C5CE7' : theme.text} />
             {activeFilterCount > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{activeFilterCount}</Text></View>}
         </TouchableOpacity>
       </View>
@@ -364,7 +366,7 @@ const AllListingsScreen = ({ navigation, route }) => {
                     </TouchableOpacity>
                 )}
                 <TouchableOpacity onPress={clearFilters} style={styles.clearTextBtn}>
-                    <Text style={{color: COLORS.primary, fontSize:12, fontWeight:'bold'}}>{t.clear}</Text>
+                    <Text style={{color: '#6C5CE7', fontSize:12, fontWeight:'bold'}}>{t.clear}</Text>
                 </TouchableOpacity>
             </ScrollView>
           </View>
@@ -379,8 +381,8 @@ const AllListingsScreen = ({ navigation, route }) => {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
             <View style={{alignItems:'center', marginTop:80}}>
-                <View style={{width: 100, height: 100, borderRadius: 50, backgroundColor: '#E3F2FD', justifyContent:'center', alignItems:'center', marginBottom:20}}>
-                    <Ionicons name="search" size={50} color={COLORS.primary} />
+                <View style={{width: 100, height: 100, borderRadius: 50, backgroundColor: 'rgba(108, 92, 231, 0.1)', justifyContent:'center', alignItems:'center', marginBottom:20}}>
+                    <Ionicons name="search" size={50} color="#6C5CE7" />
                 </View>
                 <Text style={{color: theme.text, fontSize:18, fontWeight:'bold'}}>{t.noResultTitle}</Text>
                 <Text style={{textAlign:'center', marginTop:10, color: theme.subText, fontSize:14, paddingHorizontal: 40}}>
@@ -395,9 +397,9 @@ const AllListingsScreen = ({ navigation, route }) => {
 
       {/* İLAN EKLE (YÜZEN BUTON - FAB) */}
       <TouchableOpacity 
-          style={[styles.fabButton, { backgroundColor: COLORS.primary }]}
+          style={styles.fabButton}
           onPress={() => navigation.navigate('AddListing', { category: title })} 
-          activeOpacity={0.8}
+          activeOpacity={0.9}
       >
           <Ionicons name="add" size={24} color="white" />
           <Text style={styles.fabText}>{t.addListing}</Text>
@@ -434,60 +436,61 @@ const AllListingsScreen = ({ navigation, route }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15, borderBottomWidth: 1, elevation: 2, shadowColor:'#000', shadowOpacity:0.05, shadowOffset:{width:0,height:2} },
-  headerTitle: { fontSize: 18, fontWeight: 'bold' },
-  iconBtn: { padding: 8, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.03)' },
-  badge: { position: 'absolute', top: 5, right: 5, backgroundColor: COLORS.primary, width: 8, height: 8, borderRadius: 4 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 18, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, borderBottomLeftRadius: 20, borderBottomRightRadius: 20, zIndex: 10 },
+  headerTitle: { fontSize: 19, fontWeight: '800' },
+  iconBtn: { padding: 8, borderRadius: 14 },
+  badge: { position: 'absolute', top: -2, right: -2, backgroundColor: '#6C5CE7', width: 14, height: 14, borderRadius: 7, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'white' },
+  badgeText: { color: 'white', fontSize: 8, fontWeight: 'bold' },
   
   filterBarContainer: { height: 50 },
-  chip: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginRight: 8, elevation: 2 },
+  chip: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#6C5CE7', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, marginRight: 8, elevation: 2 },
   chipText: { color: 'white', fontSize: 12, marginRight: 5, fontWeight: '600' },
   clearTextBtn: { padding: 5, justifyContent:'center' },
 
-  card: { flexDirection: 'row', borderRadius: 18, marginBottom: 15, padding: 12, elevation: 3, shadowColor: '#000', shadowOffset: {width:0, height:3}, shadowOpacity: 0.08, shadowRadius: 6 },
-  imageWrapper: { width: 100, height: 100, borderRadius: 14, overflow: 'hidden', position: 'relative' },
+  card: { flexDirection: 'row', borderRadius: 20, marginBottom: 15, padding: 12, elevation: 5, shadowOffset: {width:0, height:4}, shadowOpacity: 0.1, shadowRadius: 8 },
+  imageWrapper: { width: 100, height: 100, borderRadius: 16, overflow: 'hidden', position: 'relative' },
   image: { width: '100%', height: '100%' },
   
   badgesContainer: { position: 'absolute', top: 5, left: 5, flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
-  ratingBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  ratingBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
   ratingText: { color: 'white', fontSize: 10, fontWeight: 'bold', marginLeft: 3 },
-  genderBadge: { width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
+  genderBadge: { width: 22, height: 22, borderRadius: 11, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.5)' },
 
   info: { flex: 1, marginLeft: 15, justifyContent: 'space-between', paddingVertical: 2 },
-  name: { fontSize: 17, fontWeight: 'bold' },
-  breed: { fontSize: 13, marginTop: 4 },
+  name: { fontSize: 17, fontWeight: '700' },
+  breed: { fontSize: 13, marginTop: 4, fontWeight: '500' },
   
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
   locationRow: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   locationText: { fontSize: 12, marginLeft: 4, flex: 1 },
-  priceText: { fontWeight: 'bold', color: COLORS.primary, fontSize: 15 },
+  priceText: { fontWeight: 'bold', color: '#6C5CE7', fontSize: 16 },
 
-  resetFiltersBtn: { marginTop: 20, backgroundColor: COLORS.primary, paddingVertical: 12, paddingHorizontal: 25, borderRadius: 25 },
+  resetFiltersBtn: { marginTop: 20, backgroundColor: '#6C5CE7', paddingVertical: 12, paddingHorizontal: 25, borderRadius: 25, elevation: 3 },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  filterContent: { height: '70%', borderTopLeftRadius: 25, borderTopRightRadius: 25, padding: 25 },
+  filterContent: { height: '70%', borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 25 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 20, fontWeight: 'bold' },
-  closeBtn: { padding: 5, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 20 },
+  closeBtn: { padding: 6, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 20 },
   
-  filterLabel: { fontSize: 16, fontWeight: 'bold', marginBottom: 10 },
-  typeBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1, marginRight: 10, backgroundColor: 'transparent' },
-  typeBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  typeBtnText: { fontWeight: '500', fontSize: 14, color: '#555' },
+  filterLabel: { fontSize: 15, fontWeight: '700', marginBottom: 10, letterSpacing: 0.5 },
+  typeBtn: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20, borderWidth: 1, marginRight: 10, backgroundColor: 'transparent' },
+  typeBtnActive: { backgroundColor: '#6C5CE7', borderColor: '#6C5CE7' },
+  typeBtnText: { fontWeight: '600', fontSize: 14, color: '#555' },
 
-  selector: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, padding: 14, borderRadius: 12, marginRight: 10 },
-  ageInput: { flex: 1, borderWidth: 1, borderRadius: 12, padding: 12, textAlign: 'center', fontSize: 16 },
+  selector: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, padding: 14, borderRadius: 16, marginRight: 10 },
+  ageInput: { flex: 1, borderWidth: 1, borderRadius: 16, padding: 12, textAlign: 'center', fontSize: 16 },
 
-  genderBtn: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', borderWidth: 1, padding: 14, borderRadius: 12, marginRight: 10 },
-  genderBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  genderText: { fontWeight: '600', marginLeft: 5, color: '#888' },
+  genderBtn: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', borderWidth: 1, padding: 14, borderRadius: 16, marginRight: 10 },
+  genderBtnActive: { backgroundColor: '#6C5CE7', borderColor: '#6C5CE7' },
+  genderText: { fontWeight: '600', marginLeft: 6, color: '#888' },
   
-  applyBtn: { backgroundColor: COLORS.primary, padding: 16, borderRadius: 16, alignItems: 'center', marginTop: 10, shadowColor: COLORS.primary, shadowOpacity: 0.3, shadowOffset: {width:0, height:4} },
+  applyBtn: { backgroundColor: '#6C5CE7', padding: 18, borderRadius: 20, alignItems: 'center', marginTop: 10, shadowColor: '#6C5CE7', shadowOpacity: 0.3, shadowOffset: {width:0, height:4}, elevation: 5 },
   applyBtnText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
   clearBtn: { alignItems: 'center', marginTop: 15, padding: 10 },
 
-  selectionItem: { paddingVertical: 15, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  selectionText: { fontSize: 16 },
+  selectionItem: { paddingVertical: 16, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  selectionText: { fontSize: 16, fontWeight: '500' },
 
   fabButton: {
       position: 'absolute',
@@ -498,11 +501,12 @@ const styles = StyleSheet.create({
       paddingHorizontal: 20,
       paddingVertical: 15,
       borderRadius: 30,
+      backgroundColor: '#6C5CE7',
       elevation: 6,
-      shadowColor: '#000',
+      shadowColor: '#6C5CE7',
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.3,
-      shadowRadius: 5,
+      shadowOpacity: 0.4,
+      shadowRadius: 8,
       zIndex: 10
   },
   fabText: {
