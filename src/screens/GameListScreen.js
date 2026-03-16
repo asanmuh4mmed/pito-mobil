@@ -1,16 +1,23 @@
-import React, { useContext, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, StatusBar, Animated } from 'react-native';
+import React, { useContext, useCallback, useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, StatusBar, Animated, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../context/AuthContext';
 import { GameContext } from '../context/GameContext'; 
 
+// Android'de LayoutAnimation'ı aktif etmek için zorunlu ayar
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+    UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
 // ÇEVİRİLER
 const TRANSLATIONS = {
     TR: {
         headerTitle: "Oyun Dünyası 🎮",
-        welcome: "Hangi oyunu oynamak istersin?",
+        games: "OYUNLAR",
+        showAll: "TÜMÜNÜ GÖSTER",
+        showLess: "DAHA AZ GÖSTER",
         play: "BAŞLA",
         game1_title: "Mamaları Yakala",
         game1_sub: "REFLEKS OYUNU",
@@ -30,16 +37,20 @@ const TRANSLATIONS = {
         game6_title: "Mama Kulesi",
         game6_sub: "KULE DİZME",
         game6_desc: "Tam üst üste oturt, kuleyi göklere çıkar ve kombo yap! 🥫",
+        game7_title: "Pito Quiz",
         usePoints: "PUANLARI KULLAN",
         weeklyRank: "Haftalık Sıralama",
         allTimeRank: "Genel Sıralama",
         yourBalance: "BAKİYENİZ",
         goalTitle: "Özel Teşekkür Hedefi 💌",
-        goalDesc: "10.000 Puanla mama bağışla, özel destekçi sertifikası ve maili kazan!"
+        goalDesc: "10.000 Puanla mama bağışla ve özel destekçi maili kazan!",
+        goalReached: "Hedefe Ulaştın! Bağış yap ve maili kap! 🎉"
     },
     AU: {
         headerTitle: "Game World 🎮",
-        welcome: "Which game do you want to play?",
+        games: "GAMES",
+        showAll: "SHOW ALL",
+        showLess: "SHOW LESS",
         play: "START",
         game1_title: "Catch the Treats",
         game1_sub: "REFLEX GAME",
@@ -59,12 +70,14 @@ const TRANSLATIONS = {
         game6_title: "Treat Tower",
         game6_sub: "TOWER STACK",
         game6_desc: "Stack them perfectly, build to the sky and make combos! 🥫",
+        game7_title: "Pito Trivia",
         usePoints: "USE POINTS",
         weeklyRank: "Weekly Rank",
         allTimeRank: "All Time Rank",
         yourBalance: "YOUR BALANCE",
         goalTitle: "Special Thanks Goal 💌",
-        goalDesc: "Donate food with 10,000 Points, earn a special supporter email and certificate!"
+        goalDesc: "Donate food with 10,000 Points and earn a special supporter email!",
+        goalReached: "Goal Reached! Donate and get the email! 🎉"
     }
 };
 
@@ -74,15 +87,43 @@ const GameListScreen = ({ navigation }) => {
     const activeLang = country?.code === 'AU' ? 'AU' : 'TR';
     const t = TRANSLATIONS[activeLang];
 
+    const [showAllGames, setShowAllGames] = useState(false);
+
+    // --- ANİMASYON REFI (Sürekli Atan Kalp Efekti İçin) ---
+    const pulseAnim = useRef(new Animated.Value(1)).current;
+
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(pulseAnim, {
+                    toValue: 1.08, 
+                    duration: 800,
+                    useNativeDriver: true
+                }),
+                Animated.timing(pulseAnim, {
+                    toValue: 1, 
+                    duration: 800,
+                    useNativeDriver: true
+                })
+            ])
+        ).start();
+    }, [pulseAnim]);
+
     useFocusEffect(
         useCallback(() => {
             fetchUserPoints(); 
         }, [])
     );
 
+    // --- LİSTE AÇILMA ANİMASYONU ---
+    const toggleShowAll = () => {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); // Yumuşak açılış/kapanış
+        setShowAllGames(!showAllGames);
+    };
+
     // --- 10.000 PUAN HEDEFİ HESAPLAMASI ---
     const GOAL = 10000;
-    const progress = Math.min(userPoints / GOAL, 1); // Max 1 (100%)
+    const progress = Math.min(userPoints / GOAL, 1); 
     const progressPercent = `${(progress * 100).toFixed(0)}%`;
 
     const GAMES = [
@@ -139,12 +180,24 @@ const GameListScreen = ({ navigation }) => {
             title: t.game6_title,
             subtitle: t.game6_sub,
             description: t.game6_desc,
-            color: '#f368e0', // Canlı ve neon hissi veren bir pembe
-            route: 'TowerGame', // App.js içinde verdiğimiz isim
+            color: '#f368e0', 
+            route: 'TowerGame', 
             imageType: 'emoji',
-            emoji: '🥫' // Mama konserve emojisi
+            emoji: '🥫' 
+        },
+        {
+            id: '7', 
+            title: t.game7_title,
+            subtitle: activeLang === 'AU' ? "TRIVIA QUIZ" : "BİLGİ YARIŞMASI",
+            description: activeLang === 'AU' ? "Choose your category, answer questions and prove your wit! 🧠" : "Kategorini seç, soruları bil ve zekanı kanıtla! 🧠",
+            color: '#0984e3', 
+            route: 'QuizGame', 
+            imageType: 'emoji',
+            emoji: '💡'
         }
     ];
+
+    const displayedGames = showAllGames ? GAMES : GAMES.slice(0, 3);
 
     const handlePlay = (game) => {
         if (game.route) {
@@ -208,7 +261,6 @@ const GameListScreen = ({ navigation }) => {
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor="#222f3e" />
             
-            {/* Header */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={28} color="white" />
@@ -217,70 +269,88 @@ const GameListScreen = ({ navigation }) => {
                 <View style={{width: 45}} /> 
             </View>
 
-            {/* Ana Puan Kartı */}
-            <View style={styles.balanceCard}>
-                <View>
-                    <Text style={styles.balanceLabel}>{t.yourBalance}</Text>
-                    <View style={{flexDirection:'row', alignItems:'center'}}>
-                        <Ionicons name="star" size={24} color="#F1C40F" />
-                        <Text style={styles.balanceText}>{userPoints}</Text>
-                    </View>
-                </View>
-                <TouchableOpacity 
-                    style={styles.usePointsButton} 
-                    onPress={() => navigation.navigate('GameDonate')} 
-                >
-                    <Text style={styles.usePointsText}>{t.usePoints}</Text>
-                    <Ionicons name="heart" size={16} color="#e74c3c" style={{marginLeft: 5}} />
-                </TouchableOpacity>
-            </View>
-
-            {/* Hedefi İlerleme Çubuğu */}
-            <View style={styles.goalCard}>
-                <View style={styles.goalHeader}>
-                    <Ionicons name="mail-open" size={20} color="#00cec9" />
-                    <Text style={styles.goalTitle}>{t.goalTitle}</Text>
-                </View>
-                <Text style={styles.goalDesc}>{t.goalDesc}</Text>
-                
-                <View style={styles.progressContainer}>
-                    <View style={styles.progressBarBg}>
-                        <View style={[styles.progressBarFill, { width: progressPercent }]} />
-                    </View>
-                    <Text style={styles.progressText}>{userPoints} / {GOAL}</Text>
-                </View>
-                {userPoints >= GOAL && (
-                    <Text style={styles.goalReachedText}>Hedefe Ulaştın! Bağış yap ve maili kap! 🎉</Text>
-                )}
-            </View>
-
-            {/* Sıralama Butonları */}
-            <View style={styles.rankButtonContainer}>
-                <TouchableOpacity 
-                    style={[styles.rankButton, { backgroundColor: '#0984e3' }]}
-                    onPress={() => navigation.navigate('Leaderboard', { type: 'weekly' })}
-                >
-                    <Ionicons name="podium" size={20} color="white" />
-                    <Text style={styles.rankButtonText}>{t.weeklyRank}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                    style={[styles.rankButton, { backgroundColor: '#6c5ce7', marginLeft: 10 }]}
-                    onPress={() => navigation.navigate('Leaderboard', { type: 'all_time' })}
-                >
-                    <Ionicons name="trophy" size={20} color="white" />
-                    <Text style={styles.rankButtonText}>{t.allTimeRank}</Text>
-                </TouchableOpacity>
-            </View>
-
-            <Text style={styles.welcomeText}>{t.welcome}</Text>
-
             <FlatList 
-                data={GAMES}
+                data={displayedGames}
                 keyExtractor={item => item.id}
                 renderItem={renderGameCard}
+                extraData={showAllGames} // ✅ LİSTENİN GÜNCELLENMESİNİ GARANTİ ETTİK
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
+                ListHeaderComponent={
+                    <>
+                        <View style={styles.balanceCard}>
+                            <View>
+                                <Text style={styles.balanceLabel}>{t.yourBalance}</Text>
+                                <View style={{flexDirection:'row', alignItems:'center'}}>
+                                    <Ionicons name="star" size={24} color="#F1C40F" />
+                                    <Text style={styles.balanceText}>{userPoints}</Text>
+                                </View>
+                            </View>
+                            <TouchableOpacity 
+                                style={styles.usePointsButton} 
+                                onPress={() => navigation.navigate('GameDonate')} 
+                            >
+                                <Text style={styles.usePointsText}>{t.usePoints}</Text>
+                                <Ionicons name="heart" size={16} color="#e74c3c" style={{marginLeft: 5}} />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.goalCard}>
+                            <View style={styles.goalHeader}>
+                                <Ionicons name="mail-open" size={20} color="#00cec9" />
+                                <Text style={styles.goalTitle}>{t.goalTitle}</Text>
+                            </View>
+                            <Text style={styles.goalDesc}>{t.goalDesc}</Text>
+                            
+                            <View style={styles.progressContainer}>
+                                <View style={styles.progressBarBg}>
+                                    <View style={[styles.progressBarFill, { width: progressPercent }]} />
+                                </View>
+                                <Text style={styles.progressText}>{userPoints} / {GOAL}</Text>
+                            </View>
+                            {userPoints >= GOAL && (
+                                <Text style={styles.goalReachedText}>{t.goalReached}</Text>
+                            )}
+                        </View>
+
+                        <View style={styles.rankButtonContainer}>
+                            <TouchableOpacity 
+                                style={[styles.rankButton, { backgroundColor: '#0984e3' }]}
+                                onPress={() => navigation.navigate('Leaderboard', { type: 'weekly' })}
+                            >
+                                <Ionicons name="podium" size={20} color="white" />
+                                <Text style={styles.rankButtonText}>{t.weeklyRank}</Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity 
+                                style={[styles.rankButton, { backgroundColor: '#6c5ce7', marginLeft: 10 }]}
+                                onPress={() => navigation.navigate('Leaderboard', { type: 'all_time' })}
+                            >
+                                <Ionicons name="trophy" size={20} color="white" />
+                                <Text style={styles.rankButtonText}>{t.allTimeRank}</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.gamesHeaderRow}>
+                            <Text style={styles.gamesTitleText}>{t.games}</Text>
+                            
+                            {/* ✅ GÜNCELLENEN ANİMASYONLU VE AÇILIR KAPANIR BUTON */}
+                            <TouchableOpacity onPress={toggleShowAll} activeOpacity={0.8}>
+                                <Animated.View style={[styles.showAllAnimButton, { transform: [{ scale: pulseAnim }] }]}>
+                                    <Text style={styles.showAllText}>
+                                        {showAllGames ? t.showLess : t.showAll}
+                                    </Text>
+                                    <Ionicons 
+                                        name={showAllGames ? "chevron-up" : "chevron-down"} 
+                                        size={18} 
+                                        color="#00cec9" 
+                                        style={{marginLeft: 4}} 
+                                    />
+                                </Animated.View>
+                            </TouchableOpacity>
+                        </View>
+                    </>
+                }
             />
         </SafeAreaView>
     );
@@ -292,14 +362,12 @@ const styles = StyleSheet.create({
     backButton: { width: 45, height: 45, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
     headerTitle: { fontSize: 22, fontWeight: 'bold', color: 'white' },
     
-    // Puan Kartı
     balanceCard: { backgroundColor: 'rgba(255,255,255,0.1)', marginHorizontal: 20, borderRadius: 20, padding: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
     balanceLabel: { color: '#b2bec3', fontSize: 12, fontWeight: '600', marginBottom: 5 },
     balanceText: { color: 'white', fontSize: 28, fontWeight: '900', marginLeft: 8 },
     usePointsButton: { backgroundColor: 'white', paddingHorizontal: 15, paddingVertical: 10, borderRadius: 25, flexDirection: 'row', alignItems: 'center', elevation: 5 },
     usePointsText: { color: '#2d3436', fontWeight: 'bold', fontSize: 12 },
 
-    // Hedef Kartı 
     goalCard: { backgroundColor: 'rgba(0, 206, 201, 0.1)', marginHorizontal: 20, borderRadius: 15, padding: 15, marginBottom: 20, borderWidth: 1, borderColor: 'rgba(0, 206, 201, 0.3)' },
     goalHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 5 },
     goalTitle: { color: '#00cec9', fontSize: 14, fontWeight: 'bold', marginLeft: 8 },
@@ -310,14 +378,17 @@ const styles = StyleSheet.create({
     progressText: { color: 'white', fontSize: 12, fontWeight: 'bold', marginLeft: 10 },
     goalReachedText: { color: '#00b894', fontSize: 12, fontWeight: 'bold', marginTop: 10, textAlign: 'center' },
 
-    // Sıralama Butonları
     rankButtonContainer: { flexDirection: 'row', paddingHorizontal: 20, marginBottom: 20 },
     rankButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: 15, elevation: 3 },
     rankButtonText: { color: 'white', fontWeight: 'bold', marginLeft: 8, fontSize: 13 },
 
-    welcomeText: { color: '#c8d6e5', fontSize: 16, paddingHorizontal: 25, marginBottom: 15, fontWeight: '500' },
-    listContent: { paddingHorizontal: 20, paddingBottom: 50 },
-    card: { borderRadius: 30, marginBottom: 25, overflow: 'hidden', elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.3, shadowRadius: 6, height: 190 },
+    gamesHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, marginBottom: 20, marginTop: 5 },
+    gamesTitleText: { color: 'white', fontSize: 24, fontWeight: '900', letterSpacing: 1 },
+    showAllAnimButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0, 206, 201, 0.15)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 25, borderWidth: 1, borderColor: 'rgba(0, 206, 201, 0.5)' },
+    showAllText: { color: '#00cec9', fontSize: 13, fontWeight: '900', letterSpacing: 0.5 },
+
+    listContent: { paddingBottom: 50 },
+    card: { marginHorizontal: 20, borderRadius: 30, marginBottom: 25, overflow: 'hidden', elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 5 }, shadowOpacity: 0.3, shadowRadius: 6, height: 190 },
     decorBubble: { position: 'absolute', borderRadius: 999 },
     cardInner: { flex: 1, flexDirection: 'row', padding: 20, alignItems: 'center' },
     textContainer: { flex: 1.4, justifyContent: 'center' },

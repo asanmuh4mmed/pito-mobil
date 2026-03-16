@@ -11,6 +11,7 @@ export const GAME_IDS = {
     FLAPPY: '4', 
     BUBBLE: '5', 
     TOWER: '6', 
+    QUIZ: '7', // ✅ Pito Quiz Eklendi
     DONATE: 'donate' 
 };
 
@@ -95,7 +96,6 @@ export const GameProvider = ({ children }) => {
 
         try {
             // ✅ GÜVENLİK: Gelen skorun kesinlikle Matematiksel Sayı (Integer) olduğundan emin oluyoruz!
-            // (Aksi takdirde yan yana yazıp 10+50 = "1050" gibi hatalı string puanı yapıyordu)
             const earnedPoints = parseInt(rawScore, 10) || 0; 
 
             if (earnedPoints > 0) {
