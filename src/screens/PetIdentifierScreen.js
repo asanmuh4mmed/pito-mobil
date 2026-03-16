@@ -9,8 +9,8 @@ import { ThemeContext } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
-// 🔑 VIP BİLETİMİZ EKLENDİ!
-const HF_TOKEN = "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"; 
+// 🔒 GÜVENLİ TOKEN ÇEKİMİ (.env dosyasından geliyor)
+const HF_TOKEN = process.env.EXPO_PUBLIC_HF_TOKEN; 
 
 // ✅ Hugging Face Router URL - En stabil görüntü sınıflandırma modeli
 const HF_MODEL_URL = "https://router.huggingface.co/hf-inference/models/google/vit-base-patch16-224";
