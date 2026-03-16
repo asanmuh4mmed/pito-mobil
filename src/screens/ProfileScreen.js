@@ -16,9 +16,13 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 
 const { width } = Dimensions.get('window');
 
-// 👑 KURUCU (FOUNDER) E-POSTA ADRESİ 👑
-// Kendi kayıtlı e-posta adresini buraya yaz.
-const KURUCU_EMAIL = "asanmuh4mmed@gmail.com"; 
+// 👑 KURUCU (FOUNDER) E-POSTA ADRESLERİ 👑
+// Supabase veritabanı (is_founder) ile entegre çalışır.
+const KURUCU_EMAILLER = [
+  "asanmuh4mmed@gmail.com",
+  "izahbngyn@gmail.com",
+  "petspito@gmail.com"
+];
 
 // --- DİL PAKETİ ---
 const TRANSLATIONS = {
@@ -389,8 +393,8 @@ const ProfileScreen = ({ navigation, route }) => {
                     <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
                         <Text style={[styles.userName, { color: theme.text }]}>{viewUser.fullname}</Text>
                         
-                        {/* 👑 KURUCU (FOUNDER) ROZETİ EKLENDİ 👑 */}
-                        {(viewUser.email === KURUCU_EMAIL) && (
+                        {/* 👑 DİNAMİK KURUCU ROZETİ (Supabase + Liste Kontrolü) 👑 */}
+                        {(viewUser.is_founder || KURUCU_EMAILLER.includes(viewUser.email)) && (
                             <Ionicons 
                                 name="checkmark-circle" 
                                 size={22} 
@@ -501,8 +505,8 @@ const ProfileScreen = ({ navigation, route }) => {
                                     <Ionicons name="arrow-forward" size={22} color={theme.subText} />
                                 </TouchableOpacity>
 
-                                {/* ADMIN PANELİ BUTONU */}
-                                {user && user.is_admin && (
+                                {/* ADMIN PANELİ BUTONU (Supabase & Mail Kontrollü) */}
+                                {user && (user.is_admin || user.is_founder || KURUCU_EMAILLER.includes(user.email)) && (
                                     <TouchableOpacity 
                                         style={[styles.shopOptionCard, {backgroundColor: '#ffebee', borderWidth: 1, borderColor: '#D32F2F'}]} 
                                         onPress={() => navigation.navigate('AdminPanel')} 
@@ -765,7 +769,7 @@ const ProfileScreen = ({ navigation, route }) => {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    header: { flexDirection: 'row', justifyContent: 'space-between', padding: 15, alignItems: 'center' },
+    header: { flexDirection: 'row', justifyContent: 'space-between', padding: 15, paddingTop: 50, alignItems: 'center' },
     headerTitle: { fontSize: 18, fontWeight: 'bold' },
     iconBtn: { padding: 8, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.05)', marginLeft: 5 },
     badge: { position: 'absolute', top: 5, right: 5, backgroundColor: 'red', borderRadius: 8, width: 16, height: 16, justifyContent: 'center', alignItems: 'center' },
@@ -774,6 +778,7 @@ const styles = StyleSheet.create({
     avatarContainer: { marginBottom: 15, shadowColor: '#000', shadowOffset:{width:0, height:4}, shadowOpacity:0.25, shadowRadius:6, position: 'relative' },
     avatar: { width: 90, height: 90, borderRadius: 45 },
     avatarText: { fontSize: 40, fontWeight: 'bold', color: COLORS.primary },
+    premiumBadgeAvatar: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#2196F3', borderRadius: 15, padding: 2, borderWidth: 2, borderColor: 'white' },
     userName: { fontSize: 24, fontWeight: 'bold', marginTop: 5 },
     userEmail: { fontSize: 14, marginTop: 2, marginBottom: 10 },
     userBio: { textAlign: 'center', marginHorizontal: 20, marginTop: 10, fontStyle: 'italic', lineHeight: 20 },
@@ -801,6 +806,7 @@ const styles = StyleSheet.create({
     cardImage: { width: 80, height: 80, borderRadius: 15, backgroundColor: '#EEE' },
     cardInfo: { flex: 1, marginLeft: 15 },
     cardName: { fontSize: 18, fontWeight: 'bold' },
+    cardSub: { fontSize: 13, marginTop: 4 },
     deleteAction: { backgroundColor: '#FF4D4D', justifyContent: 'center', alignItems: 'center', width: 90, borderTopRightRadius: 20, borderBottomRightRadius: 20, height: 110, marginBottom: 15 },
     foundAction: { backgroundColor: '#4CAF50', justifyContent: 'center', alignItems: 'center', width: 110, borderTopLeftRadius: 20, borderBottomLeftRadius: 20, height: 110, marginBottom: 15 },
     actionText: { color: 'white', fontWeight: 'bold', fontSize: 12, marginTop: 5 },

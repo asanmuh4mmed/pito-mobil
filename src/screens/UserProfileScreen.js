@@ -8,10 +8,6 @@ import { supabase } from '../lib/supabase';
 
 const { width } = Dimensions.get('window');
 
-// 👑 KURUCU (FOUNDER) E-POSTA ADRESİ 👑
-// Kendi kayıtlı e-posta adresini buraya yaz.
-const KURUCU_EMAIL = "asanmuh4mmed@gmail.com"; 
-
 const TRANSLATIONS = {
     TR: {
         listings: "İlanlar",
@@ -87,7 +83,7 @@ const UserProfileScreen = ({ navigation, route }) => {
       avatar: userAvatar,
       isPremium: false,
       donation_points: 0,
-      email: '' // Kurucu kontrolü için e-posta alanı eklendi
+      is_founder: false // 👑 Güvenli veritabanı değişkeni 👑
   });
 
   const messageScale = useRef(new Animated.Value(1)).current;
@@ -103,7 +99,7 @@ const UserProfileScreen = ({ navigation, route }) => {
       }
   }, [userId]);
 
-  // ✅ DİNAMİK ROZET HESAPLAYICI (Kullanıcının profilinde görünmesi için eklendi)
+  // ✅ DİNAMİK ROZET HESAPLAYICI
   const calculateDynamicBadge = (points) => {
       const p = points || 0;
       if (p >= 50) return { name: t.badgeDiamond, icon: 'diamond', color: '#00cec9' };
@@ -171,10 +167,10 @@ const UserProfileScreen = ({ navigation, route }) => {
   };
 
   const animateButton = (scaleValue) => {
-    Animated.sequence([
-        Animated.timing(scaleValue, { toValue: 0.9, duration: 100, useNativeDriver: true, easing: Easing.ease }),
-        Animated.timing(scaleValue, { toValue: 1, duration: 100, useNativeDriver: true, easing: Easing.ease })
-    ]).start();
+      Animated.sequence([
+          Animated.timing(scaleValue, { toValue: 0.9, duration: 100, useNativeDriver: true, easing: Easing.ease }),
+          Animated.timing(scaleValue, { toValue: 1, duration: 100, useNativeDriver: true, easing: Easing.ease })
+      ]).start();
   };
 
   const handleMessagePress = () => {
@@ -311,8 +307,8 @@ const UserProfileScreen = ({ navigation, route }) => {
             <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
                 <Text style={[styles.userName, { color: theme.text }]}>{targetUser.fullname}</Text>
                 
-                {/* 👑 KURUCU (FOUNDER) ROZETİ EKLENDİ 👑 */}
-                {(targetUser.email === KURUCU_EMAIL) && (
+                {/* 👑 DİNAMİK VERİTABANI KONTROLLÜ KURUCU ROZETİ 👑 */}
+                {targetUser.is_founder && (
                     <Ionicons 
                         name="checkmark-circle" 
                         size={22} 

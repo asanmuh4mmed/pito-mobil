@@ -10,11 +10,68 @@ import { CITY_DATA } from '../constants/cities';
 
 const { width } = Dimensions.get('window');
 
+// --- ÇEVİRİLER ---
+const TRANSLATIONS = {
+    TR: {
+        listingsFound: "İlan Bulundu",
+        noLocation: "Konum Yok",
+        ageText: "Yaş",
+        animalType: "Hayvan Türü",
+        location: "Konum",
+        selectCity: "İl Seç",
+        cityWarning: "Önce şehir seçmelisiniz.",
+        selectDistrict: "İlçe Seç",
+        ageRange: "Yaş Aralığı",
+        min: "Min",
+        max: "Max",
+        gender: "Cinsiyet",
+        apply: "Uygula",
+        clearAll: "Tümünü Temizle",
+        clear: "Temizle",
+        backToCities: "Şehirlere Dön",
+        backToFilters: "Filtrelere Dön",
+        noResultTitle: "Sonuç Bulunamadı",
+        noResultDesc: "Arama kriterlerinizi değiştirerek tekrar deneyebilirsiniz.",
+        clearFilters: "Filtreleri Temizle",
+        addListing: "İlan Ekle",
+        detailedFilter: "Detaylı Filtreleme"
+    },
+    AU: {
+        listingsFound: "Listings Found",
+        noLocation: "No Location",
+        ageText: "Years Old",
+        animalType: "Animal Type",
+        location: "Location",
+        selectCity: "Select City",
+        cityWarning: "Please select a city first.",
+        selectDistrict: "Select District",
+        ageRange: "Age Range",
+        min: "Min",
+        max: "Max",
+        gender: "Gender",
+        apply: "Apply",
+        clearAll: "Clear All",
+        clear: "Clear",
+        backToCities: "Back to Cities",
+        backToFilters: "Back to Filters",
+        noResultTitle: "No Results Found",
+        noResultDesc: "You can try again by modifying your search criteria.",
+        clearFilters: "Clear Filters",
+        addListing: "Add Listing",
+        detailedFilter: "Detailed Filtering"
+    }
+};
+
 const AllListingsScreen = ({ navigation, route }) => {
   const { title, data } = route.params;
   const { reviews } = useContext(ListingContext);
   const { country } = useContext(AuthContext);
   const { theme } = useContext(ThemeContext);
+
+  // Dil Seçimi
+  const activeCountryCode = country?.code || 'TR';
+  const activeLang = country?.code === 'AU' ? 'AU' : 'TR';
+  const t = TRANSLATIONS[activeLang];
 
   // --- FİLTRELEME STATE'LERİ ---
   const [displayedData, setDisplayedData] = useState([]);
@@ -28,14 +85,26 @@ const AllListingsScreen = ({ navigation, route }) => {
   const [minAge, setMinAge] = useState('');
   const [maxAge, setMaxAge] = useState('');
   
-  // ✅ DÜZELTME: İkinci bir modal yerine, içerik değiştirmek için mod kontrolü
   const [selectionMode, setSelectionMode] = useState(null); // null | 'city' | 'district'
 
-  const activeCountryCode = country?.code || 'TR';
-  const activeLang = country?.code || 'TR';
-
-  // Hayvan Türleri Listesi
+  // Hayvan Türleri Listesi (Arka planda daima Türkçe çalışır ki filtreleme bozulmasın)
   const ANIMAL_TYPES = ['Kedi', 'Köpek', 'Kuş', 'Balık', 'Kemirgen', 'Diğer'];
+
+  // Ekranda Görünen Tür İsimleri (Çeviri)
+  const typeLabels = {
+      'Kedi': activeLang === 'AU' ? 'Cat' : 'Kedi',
+      'Köpek': activeLang === 'AU' ? 'Dog' : 'Köpek',
+      'Kuş': activeLang === 'AU' ? 'Bird' : 'Kuş',
+      'Balık': activeLang === 'AU' ? 'Fish' : 'Balık',
+      'Kemirgen': activeLang === 'AU' ? 'Rodent' : 'Kemirgen',
+      'Diğer': activeLang === 'AU' ? 'Other' : 'Diğer',
+  };
+
+  // Ekranda Görünen Cinsiyet İsimleri (Çeviri)
+  const genderLabels = {
+      'Erkek': activeLang === 'AU' ? 'Male' : 'Erkek',
+      'Dişi': activeLang === 'AU' ? 'Female' : 'Dişi',
+  };
 
   // --- VERİ İŞLEME VE FİLTRELEME ---
   useEffect(() => {
@@ -120,14 +189,14 @@ const AllListingsScreen = ({ navigation, route }) => {
                 <View>
                     <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{item.name}</Text>
                     <Text style={[styles.breed, { color: theme.subText }]} numberOfLines={1}>
-                        {item.breed || item.subtitle} {item.age ? ` • ${item.age} Yaş` : ''}
+                        {item.breed || item.subtitle} {item.age ? ` • ${item.age} ${t.ageText}` : ''}
                     </Text>
                 </View>
                 <View style={styles.cardFooter}>
                     <View style={styles.locationRow}>
                         <Ionicons name="location-outline" size={14} color={theme.subText} />
                         <Text style={[styles.locationText, { color: theme.subText }]} numberOfLines={1}>
-                            {item.city ? `${item.city}, ${item.district}` : 'Konum Yok'}
+                            {item.city ? `${item.city}, ${item.district}` : t.noLocation}
                         </Text>
                     </View>
                     {item.price > 0 && (
@@ -144,7 +213,7 @@ const AllListingsScreen = ({ navigation, route }) => {
   const FilterMainContent = () => (
       <ScrollView showsVerticalScrollIndicator={false}>
           {/* Hayvan Türü */}
-          <Text style={[styles.filterLabel, {color: theme.text}]}>Hayvan Türü</Text>
+          <Text style={[styles.filterLabel, {color: theme.text}]}>{t.animalType}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 20}}>
               {ANIMAL_TYPES.map((type) => (
                   <TouchableOpacity 
@@ -152,45 +221,45 @@ const AllListingsScreen = ({ navigation, route }) => {
                       style={[styles.typeBtn, selectedType === type && styles.typeBtnActive, {borderColor: theme.border}]}
                       onPress={() => setSelectedType(selectedType === type ? null : type)}
                   >
-                      <Text style={[styles.typeBtnText, selectedType === type && {color: 'white'}]}>{type}</Text>
+                      <Text style={[styles.typeBtnText, selectedType === type && {color: 'white'}]}>{typeLabels[type]}</Text>
                   </TouchableOpacity>
               ))}
           </ScrollView>
 
-          {/* Konum Seçimi - Butonlar SelectionMode'u tetikler */}
-          <Text style={[styles.filterLabel, {color: theme.text}]}>Konum</Text>
+          {/* Konum Seçimi */}
+          <Text style={[styles.filterLabel, {color: theme.text}]}>{t.location}</Text>
           <View style={{flexDirection:'row', justifyContent:'space-between', marginBottom:20}}>
               <TouchableOpacity style={[styles.selector, {borderColor: theme.border}]} onPress={() => setSelectionMode('city')}>
-                  <Text style={{color: selectedCity ? theme.text : theme.subText}}>{selectedCity || "İl Seç"}</Text>
+                  <Text style={{color: selectedCity ? theme.text : theme.subText}}>{selectedCity || t.selectCity}</Text>
                   <Ionicons name="chevron-forward" size={16} color={theme.subText} />
               </TouchableOpacity>
               <TouchableOpacity style={[styles.selector, {borderColor: theme.border}]} onPress={() => { 
-                  if(!selectedCity) alert("Önce şehir seçmelisiniz."); 
+                  if(!selectedCity) alert(t.cityWarning); 
                   else setSelectionMode('district');
               }}>
-                  <Text style={{color: selectedDistrict ? theme.text : theme.subText}}>{selectedDistrict || "İlçe Seç"}</Text>
+                  <Text style={{color: selectedDistrict ? theme.text : theme.subText}}>{selectedDistrict || t.selectDistrict}</Text>
                   <Ionicons name="chevron-forward" size={16} color={theme.subText} />
               </TouchableOpacity>
           </View>
 
           {/* Yaş Aralığı */}
-          <Text style={[styles.filterLabel, {color: theme.text}]}>Yaş Aralığı</Text>
+          <Text style={[styles.filterLabel, {color: theme.text}]}>{t.ageRange}</Text>
           <View style={{flexDirection:'row', alignItems:'center', marginBottom:20}}>
               <TextInput 
                   style={[styles.ageInput, {borderColor: theme.border, color: theme.text}]} 
-                  placeholder="Min" placeholderTextColor={theme.subText} keyboardType="numeric"
+                  placeholder={t.min} placeholderTextColor={theme.subText} keyboardType="numeric"
                   value={minAge} onChangeText={setMinAge}
               />
               <Text style={{marginHorizontal:10, color:theme.subText}}>-</Text>
               <TextInput 
                   style={[styles.ageInput, {borderColor: theme.border, color: theme.text}]} 
-                  placeholder="Max" placeholderTextColor={theme.subText} keyboardType="numeric"
+                  placeholder={t.max} placeholderTextColor={theme.subText} keyboardType="numeric"
                   value={maxAge} onChangeText={setMaxAge}
               />
           </View>
 
           {/* Cinsiyet */}
-          <Text style={[styles.filterLabel, {color: theme.text}]}>Cinsiyet</Text>
+          <Text style={[styles.filterLabel, {color: theme.text}]}>{t.gender}</Text>
           <View style={{flexDirection:'row', marginBottom:30}}>
               {['Erkek', 'Dişi'].map((g) => (
                   <TouchableOpacity 
@@ -199,16 +268,16 @@ const AllListingsScreen = ({ navigation, route }) => {
                       onPress={() => setSelectedGender(selectedGender === g ? null : g)}
                   >
                       <Ionicons name={g === 'Erkek' ? 'male' : 'female'} size={18} color={selectedGender === g ? 'white' : theme.subText} />
-                      <Text style={[styles.genderText, selectedGender === g && {color:'white'}]}>{g}</Text>
+                      <Text style={[styles.genderText, selectedGender === g && {color:'white'}]}>{genderLabels[g]}</Text>
                   </TouchableOpacity>
               ))}
           </View>
 
           <TouchableOpacity style={styles.applyBtn} onPress={() => setFilterModalVisible(false)}>
-              <Text style={styles.applyBtnText}>Uygula ({activeFilterCount})</Text>
+              <Text style={styles.applyBtnText}>{t.apply} ({activeFilterCount})</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.clearBtn} onPress={clearFilters}>
-              <Text style={{color: theme.subText}}>Tümünü Temizle</Text>
+              <Text style={{color: theme.subText}}>{t.clearAll}</Text>
           </TouchableOpacity>
       </ScrollView>
   );
@@ -224,7 +293,7 @@ const AllListingsScreen = ({ navigation, route }) => {
               <TouchableOpacity onPress={() => setSelectionMode(null)} style={{flexDirection:'row', alignItems:'center', marginBottom:15, paddingVertical:5}}>
                   <Ionicons name="arrow-back" size={24} color={theme.text} />
                   <Text style={{marginLeft:10, fontSize:16, fontWeight:'bold', color: theme.text}}>
-                      {selectionMode === 'city' ? "Şehirlere Dön" : "Filtrelere Dön"}
+                      {selectionMode === 'city' ? t.backToCities : t.backToFilters}
                   </Text>
               </TouchableOpacity>
               
@@ -235,7 +304,7 @@ const AllListingsScreen = ({ navigation, route }) => {
                   renderItem={({ item }) => (
                       <TouchableOpacity style={[styles.selectionItem, {borderBottomColor: theme.border}]} onPress={() => {
                           if (selectionMode === 'city') { setSelectedCity(item); setSelectedDistrict(null); } else { setSelectedDistrict(item); }
-                          setSelectionMode(null); // Seçim yapınca ana filtre ekranına dön
+                          setSelectionMode(null); 
                       }}>
                           <Text style={[styles.selectionText, {color: theme.text}]}>{item}</Text>
                           <Ionicons name="checkmark" size={20} color={COLORS.primary} style={{opacity: (selectedCity === item || selectedDistrict === item) ? 1 : 0}} />
@@ -257,7 +326,7 @@ const AllListingsScreen = ({ navigation, route }) => {
         
         <View style={{alignItems:'center'}}>
             <Text style={[styles.headerTitle, { color: theme.text }]}>{title}</Text>
-            <Text style={{fontSize:11, color: theme.subText, fontWeight:'500'}}>{displayedData.length} İlan Bulundu</Text>
+            <Text style={{fontSize:11, color: theme.subText, fontWeight:'500'}}>{displayedData.length} {t.listingsFound}</Text>
         </View>
 
         <TouchableOpacity onPress={() => setFilterModalVisible(true)} style={[styles.iconBtn, activeFilterCount > 0 && {backgroundColor: COLORS.primary + '15'}]}>
@@ -272,7 +341,7 @@ const AllListingsScreen = ({ navigation, route }) => {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{paddingHorizontal:15, paddingVertical:10}}>
                 {selectedType && (
                     <TouchableOpacity style={styles.chip} onPress={() => setSelectedType(null)}>
-                        <Text style={styles.chipText}>{selectedType}</Text>
+                        <Text style={styles.chipText}>{typeLabels[selectedType]}</Text>
                         <Ionicons name="close" size={14} color="white" />
                     </TouchableOpacity>
                 )}
@@ -290,12 +359,12 @@ const AllListingsScreen = ({ navigation, route }) => {
                 )}
                 {selectedGender && (
                     <TouchableOpacity style={styles.chip} onPress={() => setSelectedGender(null)}>
-                        <Text style={styles.chipText}>{selectedGender}</Text>
+                        <Text style={styles.chipText}>{genderLabels[selectedGender]}</Text>
                         <Ionicons name="close" size={14} color="white" />
                     </TouchableOpacity>
                 )}
                 <TouchableOpacity onPress={clearFilters} style={styles.clearTextBtn}>
-                    <Text style={{color: COLORS.primary, fontSize:12, fontWeight:'bold'}}>Temizle</Text>
+                    <Text style={{color: COLORS.primary, fontSize:12, fontWeight:'bold'}}>{t.clear}</Text>
                 </TouchableOpacity>
             </ScrollView>
           </View>
@@ -306,53 +375,53 @@ const AllListingsScreen = ({ navigation, route }) => {
         data={displayedData}
         renderItem={({ item, index }) => <ListingCard item={item} index={index} />}
         keyExtractor={item => item.id}
-        contentContainerStyle={{ padding: 15, paddingBottom: 100 }} // Butonun altından rahatça kayması için paddingBottom arttırıldı
+        contentContainerStyle={{ padding: 15, paddingBottom: 100 }} 
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
             <View style={{alignItems:'center', marginTop:80}}>
                 <View style={{width: 100, height: 100, borderRadius: 50, backgroundColor: '#E3F2FD', justifyContent:'center', alignItems:'center', marginBottom:20}}>
                     <Ionicons name="search" size={50} color={COLORS.primary} />
                 </View>
-                <Text style={{color: theme.text, fontSize:18, fontWeight:'bold'}}>Sonuç Bulunamadı</Text>
+                <Text style={{color: theme.text, fontSize:18, fontWeight:'bold'}}>{t.noResultTitle}</Text>
                 <Text style={{textAlign:'center', marginTop:10, color: theme.subText, fontSize:14, paddingHorizontal: 40}}>
-                    Arama kriterlerinizi değiştirerek tekrar deneyebilirsiniz.
+                    {t.noResultDesc}
                 </Text>
                 <TouchableOpacity onPress={clearFilters} style={styles.resetFiltersBtn}>
-                    <Text style={{color: 'white', fontWeight:'bold'}}>Filtreleri Temizle</Text>
+                    <Text style={{color: 'white', fontWeight:'bold'}}>{t.clearFilters}</Text>
                 </TouchableOpacity>
             </View>
         }
       />
 
-      {/* ✅ YENİ: İLAN EKLE (YÜZEN BUTON - FAB) */}
+      {/* İLAN EKLE (YÜZEN BUTON - FAB) */}
       <TouchableOpacity 
           style={[styles.fabButton, { backgroundColor: COLORS.primary }]}
-          onPress={() => navigation.navigate('AddListing', { category: title })} // Başlığı kategori parametresi olarak gönderir
+          onPress={() => navigation.navigate('AddListing', { category: title })} 
           activeOpacity={0.8}
       >
           <Ionicons name="add" size={24} color="white" />
-          <Text style={styles.fabText}>İlan Ekle</Text>
+          <Text style={styles.fabText}>{t.addListing}</Text>
       </TouchableOpacity>
 
       {/* TEK MODAL (İÇERİK DEĞİŞTİRMELİ) */}
       <Modal visible={filterModalVisible} animationType="slide" transparent={true} onRequestClose={() => {
-          if (selectionMode) setSelectionMode(null); // Geri tuşu önce seçimi kapatır
+          if (selectionMode) setSelectionMode(null); 
           else setFilterModalVisible(false);
       }}>
           <View style={styles.modalOverlay}>
               <View style={[styles.filterContent, { backgroundColor: theme.cardBg }]}>
                   
-                  {/* Başlık (Sadece Ana Filtre Modunda Göster) */}
+                  {/* Başlık */}
                   {!selectionMode && (
                       <View style={styles.modalHeader}>
-                          <Text style={[styles.modalTitle, {color: theme.text}]}>Detaylı Filtreleme</Text>
+                          <Text style={[styles.modalTitle, {color: theme.text}]}>{t.detailedFilter}</Text>
                           <TouchableOpacity onPress={() => setFilterModalVisible(false)} style={styles.closeBtn}>
                               <Ionicons name="close" size={24} color={theme.text} />
                           </TouchableOpacity>
                       </View>
                   )}
 
-                  {/* İÇERİK: Seçim Modu varsa Liste, yoksa Filtre Formu */}
+                  {/* İÇERİK */}
                   {selectionMode ? <SelectionListContent /> : <FilterMainContent />}
 
               </View>
@@ -420,7 +489,6 @@ const styles = StyleSheet.create({
   selectionItem: { paddingVertical: 15, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   selectionText: { fontSize: 16 },
 
-  // ✅ YENİ: YÜZEN BUTON STİLLERİ
   fabButton: {
       position: 'absolute',
       bottom: 30,

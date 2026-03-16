@@ -9,6 +9,13 @@ import { supabase } from '../lib/supabase';
 
 const { width } = Dimensions.get('window');
 
+// 👑 KURUCU (FOUNDER) E-POSTA ADRESLERİ 👑
+const KURUCU_EMAILLER = [
+  "asanmuh4mmed@gmail.com",
+  "izahbngyn@gmail.com",
+  "petspito@gmail.com"
+];
+
 const AdminPanelScreen = ({ navigation }) => {
     const { theme } = useContext(ThemeContext);
     const { user, country } = useContext(AuthContext);
@@ -76,7 +83,10 @@ const AdminPanelScreen = ({ navigation }) => {
     const t = TEXTS[activeLang];
 
     useEffect(() => {
-        if (!user || !user.is_admin) {
+        // ✅ GÜNCELLENEN KISIM: Yetki Kontrolü
+        const hasAccess = user && (user.is_admin || user.is_founder || KURUCU_EMAILLER.includes(user.email));
+        
+        if (!hasAccess) {
             Alert.alert(t.accessDenied, t.accessMsg);
             navigation.goBack();
             return;

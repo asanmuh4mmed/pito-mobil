@@ -7,14 +7,18 @@ import { sendVerificationEmail } from '../utils/EmailService';
 import AsyncStorage from '@react-native-async-storage/async-storage'; 
 
 const LoginScreen = ({ navigation }) => {
-  // 1️⃣ Username yerine artık Email kullanıyoruz
   const { login, isLoading, updateCountry, country: globalCountry, checkEmailExists, resetPassword } = useContext(AuthContext); 
 
   const [localCountry, setLocalCountry] = useState('TR'); 
-  const [email, setEmail] = useState(''); // Değişiklik: username -> email
+  const [email, setEmail] = useState(''); 
   const [password, setPassword] = useState('');
   
   const [rememberMe, setRememberMe] = useState(false);
+
+  // Şifre Göster/Gizle State'leri (YENİ EKLENDİ)
+  const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
 
   // --- ANİMASYON STATE'LERİ ---
   const [showSuccessAnim, setShowSuccessAnim] = useState(false);
@@ -31,6 +35,7 @@ const LoginScreen = ({ navigation }) => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [isResetting, setIsResetting] = useState(false); // Yüklenme durumu için eklendi
 
   useEffect(() => {
       if(globalCountry?.code) {
@@ -44,7 +49,6 @@ const LoginScreen = ({ navigation }) => {
       try {
           const savedCreds = await AsyncStorage.getItem('rememberedUser');
           if (savedCreds) {
-              // Artık e-posta ve şifreyi hatırlıyoruz
               const { email: savedEmail, password: savedPass } = JSON.parse(savedCreds);
               setEmail(savedEmail);
               setPassword(savedPass);
@@ -55,17 +59,16 @@ const LoginScreen = ({ navigation }) => {
       }
   };
 
-  // --- DİL PAKETİ (Güncellendi) ---
   const TEXTS = {
       TR: {
           title: "Tekrar Hoşgeldin!",
           subtitle: "Pito hesabına giriş yap.",
-          labelUser: "E-posta Adresi", // Güncellendi
+          labelUser: "E-posta Adresi", 
           labelPass: "Şifre",
           btnLogin: "Giriş Yap",
           linkRegister: "Hesabın yok mu? Kayıt Ol",
           linkForgot: "Şifremi Unuttum",
-          errFill: "Lütfen e-posta ve şifrenizi giriniz.", // Güncellendi
+          errFill: "Lütfen e-posta ve şifrenizi giriniz.", 
           errFail: "Giriş Başarısız",
           fpTitle: "Şifre Sıfırlama",
           fpStep1: "E-posta adresini gir, sana bir kod gönderelim.",
@@ -85,12 +88,12 @@ const LoginScreen = ({ navigation }) => {
       AU: {
           title: "Welcome Back!",
           subtitle: "Login to your Pito account.",
-          labelUser: "E-mail Address", // Güncellendi
+          labelUser: "E-mail Address", 
           labelPass: "Password",
           btnLogin: "Login",
           linkRegister: "Don't have an account? Sign Up",
           linkForgot: "Forgot Password?",
-          errFill: "Please enter your email and password.", // Güncellendi
+          errFill: "Please enter your email and password.", 
           errFail: "Login Failed",
           fpTitle: "Reset Password",
           fpStep1: "Enter your email to receive a verification code.",
@@ -117,7 +120,6 @@ const LoginScreen = ({ navigation }) => {
   };
 
   const handleLogin = async () => {
-    // 2️⃣ DÜZELTME: E-posta adresindeki olası boşlukları temizle (trim)
     const cleanEmail = email ? email.trim() : "";
     const cleanPassword = password ? password : ""; 
 
@@ -126,7 +128,6 @@ const LoginScreen = ({ navigation }) => {
         return;
     }
     
-    // AuthContext'teki login fonksiyonuna TEMİZLENMİŞ email gönderiyoruz
     const result = await login(cleanEmail, cleanPassword);
 
     if (result.success) {
@@ -168,11 +169,10 @@ const LoginScreen = ({ navigation }) => {
   };
 
   const handleSendCode = async () => {
-      // Şifremi unuttum kısmında da boşlukları temizleyelim
       const cleanFpEmail = fpEmail ? fpEmail.trim() : "";
 
       if (!cleanFpEmail) return;
-      const exists = await checkEmailExists(cleanFpEmail); // await ekledim garanti olsun diye
+      const exists = await checkEmailExists(cleanFpEmail); 
       if (!exists) {
           Alert.alert("Hata", t.errEmail);
           return;
@@ -197,17 +197,23 @@ const LoginScreen = ({ navigation }) => {
       }
   };
 
+  // ✅ ŞİFRE SIFIRLAMA GÜNCELLENDİ
   const handleResetPassword = async () => {
-      if (!newPassword || !confirmNewPassword) return;
+      if (!newPassword || !confirmNewPassword) {
+          Alert.alert("Hata", "Lütfen tüm alanları doldurunuz.");
+          return;
+      }
 
       if (newPassword !== confirmNewPassword) {
           Alert.alert("Hata", t.errMatch);
           return;
       }
 
-      // Şifre sıfırlarken de temiz mail adresi kullanalım
+      setIsResetting(true);
       const cleanFpEmail = fpEmail ? fpEmail.trim() : "";
       const result = await resetPassword(cleanFpEmail, newPassword);
+      setIsResetting(false);
+
       if (result.success) {
           Alert.alert("Başarılı", t.successReset, [
               { text: "OK", onPress: () => {
@@ -217,10 +223,14 @@ const LoginScreen = ({ navigation }) => {
                   setFpCode('');
                   setNewPassword('');
                   setConfirmNewPassword('');
+                  // Otomatik olarak giriş alanına e-postayı dolduralım kolaylık olsun
+                  setEmail(cleanFpEmail);
+                  setPassword('');
               }}
           ]);
       } else {
-          Alert.alert("Hata", "Güncelleme yapılamadı.");
+          // Eğer Supabase'den bir hata mesajı gelirse onu gösterir, gelmezse standart mesajı gösterir.
+          Alert.alert("Hata", result.message || "Güncelleme yapılamadı.");
       }
   };
 
@@ -257,14 +267,13 @@ const LoginScreen = ({ navigation }) => {
 
                 <View style={styles.form}>
                     <View style={styles.inputContainer}>
-                        {/* 3️⃣ Label ve Input Email için Güncellendi */}
                         <Text style={styles.label}>{t.labelUser}</Text>
                         <TextInput 
                             style={styles.input} 
                             placeholder="ornek@email.com"
                             placeholderTextColor="#aaa"
                             autoCapitalize="none"
-                            keyboardType="email-address" // E-posta klavyesi
+                            keyboardType="email-address" 
                             value={email}
                             onChangeText={setEmail}
                         />
@@ -272,17 +281,22 @@ const LoginScreen = ({ navigation }) => {
 
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>{t.labelPass}</Text>
-                        <TextInput 
-                            style={styles.input} 
-                            placeholder="******"
-                            placeholderTextColor="#aaa"
-                            secureTextEntry
-                            value={password}
-                            onChangeText={setPassword}
-                        />
+                        {/* GÖZ İKONLU ŞİFRE ALANI */}
+                        <View style={styles.passwordContainer}>
+                            <TextInput 
+                                style={styles.passwordInput} 
+                                placeholder="******"
+                                placeholderTextColor="#aaa"
+                                secureTextEntry={!showPassword}
+                                value={password}
+                                onChangeText={setPassword}
+                            />
+                            <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={22} color="#666" />
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
-                    {/* BENİ HATIRLA & ŞİFREMİ UNUTTUM SATIRI */}
                     <View style={styles.optionsRow}>
                         <TouchableOpacity style={styles.rememberMeContainer} onPress={() => setRememberMe(!rememberMe)}>
                             <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
@@ -325,7 +339,6 @@ const LoginScreen = ({ navigation }) => {
                             <Ionicons name="checkmark" size={50} color="white" />
                         </Animated.View>
                         <Text style={styles.successTitleModern}>{t.successLogin}</Text>
-                        {/* Kullanıcıya e-postası veya sadece hoşgeldin mesajı gösterilir */}
                         <Text style={styles.successSubModern}>{t.welcomeBack} {email.trim()}!</Text>
                     </Animated.View>
                 </View>
@@ -385,27 +398,43 @@ const LoginScreen = ({ navigation }) => {
                             {fpStep === 3 && (
                                 <>
                                     <Text style={styles.modalDesc}>{t.fpStep3}</Text>
-                                    <TextInput 
-                                        style={styles.modalInput} 
-                                        placeholder="Yeni Şifre" 
-                                        placeholderTextColor="#999"
-                                        secureTextEntry
-                                        value={newPassword}
-                                        onChangeText={setNewPassword}
-                                    />
-                                    <TextInput 
-                                        style={styles.modalInput} 
-                                        placeholder="Yeni Şifre (Tekrar)" 
-                                        placeholderTextColor="#999"
-                                        secureTextEntry
-                                        value={confirmNewPassword}
-                                        onChangeText={setConfirmNewPassword}
-                                    />
+                                    
+                                    {/* GÖZ İKONLU MODAL YENİ ŞİFRE */}
+                                    <View style={styles.passwordContainerModal}>
+                                        <TextInput 
+                                            style={styles.passwordInputModal} 
+                                            placeholder="Yeni Şifre" 
+                                            placeholderTextColor="#999"
+                                            secureTextEntry={!showNewPassword}
+                                            value={newPassword}
+                                            onChangeText={setNewPassword}
+                                        />
+                                        <TouchableOpacity onPress={() => setShowNewPassword(!showNewPassword)} style={styles.eyeIcon}>
+                                            <Ionicons name={showNewPassword ? "eye-off-outline" : "eye-outline"} size={22} color="#666" />
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    {/* GÖZ İKONLU MODAL ŞİFRE TEKRAR */}
+                                    <View style={styles.passwordContainerModal}>
+                                        <TextInput 
+                                            style={styles.passwordInputModal} 
+                                            placeholder="Yeni Şifre (Tekrar)" 
+                                            placeholderTextColor="#999"
+                                            secureTextEntry={!showConfirmNewPassword}
+                                            value={confirmNewPassword}
+                                            onChangeText={setConfirmNewPassword}
+                                        />
+                                        <TouchableOpacity onPress={() => setShowConfirmNewPassword(!showConfirmNewPassword)} style={styles.eyeIcon}>
+                                            <Ionicons name={showConfirmNewPassword ? "eye-off-outline" : "eye-outline"} size={22} color="#666" />
+                                        </TouchableOpacity>
+                                    </View>
+
                                     <TouchableOpacity 
-                                        style={{ backgroundColor: '#4CAF50', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 20 }} 
+                                        style={{ backgroundColor: '#4CAF50', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 10 }} 
                                         onPress={handleResetPassword}
+                                        disabled={isResetting}
                                     >
-                                        <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>{t.btnReset}</Text>
+                                        {isResetting ? <ActivityIndicator color="white" /> : <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>{t.btnReset}</Text>}
                                     </TouchableOpacity>
                                 </>
                             )}
@@ -439,6 +468,30 @@ const styles = StyleSheet.create({
   label: { fontSize: 16, color: COLORS.dark, marginBottom: 8, fontWeight: '700' },
   input: { backgroundColor: 'white', padding: 15, borderRadius: 15, fontSize: 16, borderWidth: 1, borderColor: '#E0E0E0', shadowColor: "#000", shadowOffset: {width: 0, height: 1}, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
   
+  // ✅ YENİ: ŞİFRE ALANI TASARIMI (Göz İkonlu)
+  passwordContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'white',
+      borderRadius: 15,
+      borderWidth: 1,
+      borderColor: '#E0E0E0',
+      shadowColor: "#000",
+      shadowOffset: {width: 0, height: 1},
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 2,
+      paddingRight: 10
+  },
+  passwordInput: {
+      flex: 1,
+      padding: 15,
+      fontSize: 16,
+  },
+  eyeIcon: {
+      padding: 5,
+  },
+
   optionsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 },
   rememberMeContainer: { flexDirection: 'row', alignItems: 'center' },
   checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1, borderColor: COLORS.gray, marginRight: 8, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' },
@@ -464,7 +517,25 @@ const styles = StyleSheet.create({
   closeBtn: { padding: 5, backgroundColor: '#eee', borderRadius: 20 },
   modalBody: { padding: 25 },
   modalDesc: { fontSize: 15, color: '#666', marginBottom: 20, lineHeight: 22 },
+  
+  // ✅ YENİ: Şifremi Unuttum Modalı İçin Tasarımlar
   modalInput: { backgroundColor: '#F5F7FA', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#E1E8ED', fontSize: 16, marginBottom: 15, color: '#333' },
+  passwordContainerModal: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#F5F7FA',
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: '#E1E8ED',
+      marginBottom: 15,
+      paddingRight: 10
+  },
+  passwordInputModal: {
+      flex: 1,
+      padding: 16,
+      fontSize: 16,
+      color: '#333'
+  },
   modalBtn: { backgroundColor: COLORS.primary, padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 5, elevation: 3 }
 });
 

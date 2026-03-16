@@ -36,6 +36,7 @@ import VetBotScreen from './src/screens/VetBotScreen';
 import PetsgramScreen from './src/screens/PetsgramScreen';
 import ShopScreen from './src/screens/ShopScreen';
 import VaccineReportScreen from './src/screens/VaccineReportScreen';
+import PetIdentifierScreen from './src/screens/PetIdentifierScreen';
 
 // OYUN EKRANLARI
 import GameScreen from './src/screens/GameScreen';
@@ -125,17 +126,19 @@ export default function App() {
                             <Stack.Screen name="ShopAdminOrders" component={ShopAdminOrdersScreen} />
                             <Stack.Screen name="AdminPanel" component={AdminPanelScreen} />
                             <Stack.Screen name="AdminUsers" component={AdminUsersScreen} />
+                            {/* YENİ EKLENEN YAPAY ZEKA SAYFASI */}
+                            <Stack.Screen name="PetIdentifier" component={PetIdentifierScreen} />
                           </Stack.Navigator>
                         </NavigationContainer>
-                      </ThemeProvider>
-                    </GameProvider>
-                  </CartProvider>
-                </ShopProvider>
-              </SocialProvider>
-            </AIProvider>
-          </ChatProvider>
-        </ListingProvider>
-      </AuthProvider>
-    </GestureHandlerRootView>
+                      </ThemeProvider> 
+                    </GameProvider> 
+                  </CartProvider> 
+                </ShopProvider> 
+              </SocialProvider> 
+            </AIProvider> 
+          </ChatProvider> 
+        </ListingProvider> 
+      </AuthProvider> 
+    </GestureHandlerRootView> 
   );
 }

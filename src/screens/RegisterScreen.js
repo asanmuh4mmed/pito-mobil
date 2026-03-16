@@ -1,5 +1,5 @@
 import React, { useState, useContext, useRef, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Modal, FlatList, ImageBackground, Animated } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Modal, FlatList, ImageBackground, Animated, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
@@ -17,6 +17,10 @@ const RegisterScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   
+  // Şifre Göster/Gizle State'leri (YENİ)
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  
   // Lokasyon State'leri
   const [city, setCity] = useState('');
   const [district, setDistrict] = useState('');
@@ -28,7 +32,7 @@ const RegisterScreen = ({ navigation }) => {
   const [userCode, setUserCode] = useState(''); 
   const [isVerifying, setIsVerifying] = useState(false); 
 
-  // Başarı Modalı Kontrolleri (YENİ)
+  // Başarı Modalı Kontrolleri
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const scaleAnim = useRef(new Animated.Value(0)).current;
 
@@ -37,7 +41,7 @@ const RegisterScreen = ({ navigation }) => {
   const [privacyVisible, setPrivacyVisible] = useState(false);
   const [isAgreed, setIsAgreed] = useState(false); 
 
-  // --- ANİMASYON ETKİLEŞİMİ (YENİ) ---
+  // --- ANİMASYON ETKİLEŞİMİ ---
   useEffect(() => {
       if (successModalVisible) {
           Animated.spring(scaleAnim, {
@@ -224,7 +228,6 @@ const RegisterScreen = ({ navigation }) => {
       
       if (result.success) {
           setVerifyModalVisible(false);
-          // ✅ Standart Alert yerine modern modal'ı açıyoruz
           setSuccessModalVisible(true);
       } else {
           Alert.alert(localCountry === 'TR' ? 'Hata' : 'Error', result.message || t.errCode);
@@ -238,124 +241,160 @@ const RegisterScreen = ({ navigation }) => {
     >
         <View style={styles.overlay}>
             <SafeAreaView style={styles.container}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-                
-                <View style={styles.countrySwitchContainer}>
-                    <TouchableOpacity 
-                        style={[styles.countryBtn, localCountry === 'TR' && styles.countryBtnActive]} 
-                        onPress={() => handleCountrySwitch('TR')}
+                {/* KLAVYE KAYDIRMA KONTROLÜ (YENİ) */}
+                <KeyboardAvoidingView 
+                    style={{ flex: 1 }} 
+                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                >
+                    <ScrollView 
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={{ flexGrow: 1, paddingBottom: 50 }} 
+                        keyboardShouldPersistTaps="handled"
                     >
-                        <Text style={styles.flag}>🇹🇷</Text>
-                        <Text style={[styles.countryText, localCountry === 'TR' && styles.countryTextActive]}>TR</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                        style={[styles.countryBtn, localCountry === 'AU' && styles.countryBtnActive]} 
-                        onPress={() => handleCountrySwitch('AU')}
-                    >
-                        <Text style={styles.flag}>🇦🇺</Text>
-                        <Text style={[styles.countryText, localCountry === 'AU' && styles.countryTextActive]}>AU</Text>
-                    </TouchableOpacity>
-                </View>
-
-                <View style={styles.header}>
-                    <Text style={styles.title}>{t.title}</Text>
-                    <Text style={styles.subtitle}>{t.subtitle}</Text>
-                </View>
-
-                <View style={styles.form}>
-                    <View style={styles.inputContainer}>
-                        <Text style={styles.label}>{t.labelUser}</Text>
-                        <TextInput 
-                            style={styles.input} 
-                            placeholder="..." 
-                            placeholderTextColor="#999" 
-                            value={username} 
-                            onChangeText={handleUsernameChange} 
-                            autoCapitalize="none" 
-                        />
-                    </View>
-
-                    <View style={styles.inputContainer}>
-                        <Text style={styles.label}>{t.labelName}</Text>
-                        <TextInput style={styles.input} placeholder="..." placeholderTextColor="#999" value={name} onChangeText={setName} />
-                    </View>
-
-                    <View style={{flexDirection:'row', justifyContent:'space-between'}}>
-                        <View style={[styles.inputContainer, {width:'48%'}]}>
-                            <Text style={styles.label}>{t.city}</Text>
-                            <TouchableOpacity style={styles.input} onPress={() => openModal('city')}>
-                                <Text style={{color: city ? 'black' : '#999'}}>{city || t.labelCity}</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        <View style={[styles.inputContainer, {width:'48%'}]}>
-                            <Text style={styles.label}>{t.dist}</Text>
-                            <TouchableOpacity style={styles.input} onPress={() => openModal('district')}>
-                                <Text style={{color: district ? 'black' : '#999'}}>{district || t.labelDistrict}</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-
-                    <View style={styles.inputContainer}>
-                        <Text style={styles.label}>{t.labelEmail}</Text>
-                        <TextInput 
-                            style={styles.input} 
-                            placeholder="..." 
-                            placeholderTextColor="#999" 
-                            keyboardType="email-address" 
-                            value={email} 
-                            onChangeText={setEmail} 
-                            autoCapitalize="none" 
-                        />
-                    </View>
-
-                    <View style={styles.inputContainer}>
-                        <Text style={styles.label}>{t.labelPass}</Text>
-                        <TextInput style={styles.input} placeholder="******" placeholderTextColor="#999" secureTextEntry value={password} onChangeText={setPassword} />
-                    </View>
-
-                    <View style={styles.inputContainer}>
-                        <Text style={styles.label}>{t.labelPassConfirm}</Text>
-                        <TextInput style={styles.input} placeholder="******" placeholderTextColor="#999" secureTextEntry value={confirmPassword} onChangeText={setConfirmPassword} />
-                    </View>
-
-                    <View style={styles.checkboxContainer}>
-                        <TouchableOpacity 
-                            style={styles.checkbox} 
-                            onPress={() => setIsAgreed(!isAgreed)}
-                            activeOpacity={0.7}
-                        >
-                            <Ionicons 
-                                name={isAgreed ? "checkbox" : "square-outline"} 
-                                size={26} 
-                                color={isAgreed ? COLORS.primary : "#666"} 
-                            />
-                        </TouchableOpacity>
                         
-                        <View style={styles.checkboxTextContainer}>
-                            <Text style={styles.legalText}>
-                                {t.agreeText}
-                                <Text style={styles.legalLink} onPress={() => setEulaVisible(true)}>{t.eula}</Text>
-                                {t.and}
-                                <Text style={styles.legalLink} onPress={() => setPrivacyVisible(true)}>{t.privacy}</Text>
-                                {t.agreeEnd}
-                            </Text>
+                        <View style={styles.countrySwitchContainer}>
+                            <TouchableOpacity 
+                                style={[styles.countryBtn, localCountry === 'TR' && styles.countryBtnActive]} 
+                                onPress={() => handleCountrySwitch('TR')}
+                            >
+                                <Text style={styles.flag}>🇹🇷</Text>
+                                <Text style={[styles.countryText, localCountry === 'TR' && styles.countryTextActive]}>TR</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity 
+                                style={[styles.countryBtn, localCountry === 'AU' && styles.countryBtnActive]} 
+                                onPress={() => handleCountrySwitch('AU')}
+                            >
+                                <Text style={styles.flag}>🇦🇺</Text>
+                                <Text style={[styles.countryText, localCountry === 'AU' && styles.countryTextActive]}>AU</Text>
+                            </TouchableOpacity>
                         </View>
-                    </View>
 
-                    <TouchableOpacity 
-                        style={[styles.button, { opacity: isAgreed ? 1 : 0.6 }]} 
-                        onPress={handleRegister} 
-                        disabled={isLoading}
-                    >
-                        {isLoading ? <ActivityIndicator color="white" /> : <Text style={styles.buttonText}>{t.btnRegister}</Text>}
-                    </TouchableOpacity>
+                        <View style={styles.header}>
+                            <Text style={styles.title}>{t.title}</Text>
+                            <Text style={styles.subtitle}>{t.subtitle}</Text>
+                        </View>
 
-                    <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate('Login')}>
-                        <Text style={styles.linkText}>{t.linkLogin}</Text>
-                    </TouchableOpacity>
-                </View>
-            </ScrollView>
+                        <View style={styles.form}>
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>{t.labelUser}</Text>
+                                <TextInput 
+                                    style={styles.input} 
+                                    placeholder="..." 
+                                    placeholderTextColor="#999" 
+                                    value={username} 
+                                    onChangeText={handleUsernameChange} 
+                                    autoCapitalize="none" 
+                                />
+                            </View>
+
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>{t.labelName}</Text>
+                                <TextInput style={styles.input} placeholder="..." placeholderTextColor="#999" value={name} onChangeText={setName} />
+                            </View>
+
+                            <View style={{flexDirection:'row', justifyContent:'space-between'}}>
+                                <View style={[styles.inputContainer, {width:'48%'}]}>
+                                    <Text style={styles.label}>{t.city}</Text>
+                                    <TouchableOpacity style={styles.input} onPress={() => openModal('city')}>
+                                        <Text style={{color: city ? 'black' : '#999'}}>{city || t.labelCity}</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <View style={[styles.inputContainer, {width:'48%'}]}>
+                                    <Text style={styles.label}>{t.dist}</Text>
+                                    <TouchableOpacity style={styles.input} onPress={() => openModal('district')}>
+                                        <Text style={{color: district ? 'black' : '#999'}}>{district || t.labelDistrict}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>{t.labelEmail}</Text>
+                                <TextInput 
+                                    style={styles.input} 
+                                    placeholder="..." 
+                                    placeholderTextColor="#999" 
+                                    keyboardType="email-address" 
+                                    value={email} 
+                                    onChangeText={setEmail} 
+                                    autoCapitalize="none" 
+                                />
+                            </View>
+
+                            {/* ŞİFRE ALANI - GÖZ İKONLU (YENİ) */}
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>{t.labelPass}</Text>
+                                <View style={styles.passwordContainer}>
+                                    <TextInput 
+                                        style={styles.passwordInput} 
+                                        placeholder="******" 
+                                        placeholderTextColor="#999" 
+                                        secureTextEntry={!showPassword} 
+                                        value={password} 
+                                        onChangeText={setPassword} 
+                                    />
+                                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                                        <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={22} color="#666" />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            {/* ŞİFRE TEKRAR ALANI - GÖZ İKONLU (YENİ) */}
+                            <View style={styles.inputContainer}>
+                                <Text style={styles.label}>{t.labelPassConfirm}</Text>
+                                <View style={styles.passwordContainer}>
+                                    <TextInput 
+                                        style={styles.passwordInput} 
+                                        placeholder="******" 
+                                        placeholderTextColor="#999" 
+                                        secureTextEntry={!showConfirmPassword} 
+                                        value={confirmPassword} 
+                                        onChangeText={setConfirmPassword} 
+                                    />
+                                    <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
+                                        <Ionicons name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} size={22} color="#666" />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            <View style={styles.checkboxContainer}>
+                                <TouchableOpacity 
+                                    style={styles.checkbox} 
+                                    onPress={() => setIsAgreed(!isAgreed)}
+                                    activeOpacity={0.7}
+                                >
+                                    <Ionicons 
+                                        name={isAgreed ? "checkbox" : "square-outline"} 
+                                        size={26} 
+                                        color={isAgreed ? COLORS.primary : "#666"} 
+                                    />
+                                </TouchableOpacity>
+                                
+                                <View style={styles.checkboxTextContainer}>
+                                    <Text style={styles.legalText}>
+                                        {t.agreeText}
+                                        <Text style={styles.legalLink} onPress={() => setEulaVisible(true)}>{t.eula}</Text>
+                                        {t.and}
+                                        <Text style={styles.legalLink} onPress={() => setPrivacyVisible(true)}>{t.privacy}</Text>
+                                        {t.agreeEnd}
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <TouchableOpacity 
+                                style={[styles.button, { opacity: isAgreed ? 1 : 0.6 }]} 
+                                onPress={handleRegister} 
+                                disabled={isLoading}
+                            >
+                                {isLoading ? <ActivityIndicator color="white" /> : <Text style={styles.buttonText}>{t.btnRegister}</Text>}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate('Login')}>
+                                <Text style={styles.linkText}>{t.linkLogin}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </ScrollView>
+                </KeyboardAvoidingView>
 
             {/* ŞEHİR/İLÇE MODALI */}
             <Modal visible={modalVisible} transparent={true} animationType="slide">
@@ -378,23 +417,25 @@ const RegisterScreen = ({ navigation }) => {
                 </View>
             </Modal>
 
-            {/* DOĞRULAMA KODU MODALI */}
+            {/* ✅ DOĞRULAMA KODU MODALI (YENİ DARK TEMA) */}
             <Modal visible={verifyModalVisible} transparent={true} animationType="fade">
-                <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { height: 'auto', paddingBottom: 30 }]}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>{t.verifyTitle}</Text>
-                            <TouchableOpacity onPress={() => setVerifyModalVisible(false)}><Ionicons name="close" size={24} color="black" /></TouchableOpacity>
+                <View style={styles.modalOverlayDark}>
+                    <View style={styles.verifyModalContentDark}>
+                        <View style={styles.verifyModalHeader}>
+                            <Text style={styles.verifyModalTitle}>{t.verifyTitle}</Text>
+                            <TouchableOpacity onPress={() => setVerifyModalVisible(false)}>
+                                <Ionicons name="close" size={24} color="white" />
+                            </TouchableOpacity>
                         </View>
                         
-                        <Text style={{ textAlign:'center', marginBottom: 20, color: '#666' }}>
+                        <Text style={styles.verifyModalDesc}>
                             {t.verifyMsg}
                         </Text>
 
                         <TextInput 
-                            style={[styles.input, { textAlign: 'center', fontSize: 24, letterSpacing: 5, fontWeight: 'bold' }]}
+                            style={styles.verifyInputDark}
                             placeholder="XXXXXX"
-                            placeholderTextColor="#ccc"
+                            placeholderTextColor="#666"
                             maxLength={6}
                             keyboardType="number-pad"
                             value={userCode}
@@ -402,7 +443,7 @@ const RegisterScreen = ({ navigation }) => {
                         />
 
                         <TouchableOpacity 
-                            style={[styles.button, { marginTop: 20, backgroundColor: COLORS.success }]} 
+                            style={[styles.button, { marginTop: 25, backgroundColor: COLORS.primary, paddingVertical: 15 }]} 
                             onPress={handleVerify}
                             disabled={isVerifying}
                         >
@@ -412,7 +453,7 @@ const RegisterScreen = ({ navigation }) => {
                 </View>
             </Modal>
 
-            {/* ✅ BAŞARI MODALI (YENİ MODERN ANİMASYONLU) */}
+            {/* BAŞARI MODALI */}
             <Modal visible={successModalVisible} transparent={true} animationType="fade">
                 <View style={styles.modalOverlay}>
                     <Animated.View style={[styles.successModalContent, { transform: [{ scale: scaleAnim }] }]}>
@@ -445,35 +486,9 @@ const RegisterScreen = ({ navigation }) => {
                         <ScrollView showsVerticalScrollIndicator={false}>
                             <Text style={styles.legalModalText}>
                                 {localCountry === 'TR' ? 
-                                `1. GİRİŞ
-Bu uygulamayı (Pito) kullanarak aşağıdaki koşulları kabul etmiş sayılırsınız. Lütfen dikkatlice okuyunuz.
-
-2. HESAP GÜVENLİĞİ
-Kullanıcılar hesaplarının güvenliğinden sorumludur. Şifrenizi kimseyle paylaşmayınız.
-
-3. İÇERİK POLİTİKASI
-Uygulamada paylaşılan içerikler genel ahlak kurallarına uygun olmalıdır. Nefret söylemi, şiddet içeren veya yasa dışı içerikler yasaktır ve hesabın silinmesine neden olabilir.
-
-4. HİZMETİN KAPSAMI
-Pito, hayvan sahiplerini ve veterinerleri bir araya getiren bir platformdur. Kullanıcılar arasındaki etkileşimlerden (sahiplendirme, eş bulma vb.) doğacak sorunlardan Pito sorumlu tutulamaz.
-
-5. ÜYELİK İPTALİ
-Kullanıcılar diledikleri zaman hesaplarını silebilirler. Kurallara uymayan hesaplar Pito tarafından askıya alınabilir.` 
+                                `1. GİRİŞ\nBu uygulamayı (Pito) kullanarak aşağıdaki koşulları kabul etmiş sayılırsınız. Lütfen dikkatlice okuyunuz.\n\n2. HESAP GÜVENLİĞİ\nKullanıcılar hesaplarının güvenliğinden sorumludur. Şifrenizi kimseyle paylaşmayınız.\n\n3. İÇERİK POLİTİKASI\nUygulamada paylaşılan içerikler genel ahlak kurallarına uygun olmalıdır. Nefret söylemi, şiddet içeren veya yasa dışı içerikler yasaktır ve hesabın silinmesine neden olabilir.\n\n4. HİZMETİN KAPSAMI\nPito, hayvan sahiplerini ve veterinerleri bir araya getiren bir platformdur. Kullanıcılar arasındaki etkileşimlerden (sahiplendirme, eş bulma vb.) doğacak sorunlardan Pito sorumlu tutulamaz.\n\n5. ÜYELİK İPTALİ\nKullanıcılar diledikleri zaman hesaplarını silebilirler. Kurallara uymayan hesaplar Pito tarafından askıya alınabilir.` 
                                 : 
-                                `1. INTRODUCTION
-By using this application (Pito), you agree to the following terms. Please read carefully.
-
-2. ACCOUNT SECURITY
-Users are responsible for the security of their accounts. Do not share your password.
-
-3. CONTENT POLICY
-Content shared in the application must comply with general moral rules. Hate speech, violent, or illegal content is prohibited and may result in account deletion.
-
-4. SCOPE OF SERVICE
-Pito is a platform connecting pet owners and vets. Pito is not responsible for issues arising from interactions between users.
-
-5. TERMINATION
-Users can delete their accounts at any time. Accounts violating rules may be suspended by Pito.`}
+                                `1. INTRODUCTION\nBy using this application (Pito), you agree to the following terms. Please read carefully.\n\n2. ACCOUNT SECURITY\nUsers are responsible for the security of their accounts. Do not share your password.\n\n3. CONTENT POLICY\nContent shared in the application must comply with general moral rules. Hate speech, violent, or illegal content is prohibited and may result in account deletion.\n\n4. SCOPE OF SERVICE\nPito is a platform connecting pet owners and vets. Pito is not responsible for issues arising from interactions between users.\n\n5. TERMINATION\nUsers can delete their accounts at any time. Accounts violating rules may be suspended by Pito.`}
                             </Text>
                         </ScrollView>
                         <TouchableOpacity style={[styles.button, {marginTop:10}]} onPress={() => setEulaVisible(false)}>
@@ -494,35 +509,9 @@ Users can delete their accounts at any time. Accounts violating rules may be sus
                         <ScrollView showsVerticalScrollIndicator={false}>
                             <Text style={styles.legalModalText}>
                                 {localCountry === 'TR' ? 
-                                `1. TOPLANAN VERİLER
-Kayıt olurken adınız, e-posta adresiniz ve konum bilgileriniz (İl/İlçe) toplanmaktadır.
-
-2. VERİLERİN KULLANIMI
-Bu veriler, size en yakın ilanları göstermek ve uygulama içi iletişimi sağlamak amacıyla kullanılır.
-
-3. VERİ GÜVENLİĞİ
-Kişisel verileriniz şifrelenerek saklanır ve yasal zorunluluklar dışında üçüncü şahıslarla paylaşılmaz.
-
-4. ÇEREZLER VE TAKİP
-Uygulama performansını artırmak için anonim kullanım verileri toplanabilir.
-
-5. İLETİŞİM
-Gizlilikle ilgili sorularınız için petspito@gmail.com adresinden bize ulaşabilirsiniz.` 
+                                `1. TOPLANAN VERİLER\nKayıt olurken adınız, e-posta adresiniz ve konum bilgileriniz (İl/İlçe) toplanmaktadır.\n\n2. VERİLERİN KULLANIMI\nBu veriler, size en yakın ilanları göstermek ve uygulama içi iletişimi sağlamak amacıyla kullanılır.\n\n3. VERİ GÜVENLİĞİ\nKişisel verileriniz şifrelenerek saklanır ve yasal zorunluluklar dışında üçüncü şahıslarla paylaşılmaz.\n\n4. ÇEREZLER VE TAKİP\nUygulama performansını artırmak için anonim kullanım verileri toplanabilir.\n\n5. İLETİŞİM\nGizlilikle ilgili sorularınız için petspito@gmail.com adresinden bize ulaşabilirsiniz.` 
                                 : 
-                                `1. DATA COLLECTED
-When registering, your name, email address, and location (State/Suburb) are collected.
-
-2. USE OF DATA
-This data is used to show you nearby listings and facilitate in-app communication.
-
-3. DATA SECURITY
-Your personal data is encrypted and stored, and is not shared with third parties except for legal obligations.
-
-4. COOKIES AND TRACKING
-Anonymous usage data may be collected to improve app performance.
-
-5. CONTACT
-For privacy-related questions, contact us at petspito@gmail.com.`}
+                                `1. DATA COLLECTED\nWhen registering, your name, email address, and location (State/Suburb) are collected.\n\n2. USE OF DATA\nThis data is used to show you nearby listings and facilitate in-app communication.\n\n3. DATA SECURITY\nYour personal data is encrypted and stored, and is not shared with third parties except for legal obligations.\n\n4. COOKIES AND TRACKING\nAnonymous usage data may be collected to improve app performance.\n\n5. CONTACT\nFor privacy-related questions, contact us at petspito@gmail.com.`}
                             </Text>
                         </ScrollView>
                         <TouchableOpacity style={[styles.button, {marginTop:10}]} onPress={() => setPrivacyVisible(false)}>
@@ -555,6 +544,31 @@ const styles = StyleSheet.create({
   inputContainer: { marginBottom: 20 },
   label: { fontSize: 16, color: COLORS.dark, marginBottom: 8, fontWeight: '600' },
   input: { backgroundColor: 'white', padding: 15, borderRadius: 15, fontSize: 16, borderWidth: 1, borderColor: '#E0E0E0', shadowColor: "#000", shadowOffset: {width: 0, height: 1}, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
+  
+  // ✅ YENİ: ŞİFRE ALANI TASARIMI (Göz İkonlu)
+  passwordContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'white',
+      borderRadius: 15,
+      borderWidth: 1,
+      borderColor: '#E0E0E0',
+      shadowColor: "#000",
+      shadowOffset: {width: 0, height: 1},
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 2,
+      paddingRight: 10
+  },
+  passwordInput: {
+      flex: 1,
+      padding: 15,
+      fontSize: 16,
+  },
+  eyeIcon: {
+      padding: 5,
+  },
+
   button: { backgroundColor: COLORS.primary, padding: 18, borderRadius: 15, alignItems: 'center', marginTop: 10, elevation: 5, shadowColor: COLORS.primary, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 5 },
   buttonText: { color: COLORS.light, fontSize: 18, fontWeight: 'bold' },
   linkButton: { marginTop: 20, alignItems: 'center' },
@@ -573,7 +587,29 @@ const styles = StyleSheet.create({
   legalLink: { color: COLORS.primary, fontWeight: 'bold', textDecorationLine: 'underline' },
   legalModalText: { fontSize: 14, color: '#333', lineHeight: 22 },
 
-  // ✅ BAŞARI MODALI STİLLERİ (YENİ)
+  // ✅ YENİ: DOĞRULAMA KODU MODALI (DARK TEMA)
+  modalOverlayDark: {
+      flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center'
+  },
+  verifyModalContentDark: {
+      width: '85%', backgroundColor: '#1E1E1E', borderRadius: 24, padding: 25, elevation: 10,
+      borderWidth: 1, borderColor: '#333'
+  },
+  verifyModalHeader: {
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15,
+  },
+  verifyModalTitle: {
+      fontSize: 20, fontWeight: 'bold', color: 'white'
+  },
+  verifyModalDesc: {
+      textAlign:'center', marginBottom: 25, color: '#AAA', fontSize: 14, lineHeight: 20
+  },
+  verifyInputDark: {
+      backgroundColor: '#2A2A2A', color: 'white', textAlign: 'center', fontSize: 32, letterSpacing: 8, fontWeight: 'bold',
+      paddingVertical: 15, borderRadius: 15, borderWidth: 1, borderColor: '#444'
+  },
+
+  // BAŞARI MODALI STİLLERİ
   successModalContent: {
       width: '80%',
       backgroundColor: 'white',

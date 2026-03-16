@@ -39,6 +39,7 @@ const TRANSLATIONS = {
         register: "Kayıt Ol",
         freeAdBtn: "Ücretsiz İlan Ver",
         vetBotBtn: "Senin Veterinerin (AI)",
+        petIdBtn: "Hayvanının Cinsini Aİ'ya sor", // YENİ EKLENDİ
         qrCollarBtn: "QR Kodlu Künye Al",  
        
         home: "Ana Sayfa",
@@ -84,6 +85,8 @@ const TRANSLATIONS = {
         cancel: "Vazgeç",
         menuShop: "Mağaza",
         gameBtn: "Pito Oyun Dünyası",
+        add: "Ekle",
+        Oyunlar: "Oyunlar",
         gameSub: "Eğlen, Yarış ve Puan Topla! 🎮"
     },
     AU: {
@@ -97,6 +100,7 @@ const TRANSLATIONS = {
         register: "Sign Up",
         freeAdBtn: "Post Free Ad",
         vetBotBtn: "VetBOT (AI)",
+        petIdBtn: "What Breed? (AI)", // YENİ EKLENDİ
         qrCollarBtn: "Buy QR Tag", 
         
         home: "Home",
@@ -142,6 +146,8 @@ const TRANSLATIONS = {
         cancel: "Cancel",
         menuShop: "Shop",
         gameBtn: "Pito Game World",
+        add: "Add", 
+        Oyunlar: "Games", 
         gameSub: "Have Fun & Earn Points! 🎮"
     }
 };
@@ -583,7 +589,7 @@ const HomeScreen = ({ navigation }) => {
                               <View style={[styles.storySquare, { borderColor: '#ddd', borderStyle: 'dashed' }]}>
                                   <Ionicons name="add" size={30} color="#6C5CE7" />
                               </View>
-                              <Text style={[styles.storyText, { color: theme.text }]} numberOfLines={1}>Ekle</Text>
+                              <Text style={[styles.storyText, { color: theme.text }]} numberOfLines={1}>{t.add}</Text>
                           </TouchableOpacity>
 
                           {posts.map((item) => (
@@ -638,6 +644,20 @@ const HomeScreen = ({ navigation }) => {
                                     <Text style={styles.bigAddButtonText}>{t.vetBotBtn}</Text>
                                 </View>
                                 <Ionicons name="chatbubbles" size={24} color="white" />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* ✅ YENİ: YAPAY ZEKA CİNS TAHMİNİ BUTONU */}
+                        <View style={{ marginTop: 10 }}>
+                            <TouchableOpacity 
+                                style={[styles.bigAddButton, { backgroundColor: '#FF6B6B' }]} 
+                                onPress={() => { playSound('water'); navigation.navigate('PetIdentifier'); }}
+                            >
+                                <View style={styles.bigAddButtonContent}>
+                                    <Ionicons name="scan-circle" size={32} color="white" />
+                                    <Text style={styles.bigAddButtonText}>{t.petIdBtn}</Text>
+                                </View>
+                                <Ionicons name="sparkles" size={24} color="white" />
                             </TouchableOpacity>
                         </View>
 
@@ -767,7 +787,7 @@ const HomeScreen = ({ navigation }) => {
                     {/* ✅ OYUN BUTONU (HAMBURGER MENÜ) */}
                     <TouchableOpacity style={styles.menuItem} onPress={() => { playSound('water'); setMenuVisible(false); navigation.navigate('GameList'); }}>
                         <Ionicons name="game-controller-outline" size={22} color="#6C5CE7" />
-                        <Text style={[styles.menuItemText, { color: theme.text }]}>Oyunlar</Text>
+                        <Text style={[styles.menuItemText, { color: theme.text }]}>{t.Oyunlar}</Text>
                         <View style={styles.newBadge}>
                             <Text style={styles.newBadgeText}>YENİ</Text>
                         </View>
