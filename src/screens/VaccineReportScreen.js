@@ -6,12 +6,9 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as Notifications from 'expo-notifications';
 import { Swipeable, GestureHandlerRootView } from 'react-native-gesture-handler'; 
 
-import { COLORS } from '../constants/colors';
-import { ThemeContext } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 
-// --- ANİMASYONLU LİSTE ELEMANI ---
 const AnimatedItem = ({ children, index }) => {
     const slideAnim = useRef(new Animated.Value(50)).current;
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -21,7 +18,7 @@ const AnimatedItem = ({ children, index }) => {
             Animated.timing(slideAnim, {
                 toValue: 0,
                 duration: 500,
-                delay: index * 100, // Sırayla gelmesi için gecikme
+                delay: index * 100, 
                 useNativeDriver: true,
                 easing: Easing.out(Easing.cubic),
             }),
@@ -42,12 +39,10 @@ const AnimatedItem = ({ children, index }) => {
 };
 
 const VaccineReportScreen = ({ navigation }) => {
-    const { theme } = useContext(ThemeContext);
     const { user, country } = useContext(AuthContext);
 
     const activeLang = country?.code || 'TR';
 
-    // --- DİL PAKETİ ---
     const TEXTS = {
         TR: {
             headerTitle: "Aşı Karnesi",
@@ -101,7 +96,6 @@ const VaccineReportScreen = ({ navigation }) => {
 
     const t = TEXTS[activeLang];
 
-    // --- STATE'LER ---
     const [vaccines, setVaccines] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modalVisible, setModalVisible] = useState(false);
@@ -110,17 +104,14 @@ const VaccineReportScreen = ({ navigation }) => {
     const [vacDate, setVacDate] = useState(new Date());
     const [showDatePicker, setShowDatePicker] = useState(false);
 
-    // Animasyonlar
     const headerAnim = useRef(new Animated.Value(-100)).current;
 
-    // --- 1. YÜKLEME ---
     useEffect(() => {
         if (user) {
             loadVaccines();
         }
         requestNotificationPermission();
         
-        // Header Animasyonu Başlat
         Animated.spring(headerAnim, {
             toValue: 0,
             friction: 5,
@@ -134,7 +125,6 @@ const VaccineReportScreen = ({ navigation }) => {
         const { status } = await Notifications.requestPermissionsAsync();
     };
 
-    // ✅ VERİTABANINDAN ÇEKME
     const loadVaccines = async () => {
         try {
             setLoading(true);
@@ -153,7 +143,6 @@ const VaccineReportScreen = ({ navigation }) => {
         }
     };
 
-    // --- 2. BİLDİRİM ---
     const scheduleNotification = async (name, date) => {
         const trigger = new Date(date);
         trigger.setHours(9, 0, 0); 
@@ -171,7 +160,6 @@ const VaccineReportScreen = ({ navigation }) => {
         } catch (e) { console.log(e); }
     };
 
-    // --- 3. EKLEME (DB) ---
     const handleAddVaccine = async () => {
         if (!vacName) return;
 
@@ -207,7 +195,6 @@ const VaccineReportScreen = ({ navigation }) => {
         }
     };
 
-    // --- 4. SİLME (DB) ---
     const deleteVaccine = async (id) => {
         try {
             const { error } = await supabase
@@ -224,7 +211,6 @@ const VaccineReportScreen = ({ navigation }) => {
         }
     };
 
-    // --- 5. TIKLAMA DETAYI ---
     const handleItemPress = (item) => {
         const dateStr = formatDate(item.date);
         let msg = "";
@@ -253,7 +239,6 @@ const VaccineReportScreen = ({ navigation }) => {
         return `${date.getDate()}.${date.getMonth() + 1}.${date.getFullYear()}`;
     };
 
-    // --- SWIPE ACTION (SİLME BUTONU) ---
     const renderRightActions = (id) => {
         return (
             <TouchableOpacity 
@@ -274,12 +259,11 @@ const VaccineReportScreen = ({ navigation }) => {
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
-            <SafeAreaView style={[styles.container, { backgroundColor: '#F4F9FA' }]}>
+            <SafeAreaView style={[styles.container, { backgroundColor: '#F3E5F5' }]}>
                 
-                {/* HEADER */}
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
-                        <Ionicons name="chevron-back" size={24} color="#333" />
+                        <Ionicons name="chevron-back" size={24} color="#3700B3" />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>{t.headerTitle}</Text>
                     <TouchableOpacity onPress={() => setModalVisible(true)} style={styles.addBtn}>
@@ -287,11 +271,10 @@ const VaccineReportScreen = ({ navigation }) => {
                     </TouchableOpacity>
                 </View>
 
-                {/* İÇERİK */}
                 <View style={{ flex: 1, paddingHorizontal: 20 }}>
                     
                     {loading ? (
-                        <ActivityIndicator size="large" color={COLORS.primary} style={{marginTop: 50}} />
+                        <ActivityIndicator size="large" color="#6200EE" style={{marginTop: 50}} />
                     ) : (
                         <FlatList 
                             data={vaccines}
@@ -300,7 +283,6 @@ const VaccineReportScreen = ({ navigation }) => {
                             contentContainerStyle={{ paddingBottom: 100 }}
                             ListHeaderComponent={
                                 <Animated.View style={{ transform: [{ translateY: headerAnim }], marginBottom: 20 }}>
-                                    {/* PET KİMLİK KARTI */}
                                     <View style={styles.petCard}>
                                         <View style={styles.petCardContent}>
                                             <View style={styles.avatarBorder}>
@@ -322,7 +304,7 @@ const VaccineReportScreen = ({ navigation }) => {
                                     </View>
                                     
                                     <View style={{flexDirection:'row', alignItems:'center', marginTop: 10, marginBottom: 5}}>
-                                        <Ionicons name="calendar" size={18} color="#00838F" style={{marginRight: 6}} />
+                                        <Ionicons name="calendar" size={18} color="#6200EE" style={{marginRight: 6}} />
                                         <Text style={styles.sectionTitle}>{t.listTitle}</Text>
                                     </View>
                                 </Animated.View>
@@ -330,7 +312,7 @@ const VaccineReportScreen = ({ navigation }) => {
                             ListEmptyComponent={
                                 <View style={styles.emptyState}>
                                     <View style={styles.emptyIconBox}>
-                                        <Ionicons name="shield-checkmark-outline" size={50} color="#00ACC1" />
+                                        <Ionicons name="shield-checkmark-outline" size={50} color="#6200EE" />
                                     </View>
                                     <Text style={styles.emptyText}>{t.empty}</Text>
                                     <Text style={styles.emptySubText}>{t.emptySub}</Text>
@@ -344,7 +326,6 @@ const VaccineReportScreen = ({ navigation }) => {
                                             onPress={() => handleItemPress(item)}
                                             activeOpacity={0.9}
                                         >
-                                            {/* Sol Çizgi (Status Indicator) */}
                                             <View style={[styles.statusLine, { backgroundColor: item.status === 'done' ? '#4CAF50' : '#FF9800' }]} />
                                             
                                             <View style={styles.vacContent}>
@@ -375,7 +356,6 @@ const VaccineReportScreen = ({ navigation }) => {
                     )}
                 </View>
 
-                {/* --- EKLEME MODALI --- */}
                 <Modal visible={modalVisible} transparent={true} animationType="fade">
                     <View style={styles.modalOverlay}>
                         <View style={styles.modalContent}>
@@ -401,7 +381,7 @@ const VaccineReportScreen = ({ navigation }) => {
                                 onPress={() => setShowDatePicker(true)}
                             >
                                 <Text style={{ color: '#333', fontSize: 16 }}>{formatDate(vacDate)}</Text>
-                                <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
+                                <Ionicons name="calendar-outline" size={20} color="#6200EE" />
                             </TouchableOpacity>
 
                             {showDatePicker && (
@@ -430,18 +410,17 @@ const VaccineReportScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
     container: { flex: 1 },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 15 },
-    headerTitle: { fontSize: 20, fontWeight: '800', color: '#006064' },
+    headerTitle: { fontSize: 20, fontWeight: '800', color: '#3700B3' },
     iconBtn: { padding: 8, backgroundColor: 'white', borderRadius: 12, elevation: 2, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 5 },
-    addBtn: { width: 45, height: 45, borderRadius: 22.5, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', elevation: 4, shadowColor: COLORS.primary, shadowOffset:{width:0, height:4}, shadowOpacity:0.3 },
+    addBtn: { width: 45, height: 45, borderRadius: 22.5, backgroundColor: '#6200EE', justifyContent: 'center', alignItems: 'center', elevation: 4, shadowColor: '#6200EE', shadowOffset:{width:0, height:4}, shadowOpacity:0.3 },
 
-    // PET CARD (ID CARD STYLE)
     petCard: { 
-        backgroundColor: COLORS.primary, 
+        backgroundColor: '#6200EE', 
         borderRadius: 24, 
         padding: 20, 
         marginBottom: 10, 
         elevation: 8, 
-        shadowColor: COLORS.primary, shadowOffset:{width:0, height:8}, shadowOpacity:0.3, shadowRadius: 10,
+        shadowColor: '#6200EE', shadowOffset:{width:0, height:8}, shadowOpacity:0.3, shadowRadius: 10,
         overflow: 'hidden'
     },
     petCardContent: { flexDirection: 'row', alignItems: 'center' },
@@ -452,9 +431,8 @@ const styles = StyleSheet.create({
     idBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, marginTop: 8, alignSelf: 'flex-start' },
     idText: { color: 'white', fontSize: 10, fontWeight: 'bold', letterSpacing: 0.5 },
 
-    sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#006064' },
+    sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#3700B3' },
 
-    // LIST ITEMS (FLOATING CARDS)
     vaccineItem: { 
         flexDirection: 'row', 
         backgroundColor: 'white', 
@@ -472,26 +450,23 @@ const styles = StyleSheet.create({
     statusChip: { paddingVertical: 5, paddingHorizontal: 12, borderRadius: 12, borderWidth: 1 },
     statusText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
 
-    // SWIPE ACTIONS
     deleteAction: { width: 80, marginBottom: 12, justifyContent: 'center', alignItems: 'center' },
     deleteIconContainer: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#FF5252', justifyContent: 'center', alignItems: 'center', elevation: 2 },
 
-    // EMPTY STATE
     emptyState: { alignItems: 'center', marginTop: 40 },
-    emptyIconBox: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#E0F7FA', justifyContent: 'center', alignItems: 'center', marginBottom: 20 },
-    emptyText: { color: '#006064', fontSize: 18, fontWeight: 'bold' },
-    emptySubText: { color: '#78909C', fontSize: 14, marginTop: 5, textAlign: 'center', paddingHorizontal: 40 },
+    emptyIconBox: { width: 100, height: 100, borderRadius: 50, backgroundColor: 'white', justifyContent: 'center', alignItems: 'center', marginBottom: 20, elevation: 2 },
+    emptyText: { color: '#3700B3', fontSize: 18, fontWeight: 'bold' },
+    emptySubText: { color: '#7E57C2', fontSize: 14, marginTop: 5, textAlign: 'center', paddingHorizontal: 40 },
 
-    // MODAL
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 25 },
     modalContent: { backgroundColor: 'white', borderRadius: 24, padding: 25, elevation: 10 },
     modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 },
     modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#333' },
     closeBtn: { padding: 5, backgroundColor: '#F5F5F5', borderRadius: 15 },
-    label: { fontWeight: '700', marginBottom: 8, color: '#006064', fontSize: 14 },
+    label: { fontWeight: '700', marginBottom: 8, color: '#3700B3', fontSize: 14 },
     input: { padding: 15, borderRadius: 12, backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#EEE', fontSize: 16, color: '#333' },
     dateBtn: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, borderRadius: 12, backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#EEE' },
-    saveBtn: { flexDirection: 'row', backgroundColor: COLORS.primary, padding: 16, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 30, elevation: 5, shadowColor: COLORS.primary, shadowOffset:{width:0, height:4}, shadowOpacity:0.3 },
+    saveBtn: { flexDirection: 'row', backgroundColor: '#6200EE', padding: 16, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 30, elevation: 5, shadowColor: '#6200EE', shadowOffset:{width:0, height:4}, shadowOpacity:0.3 },
     saveBtnText: { color: 'white', fontWeight: 'bold', fontSize: 16 }
 });
 

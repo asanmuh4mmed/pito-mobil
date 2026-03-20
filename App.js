@@ -1,12 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useContext } from 'react';
 import './src/i18n/i18n'; 
 
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
-// CONTEXT IMPORTS
-import { AuthProvider } from './src/context/AuthContext';
+import { AuthProvider, AuthContext } from './src/context/AuthContext';
 import { ListingProvider } from './src/context/ListingContext';
 import { ChatProvider } from './src/context/ChatContext';
 import { ThemeProvider } from './src/context/ThemeContext'; 
@@ -16,7 +15,6 @@ import { CartProvider } from './src/context/CartContext';
 import { ShopProvider } from './src/context/ShopContext'; 
 import { GameProvider } from './src/context/GameContext'; 
 
-// EKRANLAR
 import SplashScreen from './src/screens/SplashScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import HomeScreen from './src/screens/HomeScreen';
@@ -38,7 +36,6 @@ import ShopScreen from './src/screens/ShopScreen';
 import VaccineReportScreen from './src/screens/VaccineReportScreen';
 import PetIdentifierScreen from './src/screens/PetIdentifierScreen';
 
-// OYUN EKRANLARI
 import GameScreen from './src/screens/GameScreen';
 import MemoryGameScreen from './src/screens/MemoryGameScreen';
 import EndlessRunnerScreen from './src/screens/EndlessRunnerScreen';
@@ -50,7 +47,6 @@ import FlappyPetScreen from './src/screens/FlappyPetScreen';
 import TowerGameScreen from './src/screens/TowerGameScreen';
 import QuizGameScreen from './src/screens/QuizGameScreen';
 
-// E-TİCARET, BAĞIŞ VE ROZETLER
 import ProductDetailScreen from './src/screens/ProductDetailScreen';
 import ShopAdminScreen from './src/screens/ShopAdminScreen';
 import AddEditProductScreen from './src/screens/AddEditProductScreen';
@@ -61,14 +57,66 @@ import AllReviewsScreen from './src/screens/AllReviewsScreen';
 import DonateScreen from './src/screens/DonateScreen';
 import BadgesScreen from './src/screens/BadgesScreen';
 
-// ADMIN EKRANLARI
 import AdminPanelScreen from './src/screens/AdminPanelScreen';
 import AdminUsersScreen from './src/screens/AdminUsersScreen'; 
 
 const Stack = createNativeStackNavigator();
 
-export default function App() {
+const AppNavigator = () => {
+  const { user, isLoading } = useContext(AuthContext);
 
+  if (isLoading) return null;
+
+  return (
+    <NavigationContainer>
+      <Stack.Navigator initialRouteName={user ? "Home" : "Splash"} screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Splash" component={SplashScreen} />
+        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="Register" component={RegisterScreen} />
+        <Stack.Screen name="Profile" component={ProfileScreen} />
+        <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+        <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="UserProfile" component={UserProfileScreen} />
+        <Stack.Screen name="Badges" component={BadgesScreen} />
+        <Stack.Screen name="AddListing" component={AddListingScreen} />
+        <Stack.Screen name="AllListings" component={AllListingsScreen} />
+        <Stack.Screen name="ListingDetail" component={ListingDetailScreen} />
+        <Stack.Screen name="Reviews" component={ReviewsScreen} />
+        <Stack.Screen name="ChatList" component={ChatListScreen} />
+        <Stack.Screen name="ChatDetail" component={ChatDetailScreen} />
+        <Stack.Screen name="Petsgram" component={PetsgramScreen} />
+        <Stack.Screen name="VetBot" component={VetBotScreen} />
+        <Stack.Screen name="VaccineReport" component={VaccineReportScreen} />
+        <Stack.Screen name="GameList" component={GameListScreen} />
+        <Stack.Screen name="Game" component={GameScreen} />
+        <Stack.Screen name="MemoryGame" component={MemoryGameScreen} />
+        <Stack.Screen name="EndlessRunner" component={EndlessRunnerScreen} />
+        <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
+        <Stack.Screen name="GameDonate" component={GameDonateScreen} />
+        <Stack.Screen name="FlappyPet" component={FlappyPetScreen} />
+        <Stack.Screen name="BubbleScreen" component={BubbleScreen} />
+        <Stack.Screen name="TowerGame" component={TowerGameScreen} />
+        <Stack.Screen name="QuizGame" component={QuizGameScreen} />
+        <Stack.Screen name="Shop" component={ShopScreen} />
+        <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+        <Stack.Screen name="Checkout" component={CheckoutScreen} />
+        <Stack.Screen name="AddReview" component={AddReviewScreen} />
+        <Stack.Screen name="AllReviews" component={AllReviewsScreen} />
+        <Stack.Screen name="Donate" component={DonateScreen} />
+        <Stack.Screen name="ShopAdmin" component={ShopAdminScreen} />
+        <Stack.Screen name="AddEditProduct" component={AddEditProductScreen} />
+        <Stack.Screen name="ShopAdminOrders" component={ShopAdminOrdersScreen} />
+        <Stack.Screen name="AdminPanel" component={AdminPanelScreen} />
+        <Stack.Screen name="AdminUsers" component={AdminUsersScreen} />
+        <Stack.Screen name="PetIdentifier" component={PetIdentifierScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+};
+
+export default function App() {
   useEffect(() => {
     if (!AuthProvider) console.error("🛑 HATA: AuthProvider YÜKLENEMEDİ!");
   }, []);
@@ -80,65 +128,20 @@ export default function App() {
           <ChatProvider>
             <AIProvider>
               <SocialProvider>
-                <ShopProvider> 
-                  <CartProvider> 
-                    <GameProvider> 
-                      <ThemeProvider> 
-                        <NavigationContainer>
-                          <Stack.Navigator initialRouteName="Splash" screenOptions={{ headerShown: false }}>
-                            <Stack.Screen name="Splash" component={SplashScreen} />
-                            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-                            <Stack.Screen name="Home" component={HomeScreen} />
-                            <Stack.Screen name="Login" component={LoginScreen} />
-                            <Stack.Screen name="Register" component={RegisterScreen} />
-                            <Stack.Screen name="Profile" component={ProfileScreen} />
-                            <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-                            <Stack.Screen name="Settings" component={SettingsScreen} />
-                            <Stack.Screen name="UserProfile" component={UserProfileScreen} />
-                            <Stack.Screen name="Badges" component={BadgesScreen} />
-                            <Stack.Screen name="AddListing" component={AddListingScreen} />
-                            <Stack.Screen name="AllListings" component={AllListingsScreen} />
-                            <Stack.Screen name="ListingDetail" component={ListingDetailScreen} />
-                            <Stack.Screen name="Reviews" component={ReviewsScreen} />
-                            <Stack.Screen name="ChatList" component={ChatListScreen} />
-                            <Stack.Screen name="ChatDetail" component={ChatDetailScreen} />
-                            <Stack.Screen name="Petsgram" component={PetsgramScreen} />
-                            <Stack.Screen name="VetBot" component={VetBotScreen} />
-                            <Stack.Screen name="VaccineReport" component={VaccineReportScreen} />
-                            <Stack.Screen name="GameList" component={GameListScreen} />
-                            <Stack.Screen name="Game" component={GameScreen} />
-                            <Stack.Screen name="MemoryGame" component={MemoryGameScreen} />
-                            <Stack.Screen name="EndlessRunner" component={EndlessRunnerScreen} />
-                            <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
-                            <Stack.Screen name="GameDonate" component={GameDonateScreen} />
-                            <Stack.Screen name="FlappyPet" component={FlappyPetScreen} />
-                            <Stack.Screen name="BubbleScreen" component={BubbleScreen} />
-                            <Stack.Screen name="TowerGame" component={TowerGameScreen} />
-                            <Stack.Screen name="QuizGame" component={QuizGameScreen} />
-                            <Stack.Screen name="Shop" component={ShopScreen} />
-                            <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
-                            <Stack.Screen name="Checkout" component={CheckoutScreen} />
-                            <Stack.Screen name="AddReview" component={AddReviewScreen} />
-                            <Stack.Screen name="AllReviews" component={AllReviewsScreen} />
-                            <Stack.Screen name="Donate" component={DonateScreen} />
-                            <Stack.Screen name="ShopAdmin" component={ShopAdminScreen} />
-                            <Stack.Screen name="AddEditProduct" component={AddEditProductScreen} />
-                            <Stack.Screen name="ShopAdminOrders" component={ShopAdminOrdersScreen} />
-                            <Stack.Screen name="AdminPanel" component={AdminPanelScreen} />
-                            <Stack.Screen name="AdminUsers" component={AdminUsersScreen} />
-                            {/* YENİ EKLENEN YAPAY ZEKA SAYFASI */}
-                            <Stack.Screen name="PetIdentifier" component={PetIdentifierScreen} />
-                          </Stack.Navigator>
-                        </NavigationContainer>
-                      </ThemeProvider> 
-                    </GameProvider> 
-                  </CartProvider> 
-                </ShopProvider> 
-              </SocialProvider> 
-            </AIProvider> 
-          </ChatProvider> 
-        </ListingProvider> 
-      </AuthProvider> 
-    </GestureHandlerRootView> 
+                <ShopProvider>
+                  <CartProvider>
+                    <GameProvider>
+                      <ThemeProvider>
+                        <AppNavigator />
+                      </ThemeProvider>
+                    </GameProvider>
+                  </CartProvider>
+                </ShopProvider>
+              </SocialProvider>
+            </AIProvider>
+          </ChatProvider>
+        </ListingProvider>
+      </AuthProvider>
+    </GestureHandlerRootView>
   );
 }

@@ -1,6 +1,5 @@
 import React, { useState, useContext, useEffect, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Alert, ActivityIndicator, ImageBackground, Modal, KeyboardAvoidingView, Platform, Animated, Easing } from 'react-native';
-import { COLORS } from '../constants/colors';
 import { AuthContext } from '../context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { sendVerificationEmail } from '../utils/EmailService';
@@ -15,7 +14,7 @@ const LoginScreen = ({ navigation }) => {
   
   const [rememberMe, setRememberMe] = useState(false);
 
-  // Şifre Göster/Gizle State'leri (YENİ EKLENDİ)
+  // Şifre Göster/Gizle State'leri
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
@@ -35,7 +34,7 @@ const LoginScreen = ({ navigation }) => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const [isResetting, setIsResetting] = useState(false); // Yüklenme durumu için eklendi
+  const [isResetting, setIsResetting] = useState(false); 
 
   useEffect(() => {
       if(globalCountry?.code) {
@@ -44,7 +43,6 @@ const LoginScreen = ({ navigation }) => {
       loadRememberedUser(); 
   }, [globalCountry]);
 
-  // ✅ KAYITLI KULLANICIYI YÜKLEME
   const loadRememberedUser = async () => {
       try {
           const savedCreds = await AsyncStorage.getItem('rememberedUser');
@@ -197,7 +195,6 @@ const LoginScreen = ({ navigation }) => {
       }
   };
 
-  // ✅ ŞİFRE SIFIRLAMA GÜNCELLENDİ
   const handleResetPassword = async () => {
       if (!newPassword || !confirmNewPassword) {
           Alert.alert("Hata", "Lütfen tüm alanları doldurunuz.");
@@ -223,13 +220,11 @@ const LoginScreen = ({ navigation }) => {
                   setFpCode('');
                   setNewPassword('');
                   setConfirmNewPassword('');
-                  // Otomatik olarak giriş alanına e-postayı dolduralım kolaylık olsun
                   setEmail(cleanFpEmail);
                   setPassword('');
               }}
           ]);
       } else {
-          // Eğer Supabase'den bir hata mesajı gelirse onu gösterir, gelmezse standart mesajı gösterir.
           Alert.alert("Hata", result.message || "Güncelleme yapılamadı.");
       }
   };
@@ -281,7 +276,6 @@ const LoginScreen = ({ navigation }) => {
 
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>{t.labelPass}</Text>
-                        {/* GÖZ İKONLU ŞİFRE ALANI */}
                         <View style={styles.passwordContainer}>
                             <TextInput 
                                 style={styles.passwordInput} 
@@ -350,7 +344,7 @@ const LoginScreen = ({ navigation }) => {
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
                             <View style={{flexDirection:'row', alignItems:'center'}}>
-                                <Ionicons name="lock-closed-outline" size={24} color={COLORS.primary} style={{marginRight:8}} />
+                                <Ionicons name="lock-closed-outline" size={24} color="#6200EE" style={{marginRight:8}} />
                                 <Text style={styles.modalTitle}>{t.fpTitle}</Text>
                             </View>
                             <TouchableOpacity onPress={() => setFpModalVisible(false)} style={styles.closeBtn}>
@@ -399,7 +393,6 @@ const LoginScreen = ({ navigation }) => {
                                 <>
                                     <Text style={styles.modalDesc}>{t.fpStep3}</Text>
                                     
-                                    {/* GÖZ İKONLU MODAL YENİ ŞİFRE */}
                                     <View style={styles.passwordContainerModal}>
                                         <TextInput 
                                             style={styles.passwordInputModal} 
@@ -414,7 +407,6 @@ const LoginScreen = ({ navigation }) => {
                                         </TouchableOpacity>
                                     </View>
 
-                                    {/* GÖZ İKONLU MODAL ŞİFRE TEKRAR */}
                                     <View style={styles.passwordContainerModal}>
                                         <TextInput 
                                             style={styles.passwordInputModal} 
@@ -451,24 +443,23 @@ const LoginScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   backgroundImage: { flex: 1, width: '100%', height: '100%' },
-  overlay: { flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.65)' }, 
+  overlay: { flex: 1, backgroundColor: 'rgba(243, 229, 245, 0.85)' }, 
   container: { flex: 1 },
   countrySwitchContainer: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
   countryBtn: { flexDirection: 'row', alignItems: 'center', padding: 8, borderRadius: 20, borderWidth: 1, borderColor: '#ccc', marginHorizontal: 10, backgroundColor: 'rgba(255,255,255,0.8)' },
-  countryBtnActive: { borderColor: COLORS.primary, backgroundColor: '#E3F2FD' },
+  countryBtnActive: { borderColor: '#6200EE', backgroundColor: '#F3E5F5' },
   flag: { fontSize: 20, marginRight: 5 },
   countryText: { fontWeight: 'bold', color: '#666' },
-  countryTextActive: { color: COLORS.primary },
+  countryTextActive: { color: '#6200EE' },
   contentContainer: { flex: 1, justifyContent: 'center' },
   header: { marginBottom: 30, paddingHorizontal: 30 },
-  title: { fontSize: 36, fontWeight: 'bold', color: COLORS.primary, marginBottom: 5 },
-  subtitle: { fontSize: 18, color: COLORS.gray },
+  title: { fontSize: 36, fontWeight: 'bold', color: '#3700B3', marginBottom: 5 },
+  subtitle: { fontSize: 18, color: '#7E57C2' },
   form: { paddingHorizontal: 30 },
   inputContainer: { marginBottom: 15 },
-  label: { fontSize: 16, color: COLORS.dark, marginBottom: 8, fontWeight: '700' },
+  label: { fontSize: 16, color: '#3700B3', marginBottom: 8, fontWeight: '700' },
   input: { backgroundColor: 'white', padding: 15, borderRadius: 15, fontSize: 16, borderWidth: 1, borderColor: '#E0E0E0', shadowColor: "#000", shadowOffset: {width: 0, height: 1}, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
   
-  // ✅ YENİ: ŞİFRE ALANI TASARIMI (Göz İkonlu)
   passwordContainer: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -494,31 +485,30 @@ const styles = StyleSheet.create({
 
   optionsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 },
   rememberMeContainer: { flexDirection: 'row', alignItems: 'center' },
-  checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1, borderColor: COLORS.gray, marginRight: 8, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' },
-  checkboxChecked: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  rememberMeText: { color: COLORS.gray, fontSize: 14, fontWeight: '500' },
-  forgotText: { color: COLORS.primary, fontSize: 14, fontWeight: '600' },
+  checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1, borderColor: '#7E57C2', marginRight: 8, justifyContent: 'center', alignItems: 'center', backgroundColor: 'white' },
+  checkboxChecked: { backgroundColor: '#6200EE', borderColor: '#6200EE' },
+  rememberMeText: { color: '#7E57C2', fontSize: 14, fontWeight: '500' },
+  forgotText: { color: '#6200EE', fontSize: 14, fontWeight: '600' },
 
-  button: { backgroundColor: COLORS.primary, padding: 18, borderRadius: 15, alignItems: 'center', marginTop: 10, elevation: 5, shadowColor: COLORS.primary, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 5 },
-  buttonText: { color: COLORS.light, fontSize: 18, fontWeight: 'bold' },
+  button: { backgroundColor: '#6200EE', padding: 18, borderRadius: 15, alignItems: 'center', marginTop: 10, elevation: 5, shadowColor: '#6200EE', shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 5 },
+  buttonText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
   linkButton: { marginTop: 20, alignItems: 'center' },
-  linkText: { color: COLORS.primary, fontSize: 16, fontWeight: '600' },
+  linkText: { color: '#6200EE', fontSize: 16, fontWeight: '600' },
   
   successOverlayAbsolute: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, zIndex: 999, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   successModernCard: { backgroundColor: 'white', paddingVertical: 40, paddingHorizontal: 50, borderRadius: 30, alignItems: 'center', elevation: 20, shadowColor: '#000', shadowOffset: {width:0, height:10}, shadowOpacity: 0.3, shadowRadius: 20 },
   successIconCircleModern: { width: 80, height: 80, backgroundColor: '#4CAF50', borderRadius: 40, justifyContent: 'center', alignItems: 'center', marginBottom: 20, elevation: 10, shadowColor: '#4CAF50', shadowOffset: {width:0, height:5}, shadowOpacity: 0.5, shadowRadius: 10 },
-  successTitleModern: { fontSize: 26, fontWeight: 'bold', color: COLORS.dark, marginBottom: 10 },
+  successTitleModern: { fontSize: 26, fontWeight: 'bold', color: '#3700B3', marginBottom: 10 },
   successSubModern: { fontSize: 18, color: '#666', fontWeight: '500' },
 
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '85%', backgroundColor: 'white', borderRadius: 25, padding: 0, elevation: 20, shadowColor: '#000', shadowOffset: {width:0,height:5}, shadowOpacity:0.3, shadowRadius:10 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#f0f0f0', backgroundColor: '#f9f9f9', borderTopLeftRadius: 25, borderTopRightRadius: 25 },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.dark },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#3700B3' },
   closeBtn: { padding: 5, backgroundColor: '#eee', borderRadius: 20 },
   modalBody: { padding: 25 },
   modalDesc: { fontSize: 15, color: '#666', marginBottom: 20, lineHeight: 22 },
   
-  // ✅ YENİ: Şifremi Unuttum Modalı İçin Tasarımlar
   modalInput: { backgroundColor: '#F5F7FA', padding: 16, borderRadius: 12, borderWidth: 1, borderColor: '#E1E8ED', fontSize: 16, marginBottom: 15, color: '#333' },
   passwordContainerModal: {
       flexDirection: 'row',
@@ -536,7 +526,7 @@ const styles = StyleSheet.create({
       fontSize: 16,
       color: '#333'
   },
-  modalBtn: { backgroundColor: COLORS.primary, padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 5, elevation: 3 }
+  modalBtn: { backgroundColor: '#6200EE', padding: 16, borderRadius: 12, alignItems: 'center', marginTop: 5, elevation: 3 }
 });
 
 export default LoginScreen;

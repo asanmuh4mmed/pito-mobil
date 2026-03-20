@@ -2,7 +2,6 @@ import React, { useState, useContext, useRef, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Modal, FlatList, ImageBackground, Animated, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../constants/colors';
 import { AuthContext } from '../context/AuthContext';
 import { CITY_DATA } from '../constants/cities'; 
 
@@ -17,7 +16,7 @@ const RegisterScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   
-  // Şifre Göster/Gizle State'leri (YENİ)
+  // Şifre Göster/Gizle State'leri
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
@@ -241,7 +240,6 @@ const RegisterScreen = ({ navigation }) => {
     >
         <View style={styles.overlay}>
             <SafeAreaView style={styles.container}>
-                {/* KLAVYE KAYDIRMA KONTROLÜ (YENİ) */}
                 <KeyboardAvoidingView 
                     style={{ flex: 1 }} 
                     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -296,14 +294,14 @@ const RegisterScreen = ({ navigation }) => {
                                 <View style={[styles.inputContainer, {width:'48%'}]}>
                                     <Text style={styles.label}>{t.city}</Text>
                                     <TouchableOpacity style={styles.input} onPress={() => openModal('city')}>
-                                        <Text style={{color: city ? 'black' : '#999'}}>{city || t.labelCity}</Text>
+                                        <Text style={{color: city ? '#3700B3' : '#999'}}>{city || t.labelCity}</Text>
                                     </TouchableOpacity>
                                 </View>
 
                                 <View style={[styles.inputContainer, {width:'48%'}]}>
                                     <Text style={styles.label}>{t.dist}</Text>
                                     <TouchableOpacity style={styles.input} onPress={() => openModal('district')}>
-                                        <Text style={{color: district ? 'black' : '#999'}}>{district || t.labelDistrict}</Text>
+                                        <Text style={{color: district ? '#3700B3' : '#999'}}>{district || t.labelDistrict}</Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>
@@ -321,7 +319,6 @@ const RegisterScreen = ({ navigation }) => {
                                 />
                             </View>
 
-                            {/* ŞİFRE ALANI - GÖZ İKONLU (YENİ) */}
                             <View style={styles.inputContainer}>
                                 <Text style={styles.label}>{t.labelPass}</Text>
                                 <View style={styles.passwordContainer}>
@@ -339,7 +336,6 @@ const RegisterScreen = ({ navigation }) => {
                                 </View>
                             </View>
 
-                            {/* ŞİFRE TEKRAR ALANI - GÖZ İKONLU (YENİ) */}
                             <View style={styles.inputContainer}>
                                 <Text style={styles.label}>{t.labelPassConfirm}</Text>
                                 <View style={styles.passwordContainer}>
@@ -366,7 +362,7 @@ const RegisterScreen = ({ navigation }) => {
                                     <Ionicons 
                                         name={isAgreed ? "checkbox" : "square-outline"} 
                                         size={26} 
-                                        color={isAgreed ? COLORS.primary : "#666"} 
+                                        color={isAgreed ? "#6200EE" : "#666"} 
                                     />
                                 </TouchableOpacity>
                                 
@@ -402,7 +398,7 @@ const RegisterScreen = ({ navigation }) => {
                     <View style={styles.modalContent}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>{selectionType === 'city' ? t.modalCity : t.modalDistrict}</Text>
-                            <TouchableOpacity onPress={() => setModalVisible(false)}><Ionicons name="close" size={24} color="black" /></TouchableOpacity>
+                            <TouchableOpacity onPress={() => setModalVisible(false)}><Ionicons name="close" size={24} color="#3700B3" /></TouchableOpacity>
                         </View>
                         <FlatList 
                             data={getListData()}
@@ -417,7 +413,7 @@ const RegisterScreen = ({ navigation }) => {
                 </View>
             </Modal>
 
-            {/* ✅ DOĞRULAMA KODU MODALI (YENİ DARK TEMA) */}
+            {/* DOĞRULAMA KODU MODALI */}
             <Modal visible={verifyModalVisible} transparent={true} animationType="fade">
                 <View style={styles.modalOverlayDark}>
                     <View style={styles.verifyModalContentDark}>
@@ -443,7 +439,7 @@ const RegisterScreen = ({ navigation }) => {
                         />
 
                         <TouchableOpacity 
-                            style={[styles.button, { marginTop: 25, backgroundColor: COLORS.primary, paddingVertical: 15 }]} 
+                            style={[styles.button, { marginTop: 25, backgroundColor: '#6200EE', paddingVertical: 15 }]} 
                             onPress={handleVerify}
                             disabled={isVerifying}
                         >
@@ -475,13 +471,13 @@ const RegisterScreen = ({ navigation }) => {
                 </View>
             </Modal>
 
-            {/* EULA (KULLANIM KOŞULLARI) MODALI */}
+            {/* EULA MODALI */}
             <Modal visible={eulaVisible} transparent={true} animationType="slide">
                 <View style={styles.modalOverlay}>
                     <View style={[styles.modalContent, { height: '80%' }]}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>{t.eula}</Text>
-                            <TouchableOpacity onPress={() => setEulaVisible(false)}><Ionicons name="close" size={24} color="black" /></TouchableOpacity>
+                            <TouchableOpacity onPress={() => setEulaVisible(false)}><Ionicons name="close" size={24} color="#3700B3" /></TouchableOpacity>
                         </View>
                         <ScrollView showsVerticalScrollIndicator={false}>
                             <Text style={styles.legalModalText}>
@@ -504,7 +500,7 @@ const RegisterScreen = ({ navigation }) => {
                     <View style={[styles.modalContent, { height: '80%' }]}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>{t.privacy}</Text>
-                            <TouchableOpacity onPress={() => setPrivacyVisible(false)}><Ionicons name="close" size={24} color="black" /></TouchableOpacity>
+                            <TouchableOpacity onPress={() => setPrivacyVisible(false)}><Ionicons name="close" size={24} color="#3700B3" /></TouchableOpacity>
                         </View>
                         <ScrollView showsVerticalScrollIndicator={false}>
                             <Text style={styles.legalModalText}>
@@ -529,23 +525,22 @@ const RegisterScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   backgroundImage: { flex: 1, width: '100%', height: '100%' },
-  overlay: { flex: 1, backgroundColor: 'rgba(255, 255, 255, 0.65)' },
+  overlay: { flex: 1, backgroundColor: 'rgba(243, 229, 245, 0.85)' },
   container: { flex: 1 },
   countrySwitchContainer: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
   countryBtn: { flexDirection: 'row', alignItems: 'center', padding: 8, borderRadius: 20, borderWidth: 1, borderColor: '#ccc', marginHorizontal: 10, backgroundColor: 'rgba(255,255,255,0.8)' },
-  countryBtnActive: { borderColor: COLORS.primary, backgroundColor: '#E3F2FD' },
+  countryBtnActive: { borderColor: '#6200EE', backgroundColor: '#F3E5F5' },
   flag: { fontSize: 20, marginRight: 5 },
   countryText: { fontWeight: 'bold', color: '#666' },
-  countryTextActive: { color: COLORS.primary },
+  countryTextActive: { color: '#6200EE' },
   header: { marginTop: 20, marginBottom: 30, paddingHorizontal: 20 },
-  title: { fontSize: 32, fontWeight: 'bold', color: COLORS.primary, marginBottom: 10 },
-  subtitle: { fontSize: 18, color: COLORS.gray },
+  title: { fontSize: 32, fontWeight: 'bold', color: '#3700B3', marginBottom: 10 },
+  subtitle: { fontSize: 18, color: '#7E57C2' },
   form: { paddingHorizontal: 20, paddingBottom: 20 },
   inputContainer: { marginBottom: 20 },
-  label: { fontSize: 16, color: COLORS.dark, marginBottom: 8, fontWeight: '600' },
+  label: { fontSize: 16, color: '#3700B3', marginBottom: 8, fontWeight: '600' },
   input: { backgroundColor: 'white', padding: 15, borderRadius: 15, fontSize: 16, borderWidth: 1, borderColor: '#E0E0E0', shadowColor: "#000", shadowOffset: {width: 0, height: 1}, shadowOpacity: 0.1, shadowRadius: 2, elevation: 2 },
   
-  // ✅ YENİ: ŞİFRE ALANI TASARIMI (Göz İkonlu)
   passwordContainer: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -569,14 +564,14 @@ const styles = StyleSheet.create({
       padding: 5,
   },
 
-  button: { backgroundColor: COLORS.primary, padding: 18, borderRadius: 15, alignItems: 'center', marginTop: 10, elevation: 5, shadowColor: COLORS.primary, shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 5 },
-  buttonText: { color: COLORS.light, fontSize: 18, fontWeight: 'bold' },
+  button: { backgroundColor: '#6200EE', padding: 18, borderRadius: 15, alignItems: 'center', marginTop: 10, elevation: 5, shadowColor: '#6200EE', shadowOffset: {width: 0, height: 4}, shadowOpacity: 0.3, shadowRadius: 5 },
+  buttonText: { color: 'white', fontSize: 18, fontWeight: 'bold' },
   linkButton: { marginTop: 20, alignItems: 'center' },
-  linkText: { color: COLORS.primary, fontSize: 16, fontWeight: '600' },
+  linkText: { color: '#6200EE', fontSize: 16, fontWeight: '600' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '85%', height: '60%', backgroundColor: 'white', borderRadius: 20, padding: 20, elevation: 10 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, borderBottomWidth: 1, borderBottomColor: '#eee', paddingBottom: 10 },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', color: COLORS.dark },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#3700B3' },
   modalItem: { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#eee' },
   modalItemText: { fontSize: 16 },
   
@@ -584,10 +579,9 @@ const styles = StyleSheet.create({
   checkbox: { marginRight: 10, marginTop: 2 },
   checkboxTextContainer: { flex: 1 },
   legalText: { fontSize: 12, color: '#666', lineHeight: 18 },
-  legalLink: { color: COLORS.primary, fontWeight: 'bold', textDecorationLine: 'underline' },
+  legalLink: { color: '#6200EE', fontWeight: 'bold', textDecorationLine: 'underline' },
   legalModalText: { fontSize: 14, color: '#333', lineHeight: 22 },
 
-  // ✅ YENİ: DOĞRULAMA KODU MODALI (DARK TEMA)
   modalOverlayDark: {
       flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center'
   },
@@ -609,7 +603,6 @@ const styles = StyleSheet.create({
       paddingVertical: 15, borderRadius: 15, borderWidth: 1, borderColor: '#444'
   },
 
-  // BAŞARI MODALI STİLLERİ
   successModalContent: {
       width: '80%',
       backgroundColor: 'white',

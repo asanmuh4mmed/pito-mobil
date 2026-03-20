@@ -1,7 +1,6 @@
 import React, { useContext, useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, FlatList, Dimensions, Alert, Animated, Easing, Modal, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS } from '../constants/colors';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { supabase } from '../lib/supabase';
@@ -31,7 +30,6 @@ const TRANSLATIONS = {
         blockedDesc: "Bu profil görüntülenemiyor.",
         reported: "Bildirildi",
         reportMsg: "Kullanıcı şikayeti alındı. İnceleme başlatılacaktır.",
-        // Rozet İsimleri
         badgeBronze: "Bronz Pati", badgeSilver: "Gümüş Pati", badgeGold: "Altın Pati", badgeDiamond: "Elmas Pati"
     },
     AU: {
@@ -56,7 +54,6 @@ const TRANSLATIONS = {
         blockedDesc: "This profile cannot be viewed.",
         reported: "Reported",
         reportMsg: "User report received. Investigation will start.",
-        // Badge Names
         badgeBronze: "Bronze Paw", badgeSilver: "Silver Paw", badgeGold: "Gold Paw", badgeDiamond: "Diamond Paw"
     }
 };
@@ -70,7 +67,6 @@ const UserProfileScreen = ({ navigation, route }) => {
   const [activeTab, setActiveTab] = useState('listings');
   const [menuVisible, setMenuVisible] = useState(false);
   
-  // ✅ STATE: Engelleme Durumları
   const [isBlocked, setIsBlocked] = useState(false); 
   const [blockedByMe, setBlockedByMe] = useState(false); 
   
@@ -83,7 +79,7 @@ const UserProfileScreen = ({ navigation, route }) => {
       avatar: userAvatar,
       isPremium: false,
       donation_points: 0,
-      is_founder: false // 👑 Güvenli veritabanı değişkeni 👑
+      is_founder: false
   });
 
   const messageScale = useRef(new Animated.Value(1)).current;
@@ -99,7 +95,6 @@ const UserProfileScreen = ({ navigation, route }) => {
       }
   }, [userId]);
 
-  // ✅ DİNAMİK ROZET HESAPLAYICI
   const calculateDynamicBadge = (points) => {
       const p = points || 0;
       if (p >= 50) return { name: t.badgeDiamond, icon: 'diamond', color: '#00cec9' };
@@ -111,7 +106,6 @@ const UserProfileScreen = ({ navigation, route }) => {
 
   const displayBadge = targetUser.activeBadge || calculateDynamicBadge(targetUser.donation_points);
 
-  // ✅ ENGEL KONTROLÜ
   const checkBlockStatus = async () => {
       try {
           const { data, error } = await supabase
@@ -255,18 +249,18 @@ const UserProfileScreen = ({ navigation, route }) => {
 
   if (isBlocked) {
       return (
-          <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }]}>
-              <View style={[styles.header, { backgroundColor: theme.cardBg, position:'absolute', top:0, width:'100%' }]}>
+          <View style={[styles.container, { backgroundColor: '#F3E5F5', justifyContent: 'center', alignItems: 'center' }]}>
+              <View style={[styles.header, { backgroundColor: 'white', position:'absolute', top:0, width:'100%', borderBottomWidth: 1, borderBottomColor: '#E0E0E0' }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color={theme.text} />
+                    <Ionicons name="arrow-back" size={24} color="#3700B3" />
                 </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: theme.text }]}>{t.blockedUser}</Text>
+                <Text style={[styles.headerTitle, { color: '#3700B3' }]}>{t.blockedUser}</Text>
                 <View style={{width:24}} />
               </View>
               
-              <Ionicons name="ban-outline" size={80} color={theme.subText} />
-              <Text style={{ marginTop: 20, fontSize: 18, fontWeight: 'bold', color: theme.text }}>{t.blockedUser}</Text>
-              <Text style={{ marginTop: 10, color: theme.subText, marginBottom: 30 }}>{t.blockedDesc}</Text>
+              <Ionicons name="ban-outline" size={80} color="#999" />
+              <Text style={{ marginTop: 20, fontSize: 18, fontWeight: 'bold', color: '#3700B3' }}>{t.blockedUser}</Text>
+              <Text style={{ marginTop: 10, color: '#666', marginBottom: 30 }}>{t.blockedDesc}</Text>
 
               {blockedByMe && (
                   <TouchableOpacity style={styles.unblockButton} onPress={handleUnblockUser}>
@@ -278,21 +272,21 @@ const UserProfileScreen = ({ navigation, route }) => {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
+    <View style={[styles.container, { backgroundColor: '#F3E5F5' }]}>
       
       {/* HEADER */}
-      <View style={[styles.header, { backgroundColor: theme.cardBg }]}>
+      <View style={[styles.header, { backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#E0E0E0' }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={theme.text} />
+          <Ionicons name="arrow-back" size={24} color="#3700B3" />
         </TouchableOpacity>
         
-        <Text style={[styles.headerTitle, { color: theme.text }]} numberOfLines={1}>
+        <Text style={[styles.headerTitle, { color: '#3700B3' }]} numberOfLines={1}>
             {targetUser.fullname}
         </Text>
 
         {!isMe ? (
             <TouchableOpacity onPress={() => setMenuVisible(true)} style={{padding:5}}>
-                <Ionicons name="ellipsis-vertical" size={24} color={theme.text} />
+                <Ionicons name="ellipsis-vertical" size={24} color="#3700B3" />
             </TouchableOpacity>
         ) : (
             <View style={{width: 24}} /> 
@@ -301,13 +295,12 @@ const UserProfileScreen = ({ navigation, route }) => {
 
       <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
         {/* PROFİL KARTI */}
-        <View style={[styles.profileCard, { backgroundColor: theme.cardBg }]}>
+        <View style={[styles.profileCard, { backgroundColor: 'white' }]}>
             <Image source={{ uri: targetUser.avatar || 'https://placekitten.com/200/200' }} style={styles.avatar} />
             
             <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-                <Text style={[styles.userName, { color: theme.text }]}>{targetUser.fullname}</Text>
+                <Text style={[styles.userName, { color: '#3700B3' }]}>{targetUser.fullname}</Text>
                 
-                {/* 👑 DİNAMİK VERİTABANI KONTROLLÜ KURUCU ROZETİ 👑 */}
                 {targetUser.is_founder && (
                     <Ionicons 
                         name="checkmark-circle" 
@@ -317,8 +310,7 @@ const UserProfileScreen = ({ navigation, route }) => {
                     />
                 )}
 
-                {/* DİĞER KULLANICILARIN PREMİUM VE BAĞIŞ ROZETLERİ */}
-                {targetUser.isPremium && <Ionicons name="checkmark-circle" size={22} color="#2196F3" style={{ marginLeft: 5 }} />}
+                {targetUser.isPremium && <Ionicons name="checkmark-circle" size={22} color="#6200EE" style={{ marginLeft: 5 }} />}
                 
                 {displayBadge && (
                     <View style={{marginLeft: 8, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', backgroundColor: displayBadge.color + '20', borderRadius: 12, marginTop: 4}}>
@@ -328,18 +320,18 @@ const UserProfileScreen = ({ navigation, route }) => {
                 )}
             </View>
 
-            <Text style={{color: theme.subText, marginBottom: 15, marginTop: 5}}>{t.member}</Text>
+            <Text style={{color: '#7E57C2', marginBottom: 15, marginTop: 5}}>{t.member}</Text>
 
             <View style={styles.statsRow}>
                 <View style={styles.stat}>
-                    <Text style={[styles.statNum, {color:theme.text}]}>
+                    <Text style={[styles.statNum, {color:'#3700B3'}]}>
                         {loading ? '-' : userListings.length}
                     </Text>
                     <Text style={styles.statLabel}>{t.listings}</Text>
                 </View>
-                <View style={{width: 1, height: 30, backgroundColor: theme.border}} />
+                <View style={{width: 1, height: 30, backgroundColor: '#E0E0E0'}} />
                 <View style={styles.stat}>
-                    <Text style={[styles.statNum, {color:theme.text}]}>
+                    <Text style={[styles.statNum, {color:'#3700B3'}]}>
                         {loading ? '-' : userPosts.length}
                     </Text>
                     <Text style={styles.statLabel}>Petsgram</Text>
@@ -352,7 +344,7 @@ const UserProfileScreen = ({ navigation, route }) => {
                         <TouchableOpacity 
                             style={[
                                 styles.modernButton, 
-                                { backgroundColor: COLORS.primary, borderColor: theme.subText }
+                                { backgroundColor: '#6200EE', borderColor: '#7E57C2' }
                             ]} 
                             onPress={handleMessagePress}
                             activeOpacity={0.9}
@@ -369,17 +361,17 @@ const UserProfileScreen = ({ navigation, route }) => {
 
         <View style={styles.tabContainer}>
             <TouchableOpacity onPress={() => setActiveTab('listings')} style={[styles.tabBtn, activeTab==='listings' && styles.activeTab]}>
-                <Ionicons name="list" size={20} color={activeTab==='listings' ? COLORS.primary : theme.subText} />
-                <Text style={{color: activeTab==='listings' ? COLORS.primary : theme.subText, marginLeft:5}}>{t.listings}</Text>
+                <Ionicons name="list" size={20} color={activeTab==='listings' ? '#6200EE' : '#999'} />
+                <Text style={{color: activeTab==='listings' ? '#6200EE' : '#999', marginLeft:5, fontWeight: activeTab==='listings' ? 'bold' : 'normal'}}>{t.listings}</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setActiveTab('petsgram')} style={[styles.tabBtn, activeTab==='petsgram' && styles.activeTab]}>
-                <Ionicons name="grid" size={20} color={activeTab==='petsgram' ? COLORS.primary : theme.subText} />
-                <Text style={{color: activeTab==='petsgram' ? COLORS.primary : theme.subText, marginLeft:5}}>{t.petsgram}</Text>
+                <Ionicons name="grid" size={20} color={activeTab==='petsgram' ? '#6200EE' : '#999'} />
+                <Text style={{color: activeTab==='petsgram' ? '#6200EE' : '#999', marginLeft:5, fontWeight: activeTab==='petsgram' ? 'bold' : 'normal'}}>{t.petsgram}</Text>
             </TouchableOpacity>
         </View>
 
         {loading ? (
-            <ActivityIndicator size="large" color={COLORS.primary} style={{marginTop: 30}} />
+            <ActivityIndicator size="large" color="#6200EE" style={{marginTop: 30}} />
         ) : (
             <>
                 {activeTab === 'listings' ? (
@@ -388,13 +380,13 @@ const UserProfileScreen = ({ navigation, route }) => {
                         keyExtractor={item => item.id.toString()}
                         renderItem={({ item }) => (
                             <TouchableOpacity 
-                              style={[styles.listingCard, { backgroundColor: theme.cardBg }]}
+                              style={[styles.listingCard, { backgroundColor: 'white' }]}
                               onPress={() => navigation.push('ListingDetail', { item })}
                             >
                               <Image source={{ uri: item.images ? item.images[0] : (item.img || 'https://via.placeholder.com/150') }} style={styles.listingImage} />
                               <View style={styles.listingInfo}>
-                                <Text style={[styles.listingTitle, { color: theme.text }]} numberOfLines={1}>{item.title || item.name}</Text>
-                                <Text style={[styles.listingCategory, { color: COLORS.primary }]}>{item.category || 'İlan'}</Text>
+                                <Text style={[styles.listingTitle, { color: '#3700B3' }]} numberOfLines={1}>{item.title || item.name}</Text>
+                                <Text style={[styles.listingCategory, { color: '#6200EE' }]}>{item.category || 'İlan'}</Text>
                               </View>
                             </TouchableOpacity>
                         )}
@@ -402,11 +394,11 @@ const UserProfileScreen = ({ navigation, route }) => {
                         scrollEnabled={false}
                         columnWrapperStyle={{ justifyContent: 'space-between' }}
                         contentContainerStyle={styles.listContent}
-                        ListEmptyComponent={<View style={styles.emptyContainer}><Text style={{ color: theme.subText }}>{t.noListings}</Text></View>}
+                        ListEmptyComponent={<View style={styles.emptyContainer}><Text style={{ color: '#999' }}>{t.noListings}</Text></View>}
                     />
                 ) : (
                     userPosts.length === 0 ? (
-                        <View style={styles.emptyContainer}><Text style={{ color: theme.subText }}>{t.noPosts}</Text></View>
+                        <View style={styles.emptyContainer}><Text style={{ color: '#999' }}>{t.noPosts}</Text></View>
                     ) : (
                         <View style={styles.gridContainer}>
                             {userPosts.map((post) => (
@@ -427,25 +419,25 @@ const UserProfileScreen = ({ navigation, route }) => {
 
       <Modal visible={menuVisible} transparent={true} animationType="fade" onRequestClose={() => setMenuVisible(false)}>
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setMenuVisible(false)}>
-            <View style={[styles.menuContainer, { backgroundColor: theme.cardBg }]}>
-                <Text style={{color:theme.subText, fontSize:12, marginBottom:10, textAlign:'center'}}>{t.menu}</Text>
+            <View style={[styles.menuContainer, { backgroundColor: 'white' }]}>
+                <Text style={{color:'#999', fontSize:12, marginBottom:10, textAlign:'center'}}>{t.menu}</Text>
                 
                 <TouchableOpacity style={styles.menuItem} onPress={handleBlockUser}>
                     <Ionicons name="ban-outline" size={22} color="#FF3B30" />
                     <Text style={[styles.menuText, { color: '#FF3B30' }]}>{t.block}</Text>
                 </TouchableOpacity>
                 
-                <View style={{height:1, backgroundColor:theme.border, marginVertical:5}} />
+                <View style={{height:1, backgroundColor:'#E0E0E0', marginVertical:5}} />
                 
                 <TouchableOpacity style={styles.menuItem} onPress={handleReportUser}>
-                    <Ionicons name="alert-circle-outline" size={22} color={theme.text} />
-                    <Text style={[styles.menuText, { color: theme.text }]}>{t.report}</Text>
+                    <Ionicons name="alert-circle-outline" size={22} color="#3700B3" />
+                    <Text style={[styles.menuText, { color: '#3700B3' }]}>{t.report}</Text>
                 </TouchableOpacity>
                 
-                <View style={{height:1, backgroundColor:theme.border, marginVertical:5}} />
+                <View style={{height:1, backgroundColor:'#E0E0E0', marginVertical:5}} />
 
                 <TouchableOpacity style={styles.menuItem} onPress={() => setMenuVisible(false)}>
-                    <Text style={[styles.menuText, { color: theme.subText, textAlign:'center', width:'100%' }]}>{t.cancel}</Text>
+                    <Text style={[styles.menuText, { color: '#999', textAlign:'center', width:'100%' }]}>{t.cancel}</Text>
                 </TouchableOpacity>
             </View>
         </TouchableOpacity>
@@ -461,17 +453,17 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: 'bold', textTransform: 'lowercase' },
   backButton: { padding: 5 },
   profileCard: { alignItems: 'center', padding: 20, margin: 15, borderRadius: 25, elevation: 5, shadowColor: "#000", shadowOffset: {width:0, height:2}, shadowOpacity:0.1, shadowRadius:4 },
-  avatar: { width: 100, height: 100, borderRadius: 50, marginBottom: 15, borderWidth: 3, borderColor: COLORS.primary },
+  avatar: { width: 100, height: 100, borderRadius: 50, marginBottom: 15, borderWidth: 3, borderColor: '#6200EE' },
   userName: { fontSize: 24, fontWeight: 'bold' },
-  statsRow: { flexDirection: 'row', justifyContent: 'center', alignItems:'center', width: '100%', marginVertical: 20, borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 20 },
+  statsRow: { flexDirection: 'row', justifyContent: 'center', alignItems:'center', width: '100%', marginVertical: 20, borderTopWidth: 1, borderTopColor: '#E0E0E0', paddingTop: 20 },
   stat: { alignItems: 'center', marginHorizontal: 20 },
   statNum: { fontWeight: 'bold', fontSize: 20 },
   statLabel: { fontSize: 13, color: '#888', marginTop: 2 },
   actionButtonsContainer: { flexDirection: 'row', marginTop: 15, width: '100%', alignItems: 'center', justifyContent: 'center' },
-  modernButton: { flexDirection: 'row', height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', elevation: 3, shadowColor: COLORS.primary, shadowOffset: {width:0, height:4}, shadowOpacity:0.3, shadowRadius:5, paddingHorizontal: 40 },
+  modernButton: { flexDirection: 'row', height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', elevation: 3, shadowColor: '#6200EE', shadowOffset: {width:0, height:4}, shadowOpacity:0.3, shadowRadius:5, paddingHorizontal: 40 },
   tabContainer: { flexDirection: 'row', justifyContent: 'center', marginBottom: 10 },
   tabBtn: { padding: 10, marginHorizontal: 20, borderBottomWidth: 3, borderBottomColor: 'transparent', flexDirection: 'row', alignItems: 'center' },
-  activeTab: { borderBottomColor: COLORS.primary },
+  activeTab: { borderBottomColor: '#6200EE' },
   listContent: { paddingHorizontal: 15, paddingBottom: 20 },
   listingCard: { width: (width-40)/2, borderRadius: 15, marginBottom: 15, paddingBottom: 10, overflow:'hidden', elevation:2 },
   listingImage: { width: '100%', height: 120 },
@@ -489,7 +481,7 @@ const styles = StyleSheet.create({
   menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15 },
   menuText: { fontSize: 16, fontWeight: 'bold', marginLeft: 15 },
 
-  unblockButton: { backgroundColor: COLORS.primary, paddingHorizontal: 30, paddingVertical: 15, borderRadius: 25 },
+  unblockButton: { backgroundColor: '#6200EE', paddingHorizontal: 30, paddingVertical: 15, borderRadius: 25 },
   unblockButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 }
 });
 
