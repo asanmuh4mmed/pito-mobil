@@ -5,6 +5,7 @@ const soundFiles = {
     // 📱 UI Sesleri
     water: require('../../assets/sounds/water.mp3'),       // Tıklama / Menü Geçişi
     kitty: require('../../assets/sounds/kitty.mp3'),       // Bağış / Özel İşlem
+    noti: require('../../assets/sounds/noti.mp3'),         // 🔔 Yeni: Üstten Düşen Bildirim Sesi
     
     // 🗄️ Veritabanı Aksiyon Sesleri
     paw: require('../../assets/sounds/paw.mp3'),           // Beğeni (Like) / Sipariş Verme

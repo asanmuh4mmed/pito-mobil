@@ -75,8 +75,7 @@ const AddListingScreen = ({ route, navigation }) => {
   const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false); 
   
-  // Hayvan Bilgileri
-  const [petName, setPetName] = useState('');
+  // Hayvan Bilgileri (Pet Name kaldırıldı)
   const [age, setAge] = useState('');
   const [breed, setBreed] = useState('');
   const [gender, setGender] = useState('Erkek');
@@ -89,7 +88,7 @@ const AddListingScreen = ({ route, navigation }) => {
   const [address, setAddress] = useState(''); 
   const [price, setPrice] = useState(''); 
 
-  // Bakıcı Bilgileri (YENİ)
+  // Bakıcı Bilgileri
   const [sitterName, setSitterName] = useState(user?.user_metadata?.full_name || ''); 
   const [experience, setExperience] = useState(''); 
 
@@ -109,6 +108,7 @@ const AddListingScreen = ({ route, navigation }) => {
 
   const displayCategory = getLocalizedCategory(category);
 
+  // Veritabanı için sabit kalacak etiketler
   const ANIMAL_TYPES = [
       { label: 'Kedi', icon: 'paw' },
       { label: 'Köpek', icon: 'paw' },
@@ -117,6 +117,16 @@ const AddListingScreen = ({ route, navigation }) => {
       { label: 'Kemirgen', icon: 'leaf' },
       { label: 'Diğer', icon: 'ellipsis-horizontal' }
   ];
+
+  // Ekranda Görünen Tür İsimleri (Çeviri)
+  const typeLabels = {
+      'Kedi': activeLang === 'AU' ? 'Cat' : 'Kedi',
+      'Köpek': activeLang === 'AU' ? 'Dog' : 'Köpek',
+      'Kuş': activeLang === 'AU' ? 'Bird' : 'Kuş',
+      'Balık': activeLang === 'AU' ? 'Fish' : 'Balık',
+      'Kemirgen': activeLang === 'AU' ? 'Rodent' : 'Kemirgen',
+      'Diğer': activeLang === 'AU' ? 'Other' : 'Diğer',
+  };
 
   const TEXTS = {
       TR: {
@@ -128,8 +138,8 @@ const AddListingScreen = ({ route, navigation }) => {
           cityLabel: "İl",
           distLabel: "İlçe",
           select: "Seçiniz",
+          addBtn: "Ekle", // 🆕 Çeviri Eklendi
           btnPost: "İlanı Yayınla",
-          petName: "Pet İsmi",
           breed: "Tür / Cins",
           age: "Yaş",
           gender: "Cinsiyet",
@@ -141,8 +151,8 @@ const AddListingScreen = ({ route, navigation }) => {
           phonePlace: "0555 ...",
           address: "Açık Adres",
           price: "Ücret (TL)",
-          sitterName: "İsim Soyisim", // 🆕 YENİ
-          experience: "Deneyim (Yıl)", // 🆕 YENİ
+          sitterName: "İsim Soyisim", 
+          experience: "Deneyim (Yıl)", 
           alertTitle: "Eksik Bilgi",
           alertMsg: "Lütfen fotoğraf, konum ve tüm zorunlu alanları doldurunuz.",
           typeAlert: "Lütfen hayvan türünü seçiniz.", 
@@ -151,7 +161,8 @@ const AddListingScreen = ({ route, navigation }) => {
           limitTitle: "Limit",
           limitMsg: "En fazla 3 fotoğraf seçebilirsiniz.",
           cityWarning: "Önce şehir seçmelisiniz.",
-          uploading: "Yükleniyor..."
+          uploading: "Yükleniyor...",
+          unnamed: "İsimsiz İlan"
       },
       AU: {
           headerTitle: isServiceListing ? `Add ${displayCategory}` : `${displayCategory} Listing`,
@@ -162,8 +173,8 @@ const AddListingScreen = ({ route, navigation }) => {
           cityLabel: "State",
           distLabel: "Suburb",
           select: "Select",
+          addBtn: "Add", // 🆕 Çeviri Eklendi
           btnPost: "Post Listing",
-          petName: "Pet Name",
           breed: "Breed",
           age: "Age",
           gender: "Gender",
@@ -175,8 +186,8 @@ const AddListingScreen = ({ route, navigation }) => {
           phonePlace: "0400 ...",
           address: "Full Address",
           price: "Price (AUD)",
-          sitterName: "Full Name", // 🆕 YENİ
-          experience: "Experience (Years)", // 🆕 YENİ
+          sitterName: "Full Name", 
+          experience: "Experience (Years)", 
           alertTitle: "Missing Info",
           alertMsg: "Please fill in photo, location and all required fields.",
           typeAlert: "Please select an animal type.", 
@@ -185,7 +196,8 @@ const AddListingScreen = ({ route, navigation }) => {
           limitTitle: "Limit",
           limitMsg: "Max 3 photos allowed.",
           cityWarning: "Select state first.",
-          uploading: "Uploading..."
+          uploading: "Uploading...",
+          unnamed: "Unnamed Listing"
       }
   };
 
@@ -254,7 +266,7 @@ const AddListingScreen = ({ route, navigation }) => {
           return;
       }
 
-      // 🆕 Hayvan Türü Kontrolü (Hizmet ilanı VEYA Bakıcı ilanı değilse sorulacak)
+      // Hayvan Türü Kontrolü (Hizmet ilanı VEYA Bakıcı ilanı değilse sorulacak)
       if (!isServiceListing && !isSitter && !petType) {
           Alert.alert(t.alertTitle, t.typeAlert);
           return;
@@ -277,8 +289,8 @@ const AddListingScreen = ({ route, navigation }) => {
               }
           }
 
-          // İlan İsmi Belirleme (Bakıcıysa sitterName, Değilse petName veya shopName)
-          const finalName = isServiceListing ? shopName : (isSitter ? sitterName : petName);
+          // İlan İsmi Belirleme (Bakıcıysa sitterName, Hizmetse shopName, Hayvansa cinsi(breed) başlık olur)
+          const finalName = isServiceListing ? shopName : (isSitter ? sitterName : breed);
           
           const numericPrice = price && price.trim() !== '' ? parseFloat(price) : 0;
           
@@ -292,7 +304,7 @@ const AddListingScreen = ({ route, navigation }) => {
               .from('listings')
               .insert({
                   owner_id: user.id, 
-                  name: finalName || 'İsimsiz İlan', 
+                  name: finalName || t.unnamed, 
                   category: category,
                   description: description,
                   city: city,
@@ -307,6 +319,7 @@ const AddListingScreen = ({ route, navigation }) => {
                   img: uploadedUrls.length > 0 ? uploadedUrls[0] : null, 
                   images: uploadedUrls, 
                   is_found: false,
+                  country_code: activeLang, // ✨ İLANIN ÜLKESİ BURADA KAYDEDİLİYOR
                   created_at: new Date()
               });
 
@@ -354,7 +367,7 @@ const AddListingScreen = ({ route, navigation }) => {
                     <View style={styles.mediaRow}>
                         <TouchableOpacity style={[styles.addMediaBtn, { borderColor: '#6C5CE7', backgroundColor: isDarkMode ? 'rgba(108, 92, 231, 0.1)' : 'rgba(108, 92, 231, 0.05)' }]} onPress={pickMedia}>
                             <Ionicons name="add" size={32} color="#6C5CE7" />
-                            <Text style={[styles.addMediaText, {color: '#6C5CE7'}]}>Ekle</Text>
+                            <Text style={[styles.addMediaText, {color: '#6C5CE7'}]}>{t.addBtn}</Text>
                         </TouchableOpacity>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{alignItems: 'center'}}>
                             {mediaList.map((item, index) => (
@@ -369,7 +382,7 @@ const AddListingScreen = ({ route, navigation }) => {
                     </View>
                 </View>
 
-                {/* 🆕 HAYVAN TÜRÜ SEÇİMİ (Hizmet VEYA Bakıcı ilanı DEĞİLSE sorulacak) */}
+                {/* HAYVAN TÜRÜ SEÇİMİ (Hizmet VEYA Bakıcı ilanı DEĞİLSE sorulacak) */}
                 {!isServiceListing && !isSitter && (
                     <View style={[styles.sectionContainer, {backgroundColor: theme.cardBg, paddingVertical: 15, shadowColor: isDarkMode ? '#000' : '#6C5CE7'}]}>
                         <View style={styles.sectionHeader}>
@@ -393,7 +406,7 @@ const AddListingScreen = ({ route, navigation }) => {
                                         styles.typeChipText, 
                                         { color: petType === type.label ? 'white' : theme.subText }
                                     ]}>
-                                        {type.label}
+                                        {typeLabels[type.label]}
                                     </Text>
                                     {petType === type.label && <Ionicons name="checkmark-circle" size={16} color="white" style={{marginLeft: 5}} />}
                                 </TouchableOpacity>
@@ -435,9 +448,6 @@ const AddListingScreen = ({ route, navigation }) => {
                         </>
                     ) : (
                         <>
-                            <Text style={[styles.fieldLabel, {color: theme.subText}]}>{t.petName}</Text>
-                            <ModernInput theme={theme} icon="paw-outline" placeholder={t.petName} value={petName} onChangeText={setPetName} />
-                            
                             <View style={styles.row}>
                                 <View style={{ flex: 1, marginRight: 10 }}>
                                     <Text style={[styles.fieldLabel, {color: theme.subText}]}>{t.breed}</Text>

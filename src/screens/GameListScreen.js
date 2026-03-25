@@ -1,15 +1,10 @@
 import React, { useContext, useCallback, useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, StatusBar, Animated, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, StatusBar, Animated, Platform, UIManager, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../context/AuthContext';
 import { GameContext } from '../context/GameContext'; 
-
-// Android'de LayoutAnimation'ı aktif etmek için zorunlu ayar
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 // ÇEVİRİLER
 const TRANSLATIONS = {
@@ -17,7 +12,6 @@ const TRANSLATIONS = {
         headerTitle: "Oyun Dünyası 🎮",
         games: "OYUNLAR",
         showAll: "TÜMÜNÜ GÖSTER",
-        showLess: "DAHA AZ GÖSTER",
         play: "BAŞLA",
         game1_title: "Mamaları Yakala",
         game1_sub: "REFLEKS OYUNU",
@@ -38,6 +32,10 @@ const TRANSLATIONS = {
         game6_sub: "KULE DİZME",
         game6_desc: "Tam üst üste oturt, kuleyi göklere çıkar ve kombo yap! 🥫",
         game7_title: "Pito Quiz",
+        // ✅ YENİ EKLENEN OYUN ÇEVİRİSİ (TR)
+        game8_title: "Pito Karoları",
+        game8_sub: "BULMACA",
+        game8_desc: "Aynı sembolden 3 tanesini biriktir ve tepsiyi boşalt! 🧩",
         usePoints: "PUANLARI KULLAN",
         weeklyRank: "Haftalık Sıralama",
         allTimeRank: "Genel Sıralama",
@@ -50,7 +48,6 @@ const TRANSLATIONS = {
         headerTitle: "Game World 🎮",
         games: "GAMES",
         showAll: "SHOW ALL",
-        showLess: "SHOW LESS",
         play: "START",
         game1_title: "Catch the Treats",
         game1_sub: "REFLEX GAME",
@@ -71,6 +68,10 @@ const TRANSLATIONS = {
         game6_sub: "TOWER STACK",
         game6_desc: "Stack them perfectly, build to the sky and make combos! 🥫",
         game7_title: "Pito Trivia",
+        // ✅ YENİ EKLENEN OYUN ÇEVİRİSİ (AU)
+        game8_title: "Pito Tiles",
+        game8_sub: "PUZZLE",
+        game8_desc: "Match 3 identical tiles to clear the tray! 🧩",
         usePoints: "USE POINTS",
         weeklyRank: "Weekly Rank",
         allTimeRank: "All Time Rank",
@@ -87,9 +88,10 @@ const GameListScreen = ({ navigation }) => {
     const activeLang = country?.code === 'AU' ? 'AU' : 'TR';
     const t = TRANSLATIONS[activeLang];
 
-    const [showAllGames, setShowAllGames] = useState(false);
+    // ✨ ÇÖZÜM: Artık listeyi uzatmak yerine Modal (Yeni Sayfa) açacak
+    const [modalVisible, setModalVisible] = useState(false);
 
-    // --- ANİMASYON REFI (Sürekli Atan Kalp Efekti İçin) ---
+    // --- ANİMASYON REFI ---
     const pulseAnim = useRef(new Animated.Value(1)).current;
 
     useEffect(() => {
@@ -114,12 +116,6 @@ const GameListScreen = ({ navigation }) => {
             fetchUserPoints(); 
         }, [])
     );
-
-    // --- LİSTE AÇILMA ANİMASYONU ---
-    const toggleShowAll = () => {
-        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); // Yumuşak açılış/kapanış
-        setShowAllGames(!showAllGames);
-    };
 
     // --- 10.000 PUAN HEDEFİ HESAPLAMASI ---
     const GOAL = 10000;
@@ -194,12 +190,23 @@ const GameListScreen = ({ navigation }) => {
             route: 'QuizGame', 
             imageType: 'emoji',
             emoji: '💡'
+        },
+        // ✅ YENİ EKLENEN OYUN: TILE MATCH
+        {
+            id: '8', 
+            title: t.game8_title,
+            subtitle: t.game8_sub,
+            description: t.game8_desc,
+            color: '#ff7675', // Tatlı bir mercan kırmızısı
+            route: 'TileMatch', 
+            imageType: 'emoji',
+            emoji: '🧩'
         }
     ];
 
-    const displayedGames = showAllGames ? GAMES : GAMES.slice(0, 3);
-
     const handlePlay = (game) => {
+        // Modal açıksa önce onu kapat, sonra oyuna git
+        if (modalVisible) setModalVisible(false);
         if (game.route) {
             navigation.navigate(game.route);
         }
@@ -259,7 +266,8 @@ const GameListScreen = ({ navigation }) => {
 
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="#222f3e" />
+            {/* ✨ ÇÖZÜM: Morumsu Tema Arka Plan Rengi */}
+            <StatusBar barStyle="light-content" backgroundColor="#301955" />
             
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -270,10 +278,9 @@ const GameListScreen = ({ navigation }) => {
             </View>
 
             <FlatList 
-                data={displayedGames}
+                data={GAMES.slice(0, 3)} // ✨ Ana ekranda daima sadece ilk 3 oyun görünür
                 keyExtractor={item => item.id}
                 renderItem={renderGameCard}
-                extraData={showAllGames} // ✅ LİSTENİN GÜNCELLENMESİNİ GARANTİ ETTİK
                 contentContainerStyle={styles.listContent}
                 showsVerticalScrollIndicator={false}
                 ListHeaderComponent={
@@ -334,30 +341,45 @@ const GameListScreen = ({ navigation }) => {
                         <View style={styles.gamesHeaderRow}>
                             <Text style={styles.gamesTitleText}>{t.games}</Text>
                             
-                            {/* ✅ GÜNCELLENEN ANİMASYONLU VE AÇILIR KAPANIR BUTON */}
-                            <TouchableOpacity onPress={toggleShowAll} activeOpacity={0.8}>
+                            {/* ✨ ÇÖZÜM: Modal Açan Buton */}
+                            <TouchableOpacity onPress={() => setModalVisible(true)} activeOpacity={0.8}>
                                 <Animated.View style={[styles.showAllAnimButton, { transform: [{ scale: pulseAnim }] }]}>
-                                    <Text style={styles.showAllText}>
-                                        {showAllGames ? t.showLess : t.showAll}
-                                    </Text>
-                                    <Ionicons 
-                                        name={showAllGames ? "chevron-up" : "chevron-down"} 
-                                        size={18} 
-                                        color="#00cec9" 
-                                        style={{marginLeft: 4}} 
-                                    />
+                                    <Text style={styles.showAllText}>{t.showAll}</Text>
+                                    <Ionicons name="chevron-forward" size={18} color="#00cec9" style={{marginLeft: 4}} />
                                 </Animated.View>
                             </TouchableOpacity>
                         </View>
                     </>
                 }
             />
+
+            {/* ✨ ÇÖZÜM: TÜM OYUNLAR İÇİN TAM EKRAN MODAL EKLENDİ */}
+            <Modal visible={modalVisible} animationType="slide" onRequestClose={() => setModalVisible(false)}>
+                <SafeAreaView style={styles.container}>
+                    <View style={styles.header}>
+                        <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.backButton}>
+                            <Ionicons name="arrow-down" size={28} color="white" />
+                        </TouchableOpacity>
+                        <Text style={styles.headerTitle}>{t.games}</Text>
+                        <View style={{width: 45}} /> 
+                    </View>
+                    
+                    <FlatList 
+                        data={GAMES}
+                        keyExtractor={item => item.id}
+                        renderItem={renderGameCard}
+                        contentContainerStyle={{ paddingBottom: 40, paddingTop: 10 }}
+                        showsVerticalScrollIndicator={false}
+                    />
+                </SafeAreaView>
+            </Modal>
+
         </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#222f3e' },
+    container: { flex: 1, backgroundColor: '#301955' }, // ✨ Morumsu Tema
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 15 },
     backButton: { width: 45, height: 45, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
     headerTitle: { fontSize: 22, fontWeight: 'bold', color: 'white' },

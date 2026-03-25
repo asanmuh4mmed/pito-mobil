@@ -11,9 +11,8 @@ import { supabase } from '../lib/supabase'; // Supabase bağlantısı
 const { width } = Dimensions.get('window');
 const TARGET_POINTS = 10000; 
 
-// 🚨 ÖNEMLİ: Supabase -> Authentication -> Users paneline gir. 
-// petspito@gmail.com kullanıcısının yanındaki "Copy User ID" butonuna basarak kopyaladığın uzun kodu buraya yapıştır!
-const PETSPITO_ADMIN_ID = "BURAYA_PETSPITO_USER_ID_YAPISTIRILACAK";
+// ✅ Admin ID Supabase'den alınarak güncellendi
+const PETSPITO_ADMIN_ID = "c6d87d7b-0c0c-40ee-aebb-dd37436b0292";
 
 const TRANSLATIONS = {
     TR: {
@@ -117,23 +116,39 @@ const GameDonateScreen = ({ navigation }) => {
     };
 
     const handleAction = async () => {
-        if (canDonate) {
-            setIsDonating(true); 
-            const success = await spendPoints(TARGET_POINTS);
-            
-            if (success) {
-                // ✅ Bağış başarılıysa uygulama içi mesaj at!
-                await sendInAppThankYouMessage();
-                
-                playSound('game_win');
-                setShowSuccess(true);
-            }
-            setIsDonating(false); 
-        } else {
-            navigation.navigate('GameList');
-        }
-    };
+    if (canDonate) {
+        setIsDonating(true); 
+        // 1. 10.000 Puanı harca
+        const success = await spendPoints(TARGET_POINTS);
+        
+        if (success) {
+            // 2. Mesajı gönder
+            await sendInAppThankYouMessage();
 
+            // 3. 🚨 KULLANICININ BAĞIŞ SAYISINI 1 ARTIR 🚨
+            try {
+                // Mevcut bağış sayısını al (yoksa 0 kabul et) ve 1 ekle
+                const currentDonationCount = user?.donation_count || 0;
+                const newDonationCount = currentDonationCount + 1;
+
+                const { error: updateError } = await supabase
+                    .from('users') // <-- Senin tablonun gerçek adı!
+                    .update({ donation_count: newDonationCount })
+                    .eq('id', user.id);
+                    
+                if (updateError) console.error("Bağış sayısı güncellenemedi:", updateError);
+            } catch (err) {
+                console.error("Veritabanı hatası:", err);
+            }
+            
+            playSound('game_win');
+            setShowSuccess(true);
+        }
+        setIsDonating(false); 
+    } else {
+        navigation.navigate('GameList');
+    }
+};
     return (
         <View style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#e0f2fe" />

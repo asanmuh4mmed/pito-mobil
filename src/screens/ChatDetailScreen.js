@@ -13,7 +13,6 @@ const TRANSLATIONS = {
     AU: { unknown: "Unknown", user: "User", listing: "Listing", permRequired: "Permission Required", permMsg: "Grant gallery permission.", error: "Error", photoError: "Photo error.", typeMessage: "Type a message...", unsend: "Unsend Message", cancel: "Cancel", unsendConfirm: "This message will be deleted for everyone.", regardingListing: "Regarding Listing:" }
 };
 
-// ✅ ANİMASYONLU PATİ BUTONU (ÖZEL BİLEŞEN)
 const AnimatedPawButton = ({ isLiked, onPress }) => {
     const scaleValue = useRef(new Animated.Value(1)).current;
 
@@ -38,7 +37,6 @@ const AnimatedPawButton = ({ isLiked, onPress }) => {
     );
 };
 
-// ✅ AVATAR TİTREMESİNİ (FLICKER) ENGELLEYEN MEMOIZED BİLEŞEN
 const UserAvatar = memo(({ avatarUrl, name, style }) => {
     if (avatarUrl) return <Image source={{ uri: avatarUrl }} style={[styles.avatarImage, style]} />;
     return (
@@ -59,12 +57,10 @@ const ChatDetailScreen = ({ navigation, route }) => {
   const params = route.params || {};
   const { chat, targetUser, listingId, listingName } = params;
 
-  // Başlangıç değerleri
   const currentUserId = String(user?.id);
   let otherUser = targetUser || { id: 'unknown', fullname: t.unknown, avatar: null };
   let currentChatId = null;
 
-  // ✅ SOHBET ID VE KARŞI TARAF BELİRLEME
   if (chat) {
       currentChatId = chat.id;
       
@@ -83,13 +79,11 @@ const ChatDetailScreen = ({ navigation, route }) => {
       currentChatId = ids.join('_');
   }
 
-  // ✅ CANLI VERİ AKIŞI
   const currentChatData = (conversations || []).find(c => c.id === currentChatId);
   const messages = currentChatData ? currentChatData.messages : [];
   
   const displayTitle = String(otherUser.fullname || t.user);
   
-  // ✅ İlgili İlan Kontrolü
   let displaySubject = '';
   if (listingName && listingName !== 'undefined') displaySubject = listingName;
   else if (currentChatData && currentChatData.listingName && currentChatData.listingName !== 'undefined') displaySubject = currentChatData.listingName;
@@ -103,7 +97,6 @@ const ChatDetailScreen = ({ navigation, route }) => {
       }
   };
 
-  // ✅ OKUNDU BİLGİSİ GÜNCELLEME
   useEffect(() => {
     if (currentChatId && user) {
         markAsRead(currentChatId, user.id);
@@ -151,7 +144,6 @@ const ChatDetailScreen = ({ navigation, route }) => {
       );
   };
 
-  // ✅ SOHBET BAŞINA EKLENEN İLAN BİLGİSİ ROZETİ
   const renderListingBanner = () => {
       if (!displaySubject || displaySubject.trim() === '') return null;
       return (
@@ -233,60 +225,62 @@ const ChatDetailScreen = ({ navigation, route }) => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isDarkMode ? '#121212' : '#F8F9FA' }]}>
-      
-      {/* ŞIK HEADER */}
-      <View style={[styles.header, { backgroundColor: theme.cardBg }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, {backgroundColor: isDarkMode ? '#333' : '#F0F0F0'}]}>
-            <Ionicons name="arrow-back" size={24} color={theme.text} />
-        </TouchableOpacity>
-        <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginLeft: 10 }} onPress={handleProfilePress} activeOpacity={0.8}>
-            <UserAvatar avatarUrl={otherUser.avatar} name={otherUser.fullname} style={{ width: 40, height: 40, borderRadius: 20 }} />
-            <View style={styles.headerInfo}>
-                <Text style={[styles.headerTitle, { color: theme.text }]} numberOfLines={1}>{displayTitle}</Text>
-            </View>
-        </TouchableOpacity>
-      </View>
-
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={item => item.id.toString()}
-        contentContainerStyle={styles.listContent}
-        ListHeaderComponent={renderListingBanner} // ✅ İLAN BİLGİSİ BURADA GÖSTERİLİYOR
-        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
-        showsVerticalScrollIndicator={false}
-      />
-
-      <KeyboardAvoidingView 
-          behavior={Platform.OS === "ios" ? "padding" : undefined} 
-          keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
-      >
-        <View style={[styles.inputWrapper, { backgroundColor: theme.background }]}>
-            <View style={[styles.inputContainer, { backgroundColor: theme.cardBg, borderColor: isDarkMode ? '#333' : '#E0E0E0', borderWidth: 1 }]}>
-                <TouchableOpacity onPress={pickImage} style={styles.attachBtn}>
-                    <Ionicons name="add-circle" size={30} color="#6C5CE7" />
+    <SafeAreaView style={[styles.container, { backgroundColor: isDarkMode ? '#121212' : '#F8F9FA' }]} edges={['top', 'right', 'left']}>
+        {/* ✨ KESİN ÇÖZÜM: Android'de 'height' ve ekstra offset kullanarak zorla yukarı itmesini sağlıyoruz. */}
+        <KeyboardAvoidingView 
+            style={{ flex: 1 }} 
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+            keyboardVerticalOffset={Platform.OS === 'android' ? 25 : 0} 
+        >
+            <View style={[styles.header, { backgroundColor: theme.cardBg }]}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, {backgroundColor: isDarkMode ? '#333' : '#F0F0F0'}]}>
+                    <Ionicons name="arrow-back" size={24} color={theme.text} />
                 </TouchableOpacity>
-                <TextInput 
-                    style={[styles.input, { color: theme.text }]} 
-                    value={text} 
-                    onChangeText={setText} 
-                    placeholder={t.typeMessage} 
-                    placeholderTextColor={theme.subText} 
-                    multiline 
-                />
-                <TouchableOpacity 
-                    style={[styles.sendBtn, { backgroundColor: text.trim().length > 0 ? '#6C5CE7' : 'rgba(108, 92, 231, 0.4)' }]} 
-                    onPress={handleSendText}
-                    disabled={text.trim().length === 0}
-                >
-                    <Ionicons name="send" size={18} color="white" style={{marginLeft: 2}} />
+                <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginLeft: 10 }} onPress={handleProfilePress} activeOpacity={0.8}>
+                    <UserAvatar avatarUrl={otherUser.avatar} name={otherUser.fullname} style={{ width: 40, height: 40, borderRadius: 20 }} />
+                    <View style={styles.headerInfo}>
+                        <Text style={[styles.headerTitle, { color: theme.text }]} numberOfLines={1}>{displayTitle}</Text>
+                    </View>
                 </TouchableOpacity>
             </View>
-        </View>
-      </KeyboardAvoidingView>
+
+            <FlatList
+                ref={flatListRef}
+                data={messages}
+                renderItem={renderMessage}
+                keyExtractor={item => item.id.toString()}
+                contentContainerStyle={styles.listContent}
+                ListHeaderComponent={renderListingBanner} 
+                onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+            />
+
+            <View style={[styles.inputWrapper, { backgroundColor: theme.background }]}>
+                <View style={[styles.inputContainer, { backgroundColor: theme.cardBg, borderColor: isDarkMode ? '#333' : '#E0E0E0', borderWidth: 1 }]}>
+                    <TouchableOpacity onPress={pickImage} style={styles.attachBtn}>
+                        <Ionicons name="add-circle" size={30} color="#6C5CE7" />
+                    </TouchableOpacity>
+                    <TextInput 
+                        style={[styles.input, { color: theme.text }]} 
+                        value={text} 
+                        onChangeText={setText} 
+                        placeholder={t.typeMessage} 
+                        placeholderTextColor={theme.subText} 
+                        multiline 
+                    />
+                    <TouchableOpacity 
+                        style={[styles.sendBtn, { backgroundColor: text.trim().length > 0 ? '#6C5CE7' : 'rgba(108, 92, 231, 0.4)' }]} 
+                        onPress={handleSendText}
+                        disabled={text.trim().length === 0}
+                    >
+                        <Ionicons name="send" size={18} color="white" style={{marginLeft: 2}} />
+                    </TouchableOpacity>
+                </View>
+            </View>
+        </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -298,7 +292,6 @@ const styles = StyleSheet.create({
   headerInfo: { flex: 1, justifyContent: 'center', marginLeft: 12 },
   headerTitle: { fontSize: 17, fontWeight: '800' },
   
-  // ✅ YENİ EKLENEN İLAN ROZETİ STİLLERİ
   listingBannerContainer: { width: '100%', alignItems: 'center', marginBottom: 20, marginTop: 10 },
   listingBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(108, 92, 231, 0.1)', paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20 },
   listingBannerText: { color: '#6C5CE7', fontSize: 12, marginLeft: 6 },
@@ -333,7 +326,7 @@ const styles = StyleSheet.create({
   pawButton: { position: 'absolute', bottom: 45, right: 10, backgroundColor: 'rgba(255,255,255,0.9)', padding: 8, borderRadius: 20, elevation: 5, shadowColor: '#000', shadowOffset: {width: 0, height: 2}, shadowOpacity: 0.2, alignItems: 'center', justifyContent: 'center', zIndex: 10 },
   textReactionBadge: { position: 'absolute', bottom: -8, left: 15, backgroundColor: '#fff', padding: 4, borderRadius: 12, borderWidth: 1, borderColor: '#eee', elevation: 3 },
   
-  inputWrapper: { paddingHorizontal: 15, paddingVertical: 10, paddingBottom: Platform.OS === 'ios' ? 25 : 15 },
+  inputWrapper: { paddingHorizontal: 15, paddingVertical: 10, paddingBottom: Platform.OS === 'ios' ? 25 : 10 },
   inputContainer: { flexDirection: 'row', alignItems: 'center', borderRadius: 25, paddingHorizontal: 5, paddingVertical: 5 },
   input: { flex: 1, paddingHorizontal: 10, paddingVertical: 12, maxHeight: 100, fontSize: 16 },
   sendBtn: { width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center', marginHorizontal: 5 },

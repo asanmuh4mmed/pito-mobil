@@ -102,89 +102,100 @@ const VetBotScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'right', 'left']}>
       
-      {/* HEADER */}
-      <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
-              <Ionicons name="chevron-back" size={28} color="#6200EE" />
-          </TouchableOpacity>
-          <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={styles.headerTitle}>{texts.header}</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <View style={styles.onlineDot} />
-                  <Text style={styles.statusText}>{texts.status}</Text>
+      {/* ✨ KESİN ÇÖZÜM: Android'de klavyenin UI'ı bozmaması için height ve offset geri eklendi */}
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+        keyboardVerticalOffset={Platform.OS === 'android' ? 25 : 0} 
+      >
+          {/* HEADER */}
+          <View style={styles.header}>
+              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
+                  <Ionicons name="chevron-back" size={28} color="#6200EE" />
+              </TouchableOpacity>
+              <View style={{ flex: 1, marginLeft: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Ionicons name="medkit" size={18} color="#3700B3" style={{ marginRight: 6 }} />
+                      <Text style={styles.headerTitle}>{texts.header}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                      <View style={styles.onlineDot} />
+                      <Text style={styles.statusText}>{texts.status}</Text>
+                  </View>
               </View>
+              <TouchableOpacity onPress={clearChat} style={styles.iconBtn}>
+                  <Ionicons name="trash-bin-outline" size={22} color="#6200EE" />
+              </TouchableOpacity>
           </View>
-          <TouchableOpacity onPress={clearChat} style={styles.iconBtn}>
-              <Ionicons name="trash-bin-outline" size={22} color="#6200EE" />
-          </TouchableOpacity>
-      </View>
 
-      {/* SOHBET LİSTESİ */}
-      <FlatList
-          ref={flatListRef}
-          data={messages}
-          renderItem={renderItem}
-          keyExtractor={item => item.id}
-          contentContainerStyle={{ padding: 15, paddingBottom: 20 }}
-          ListFooterComponent={isTyping ? (
-            <View style={{flexDirection:'row', alignItems:'center', marginLeft:10, marginBottom:10}}>
-                <View style={[styles.botAvatar, {width:20, height:20, marginRight:5}]}><Ionicons name="paw" size={12} color="white"/></View>
-                <Text style={{fontSize:12, color:'#7E57C2', fontStyle:'italic'}}>{texts.typing}</Text>
-            </View>
-          ) : null}
-      />
-
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={10}>
-        <View style={styles.footerContainer}>
-            
-            {/* 🖼️ ÖNİZLEME ALANI */}
-            {selectedImage && (
-                <View style={styles.previewContainer}>
-                    <Image source={{ uri: selectedImage }} style={styles.previewImage} />
-                    <TouchableOpacity style={styles.removePreviewBtn} onPress={removeImage}>
-                        <Ionicons name="close" size={16} color="white" />
-                    </TouchableOpacity>
+          {/* SOHBET LİSTESİ */}
+          <FlatList
+              ref={flatListRef}
+              data={messages}
+              renderItem={renderItem}
+              keyExtractor={item => item.id}
+              contentContainerStyle={{ padding: 15, paddingBottom: 20 }}
+              keyboardShouldPersistTaps="handled" 
+              keyboardDismissMode="on-drag" // ✨ ÇÖZÜM: Scroll yapıldığında klavye yumuşakça kapanır
+              ListFooterComponent={isTyping ? (
+                <View style={{flexDirection:'row', alignItems:'center', marginLeft:10, marginBottom:10}}>
+                    <View style={[styles.botAvatar, {width:20, height:20, marginRight:5}]}><Ionicons name="paw" size={12} color="white"/></View>
+                    <Text style={{fontSize:12, color:'#7E57C2', fontStyle:'italic'}}>{texts.typing}</Text>
                 </View>
-            )}
+              ) : null}
+          />
 
-            {/* BUTONLAR VE INPUT SATIRI */}
-            <View style={styles.inputRow}>
-                <TouchableOpacity onPress={pickImage} style={styles.mediaBtn}>
-                    <Ionicons name="add" size={28} color="#6200EE" />
-                </TouchableOpacity>
+          {/* KLAVYE VE GİRİŞ ALANI */}
+          <View style={styles.footerContainer}>
+              
+              {/* 🖼️ ÖNİZLEME ALANI */}
+              {selectedImage && (
+                  <View style={styles.previewContainer}>
+                      <Image source={{ uri: selectedImage }} style={styles.previewImage} />
+                      <TouchableOpacity style={styles.removePreviewBtn} onPress={removeImage}>
+                          <Ionicons name="close" size={16} color="white" />
+                      </TouchableOpacity>
+                  </View>
+              )}
 
-                <View style={styles.inputContainer}>
-                    <TextInput
-                        style={styles.input}
-                        value={text}
-                        onChangeText={setText}
-                        placeholder={texts.placeholder}
-                        placeholderTextColor="#999"
-                        multiline
-                    />
-                </View>
+              {/* BUTONLAR VE INPUT SATIRI */}
+              <View style={styles.inputRow}>
+                  <TouchableOpacity onPress={pickImage} style={styles.mediaBtn}>
+                      <Ionicons name="add" size={28} color="#6200EE" />
+                  </TouchableOpacity>
 
-                <TouchableOpacity 
-                    style={[styles.sendBtn, { backgroundColor: (text.length > 0 || selectedImage) ? '#6200EE' : '#ccc' }]} 
-                    onPress={handleSend}
-                    disabled={(text.length === 0 && !selectedImage) || isTyping}
-                >
-                    <Ionicons name="send" size={20} color="white" style={{marginLeft:2}} />
-                </TouchableOpacity>
-            </View>
+                  <View style={styles.inputContainer}>
+                      <TextInput
+                          style={styles.input}
+                          value={text}
+                          onChangeText={setText}
+                          placeholder={texts.placeholder}
+                          placeholderTextColor="#999"
+                          multiline
+                      />
+                  </View>
 
-        </View>
+                  <TouchableOpacity 
+                      style={[styles.sendBtn, { backgroundColor: (text.length > 0 || selectedImage) ? '#6200EE' : '#ccc' }]} 
+                      onPress={handleSend}
+                      disabled={(text.length === 0 && !selectedImage) || isTyping}
+                  >
+                      <Ionicons name="send" size={20} color="white" style={{marginLeft:2}} />
+                  </TouchableOpacity>
+              </View>
+
+          </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F3E5F5' }, // Yumuşak Menekşe Arkaplan
+  container: { flex: 1, backgroundColor: '#F3E5F5' }, 
   header: { flexDirection: 'row', alignItems: 'center', padding: 10, backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#E0E0E0', elevation: 2, shadowColor:'#000', shadowOpacity:0.05, shadowRadius:5 },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: '#3700B3' }, // Derin Mor
+  headerTitle: { fontSize: 17, fontWeight: '700', color: '#3700B3' }, 
   onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#4CAF50', marginRight: 5 },
   statusText: { fontSize: 12, color: '#4CAF50' },
   iconBtn: { padding: 8 },
@@ -193,17 +204,18 @@ const styles = StyleSheet.create({
   rowLeft: { justifyContent: 'flex-start', alignItems: 'flex-end' },
   rowRight: { justifyContent: 'flex-end', alignItems: 'flex-end' },
   
-  botAvatar: { width: 32, height: 32, borderRadius: 12, backgroundColor: '#6200EE', justifyContent: 'center', alignItems: 'center', marginRight: 8 }, // Ana Mor
+  botAvatar: { width: 32, height: 32, borderRadius: 12, backgroundColor: '#6200EE', justifyContent: 'center', alignItems: 'center', marginRight: 8 }, 
   bubble: { maxWidth: '75%', padding: 12, borderRadius: 18, elevation: 1 },
   bubbleBot: { backgroundColor: 'white', borderBottomLeftRadius: 2, borderWidth:1, borderColor:'rgba(0,0,0,0.05)' },
-  bubbleUser: { backgroundColor: '#6200EE', borderBottomRightRadius: 2 }, // Ana Mor
+  bubbleUser: { backgroundColor: '#6200EE', borderBottomRightRadius: 2 }, 
   
   msgText: { fontSize: 15, lineHeight: 22 },
   timeText: { fontSize: 9, textAlign: 'right', marginTop: 4 },
   
   chatImage: { width: 220, height: 160, borderRadius: 12 },
   
-  footerContainer: { padding: 10, backgroundColor: '#F3E5F5' },
+  // ✨ GÜNCELLEME: Çift boşluk (klavye + padding) sorununu engellemek için Android padding'i düşürüldü
+  footerContainer: { padding: 10, backgroundColor: '#F3E5F5', paddingBottom: Platform.OS === 'ios' ? 25 : 10 },
   
   previewContainer: { 
       flexDirection: 'row', 

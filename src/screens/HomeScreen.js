@@ -194,7 +194,6 @@ const HomeScreen = ({ navigation }) => {
   // --- YENİ EKLENDİ: GENEL BİLDİRİM SESİ ---
   useEffect(() => {
       const subscription = Notifications.addNotificationReceivedListener(notification => {
-          // Bildirim ekrana düştüğünde game_start sesini çalar
           playSound('game_start');
       });
       return () => subscription.remove();
@@ -225,7 +224,7 @@ const HomeScreen = ({ navigation }) => {
     }
   }, [user, conversations]);
 
-  // --- 3. GÜVENLİK KONTROLÜ (Giriş Yapmamışsa Uyar) ---
+  // --- 3. GÜVENLİK KONTROLÜ ---
   const checkAuth = (action) => {
       if (user) {
           action();
@@ -237,22 +236,11 @@ const HomeScreen = ({ navigation }) => {
       }
   };
 
-  // --- 4. YARDIMCI FONKSİYONLAR ---
-  const filterByCountry = (list) => {
-      if (!list) return [];
-      return list.filter(item => {
-          if (item.countryCode) {
-              return item.countryCode === activeLang;
-          }
-          return activeLang === 'TR'; 
-      });
-  };
-
-  const filteredUrgent = filterByCountry(urgentList);
-  const filteredMate = filterByCountry(mateList);
-  const filteredVet = filterByCountry(vetList);
-  const filteredSitter = filterByCountry(sitterList);
-  const filteredGrooming = []; 
+  const filteredUrgent = urgentList;
+  const filteredMate = mateList;
+  const filteredVet = vetList;
+  const filteredSitter = sitterList;
+  const filteredGrooming = [];
 
   const handleSearch = (text) => {
       setSearchQuery(text);
@@ -292,7 +280,10 @@ const HomeScreen = ({ navigation }) => {
       });
   };
 
-  const handleNotificationItemClick = (notification) => {
+ const handleNotificationItemClick = (notification) => {
+      // BİLDİRİMİN İÇİNDE NELER VAR KONSOLA YAZDIRALIM
+      console.log("TIKLANAN BİLDİRİM VERİSİ:", notification); 
+
       setNotificationsVisible(false);
       
       if (notification.type === 'follow' && notification.fromUserId) {
@@ -303,9 +294,14 @@ const HomeScreen = ({ navigation }) => {
           });
       } else if (notification.type === 'order_success' || notification.type === 'order_update') {
           navigation.navigate('Profile'); 
+      } else if (notification.type === 'like' || notification.type === 'comment') {
+          
+          // Olası tüm ID isimlerini deniyoruz
+          const targetId = notification.postId || notification.post_id || notification.targetId || notification.target_id || notification.referenceId;
+          
+          navigation.navigate('Petsgram', { targetPostId: targetId }); 
       }
   };
-
   const renderRightActions = (id) => (
       <TouchableOpacity style={styles.deleteAction} onPress={() => { deleteNotification(id); }}>
           <Ionicons name="trash-outline" size={24} color="white" />
@@ -356,11 +352,12 @@ const HomeScreen = ({ navigation }) => {
   const navigateToAdd = (categoryName) => {
       setModalVisible(false); 
       let backendCategoryName = categoryName;
-      if (categoryName === 'Find Mate') backendCategoryName = 'Eş Arayanlar';
-      else if (categoryName === 'Adopt') backendCategoryName = 'Sahiplendirme';
-      else if (categoryName === 'Vet Clinics') backendCategoryName = 'Veteriner Klinikleri';
-      else if (categoryName === 'Pet Sitter') backendCategoryName = 'Bakıcı';
-      else if (categoryName === 'Pet Groomer') backendCategoryName = 'Pet Kuaför';
+      // ✨ DÜZELTME: İngilizce seçildiğinde Veritabanına doğru İngilizce tag gitsin diye değiştirildi
+      if (categoryName === 'Eş Bulma İlanı' || categoryName === 'Find Mate') backendCategoryName = activeLang === 'TR' ? 'Eş Arayanlar' : 'Find Mate';
+      else if (categoryName === 'Yuva Bulma' || categoryName === 'Adopt') backendCategoryName = activeLang === 'TR' ? 'Sahiplendirme' : 'Adopt';
+      else if (categoryName === 'Veteriner Kliniği' || categoryName === 'Vet Clinics') backendCategoryName = activeLang === 'TR' ? 'Veteriner Klinikleri' : 'Vet Clinics';
+      else if (categoryName === 'Bakıcı İlanı' || categoryName === 'Pet Sitter') backendCategoryName = activeLang === 'TR' ? 'Bakıcı' : 'Pet Sitter';
+      else if (categoryName === 'Pet Kuaför İlanı' || categoryName === 'Pet Groomer') backendCategoryName = activeLang === 'TR' ? 'Pet Kuaför' : 'Pet Groomer';
 
       navigation.navigate('AddListing', { category: backendCategoryName });
   };
@@ -391,14 +388,17 @@ const HomeScreen = ({ navigation }) => {
       setTouchStart(null);
   };
 
-  const categories = [
+ const categories = [
+    // ✨ DÜZELTME: Veritabanı ve ListingContext ile eşleşmesi için AU tarafındaki title'lar Backend ile aynı yapıldı
     { id: '1', title: activeLang === 'TR' ? 'Eş Bul' : 'Find Mate', icon: 'heart', color: '#FF6B6B', navTitle: t.catMate, data: filteredMate, type: 'listing' },
     { id: '2', title: activeLang === 'TR' ? 'Sahiplen' : 'Adopt', icon: 'paw', color: '#4ECDC4', navTitle: t.catAdopt, data: filteredUrgent, type: 'listing' },
-    { id: '3', title: activeLang === 'TR' ? 'Veteriner' : 'Vet', icon: 'medkit', color: '#45B7D1', navTitle: t.catVet, data: filteredVet, type: 'listing' },
-    { id: '4', title: activeLang === 'TR' ? 'Bakıcı Bul' : 'Sitter', icon: 'people', color: '#F7B731', navTitle: t.catSitter, data: filteredSitter, type: 'listing' },
-    { id: '5', title: activeLang === 'TR' ? 'Pet Kuaför' : 'Grooming', icon: 'cut', color: '#A55EEA', navTitle: t.catGrooming, data: [], type: 'listing' }, 
+    { id: '3', title: activeLang === 'TR' ? 'Veteriner' : 'Vet Clinics', icon: 'medkit', color: '#45B7D1', navTitle: t.catVet, data: filteredVet, type: 'listing' },
+    { id: '4', title: activeLang === 'TR' ? 'Bakıcı Bul' : 'Pet Sitter', icon: 'people', color: '#F7B731', navTitle: t.catSitter, data: filteredSitter, type: 'listing' },
+    { id: '5', title: activeLang === 'TR' ? 'Pet Kuaför' : 'Pet Groomer', icon: 'cut', color: '#A55EEA', navTitle: t.catGrooming, data: [], type: 'listing' }, 
     { id: '6', title: activeLang === 'TR' ? 'Aşı Karnesi' : 'Vaccine', icon: 'document-text', color: '#26de81', navTitle: t.catVaccine, data: [], type: 'vaccine' }, 
   ];
+
+  // --- RENDER FONKSİYONLARI ---
 
   // --- RENDER FONKSİYONLARI ---
   const renderCategory = ({ item }) => (
@@ -511,18 +511,19 @@ const HomeScreen = ({ navigation }) => {
                     <Ionicons name="menu" size={30} color={theme.icon} />
                   </TouchableOpacity>
 
-                  <View style={[styles.headerSearchBox, { backgroundColor: isDarkMode ? '#333' : '#FFF', elevation: 3, shadowColor:'#000', shadowOpacity:0.1 }]}>
-                      <Ionicons name="search" size={20} color={theme.subText} style={{ marginRight: 8 }} />
+                  {/* YENİ NESİL AÇIK RENKLİ ŞIK MOR ARAMA MOTORU */}
+                  <View style={[styles.headerSearchBox, { backgroundColor: isDarkMode ? '#333' : '#F4F0FF', elevation: 6, shadowColor:'#6C5CE7', shadowOffset:{width:0, height:4}, shadowOpacity:0.2, shadowRadius: 6, borderWidth: 1, borderColor: '#EBE5FF' }]}>
+                      <Ionicons name="search" size={20} color="#6C5CE7" style={{ marginRight: 8 }} />
                       <TextInput 
                         placeholder={t.searchPlaceholder} 
-                        placeholderTextColor={theme.subText} 
+                        placeholderTextColor="#A294F9" 
                         style={[styles.headerSearchInput, { color: theme.text }]} 
                         value={searchQuery}
                         onChangeText={handleSearch} 
                       />
                       {searchQuery.length > 0 && (
                           <TouchableOpacity onPress={() => { handleSearch(''); }}>
-                              <Ionicons name="close-circle" size={18} color={theme.subText} />
+                              <Ionicons name="close-circle" size={18} color="#6C5CE7" />
                           </TouchableOpacity>
                       )}
                   </View>
@@ -532,7 +533,8 @@ const HomeScreen = ({ navigation }) => {
                         <View style={{flexDirection:'row'}}>
                             <TouchableOpacity onPress={handleNotificationPress} style={{ padding: 5, marginLeft: 5 }}>
                                 <View>
-                                    <Ionicons name="notifications-outline" size={28} color={theme.icon} />
+                                    {/* BİLDİRİM İKONU SARI YAPILDI */}
+                                    <Ionicons name="notifications" size={28} color="#FDCB6E" />
                                     {unreadNotifCount > 0 && (
                                         <View style={styles.badge}>
                                             <Text style={styles.badgeText}>{unreadNotifCount}</Text>
@@ -578,12 +580,12 @@ const HomeScreen = ({ navigation }) => {
                   {/* MODERN KARE HİKAYELER */}
                   <View style={styles.storySection}>
                       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{paddingHorizontal: 20}}>
-                          {/* Hikaye Ekle Butonu */}
+                          {/* Hikaye Ekle Butonu - Doğrudan Petsgram Ekleme Sayfasına */}
                           <TouchableOpacity 
                               style={styles.storyContainer}
-                              onPress={() => { checkAuth(() => navigation.navigate('Petsgram')); }}
+                              onPress={() => { checkAuth(() => navigation.navigate('Petsgram', { openAddModal: true })); }}
                           >
-                              <View style={[styles.storySquare, { borderColor: '#ddd', borderStyle: 'dashed' }]}>
+                              <View style={[styles.storySquare, { borderColor: '#A294F9', borderStyle: 'dashed' }]}>
                                   <Ionicons name="add" size={30} color="#6C5CE7" />
                               </View>
                               <Text style={[styles.storyText, { color: theme.text }]} numberOfLines={1}>{t.add}</Text>
@@ -593,9 +595,10 @@ const HomeScreen = ({ navigation }) => {
                               <TouchableOpacity 
                                   key={item.id} 
                                   style={styles.storyContainer}
-                                  onPress={() => { checkAuth(() => navigation.navigate('Petsgram', { initialPostId: item.id })); }}
+                                  onPress={() => { checkAuth(() => navigation.navigate('Petsgram', { targetPostId: item.id })); }}
                               >
-                                  <Image source={{ uri: item.image }} style={[styles.storySquare, { borderColor: '#FD79A8' }]} />
+                                  {/* ÇERÇEVE MOR TEMAYA UYARLANDI */}
+                                  <Image source={{ uri: item.image }} style={[styles.storySquare, { borderColor: '#8C7AE6' }]} />
                                   <Text style={[styles.storyText, { color: theme.text }]} numberOfLines={1}>{item.user ? item.user.split(' ')[0] : 'User'}</Text>
                               </TouchableOpacity>
                           ))}
@@ -603,7 +606,6 @@ const HomeScreen = ({ navigation }) => {
                   </View>
 
                   <View style={[styles.bigAddButtonContainer, { paddingHorizontal: 20, marginBottom: 20 }]}>
-                        {/* YENİ NESİL BÜTÜNLEŞİK BUTON RENKLERİ */}
                         {/* İLAN EKLEME BUTONU */}
                         <TouchableOpacity style={[styles.bigAddButton, { backgroundColor: '#6C5CE7' }]} onPress={handleAddPress}>
                             <View style={styles.bigAddButtonContent}>
@@ -695,7 +697,7 @@ const HomeScreen = ({ navigation }) => {
                   {renderSection(t.catSitter, filteredSitter)}
                   {renderSection(t.catGrooming, filteredGrooming)} 
 
-                  {/* POPÜLER ÜRÜNLER (DB) */}
+                  {/* POPÜLER ÜRÜNLER (DB) 
                   <View style={styles.section}>
                       <View style={styles.sectionHeader}>
                           <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.shop}</Text>
@@ -716,6 +718,7 @@ const HomeScreen = ({ navigation }) => {
                           />
                       )}
                   </View>
+                  */}
 
                   <View style={{marginTop: 20, alignItems: 'center', opacity: 0.5}}>
                       <Text style={{color: theme.subText, fontSize: 12}}>{t.copyright}</Text>
@@ -725,12 +728,15 @@ const HomeScreen = ({ navigation }) => {
           )}
       </View>
       
-      {/* BOTTOM BAR (MODERN APERTURE BUTON) */}
+      {/* BOTTOM BAR - Biraz Yukarı Kaldırıldı */}
       <View style={[styles.bottomBar, { backgroundColor: theme.cardBg }]}>
         
+        {/* ANA SAYFA İKONU MODERNLEŞTİRİLDİ */}
         <TouchableOpacity style={styles.tabItem} onPress={() => { setSearchQuery(''); }}>
-            <Ionicons name="home-outline" size={26} color={COLORS.primary} />
-            <Text style={[styles.tabText, { color: COLORS.primary }]}>{t.home}</Text>
+            <View style={{ backgroundColor: '#F4F0FF', padding: 8, borderRadius: 18 }}>
+                <Ionicons name="home" size={24} color="#6C5CE7" />
+            </View>
+            <Text style={[styles.tabText, { color: '#6C5CE7', fontWeight: 'bold' }]}>{t.home}</Text>
         </TouchableOpacity>
         
         {/* Petsgram - Modern Aperture Icon */}
@@ -826,15 +832,18 @@ const HomeScreen = ({ navigation }) => {
                         <Text style={[styles.menuItemText, { color: theme.text }]}>{t.language}</Text>
                     </TouchableOpacity>
 
+                    {/* BİZE ULAŞIN - MOR TEMA GÜNCELLEMESİ */}
+                    <TouchableOpacity style={[styles.menuItem, { backgroundColor: '#F4F0FF', marginTop: 10, borderRadius: 12 }]} onPress={() => { setMenuVisible(false); setContactVisible(true); }}>
+                        <Ionicons name="mail" size={24} color="#6C5CE7" />
+                        <Text style={[styles.menuItemText, { color: '#6C5CE7' }]}>{t.contactUs}</Text>
+                    </TouchableOpacity>
+                    
+                    {/* HAKKIMIZDA - MOR TEMA GÜNCELLEMESİ */}
+                    <TouchableOpacity style={[styles.menuItem, { backgroundColor: '#F4F0FF', marginTop: 8, borderRadius: 12 }]} onPress={() => { setMenuVisible(false); setAboutVisible(true); }}>
+                        <Ionicons name="information-circle" size={24} color="#6C5CE7" />
+                        <Text style={[styles.menuItemText, { color: '#6C5CE7' }]}>{t.aboutUs}</Text>
+                    </TouchableOpacity>
 
-                    <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setContactVisible(true); }}>
-                        <Ionicons name="mail-outline" size={24} color={theme.icon} />
-                        <Text style={[styles.menuItemText, { color: theme.text }]}>{t.contactUs}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.menuItem} onPress={() => { setMenuVisible(false); setAboutVisible(true); }}>
-                        <Ionicons name="information-circle-outline" size={24} color={theme.icon} />
-                        <Text style={[styles.menuItemText, { color: theme.text }]}>{t.aboutUs}</Text>
-                    </TouchableOpacity>
                     {user && (
                         <TouchableOpacity style={[styles.menuItem, { marginTop: 20, backgroundColor: '#FF4D4D15' }]} onPress={handleLogout}>
                             <Ionicons name="log-out-outline" size={24} color="#FF4D4D" />
@@ -930,7 +939,7 @@ const HomeScreen = ({ navigation }) => {
         </View>
       </Modal>
 
-      {/* YENİ NESİL ŞIK BİLDİRİM MODALI */}
+      {/* YENİ NESİL ŞIK BİLDİRİM MODALI - LİKE VE YORUM İKONLARI EKLENDİ */}
       <Modal animationType="fade" transparent={true} visible={notificationsVisible} onRequestClose={() => setNotificationsVisible(false)}>
         <GestureHandlerRootView style={styles.modalOverlay}>
             <View style={[styles.modalContent, { height: '70%', backgroundColor: theme.background }]}>
@@ -945,28 +954,40 @@ const HomeScreen = ({ navigation }) => {
                         data={user.notifications}
                         keyExtractor={(item) => item.id.toString()}
                         contentContainerStyle={{ paddingBottom: 20 }}
-                        renderItem={({ item }) => (
-                            <Swipeable renderRightActions={() => renderRightActions(item.id)}>
-                                <TouchableOpacity style={[styles.notificationItem, { backgroundColor: theme.cardBg }]} onPress={() => handleNotificationItemClick(item)}>
-                                    <View style={styles.notifIconContainer}>
-                                            {item.fromUserAvatar ? (
-                                                <Image source={{ uri: item.fromUserAvatar }} style={styles.notifAvatar} />
-                                            ) : (
-                                                <View style={[styles.notifIconPlaceholder, { backgroundColor: item.type === 'follow' ? '#E3F2FD' : '#FFF3E0' }]}>
-                                                    <Ionicons name={item.type === 'follow' ? 'person-add' : 'notifications'} size={22} color={item.type === 'follow' ? '#2196F3' : '#FF9800'} />
-                                                </View>
-                                            )}
-                                    </View>
-                                    <View style={{ flex: 1 }}>
-                                            <Text style={[styles.notifText, { color: theme.text }]}>{item.message}</Text>
-                                            <Text style={{ fontSize: 11, color: theme.subText, marginTop: 4 }}>
-                                                {new Date(item.date).toLocaleDateString()} • {new Date(item.date).toLocaleTimeString().slice(0,5)}
-                                            </Text>
-                                    </View>
-                                    <Ionicons name="chevron-forward" size={18} color={theme.subText} style={{marginLeft: 10}} />
-                                </TouchableOpacity>
-                            </Swipeable>
-                        )}
+                        renderItem={({ item }) => {
+                            
+                            // Bildirim Tipi İkonları
+                            let iconName = 'notifications';
+                            let iconColor = '#FF9800';
+                            let bgColor = '#FFF3E0';
+
+                            if (item.type === 'follow') { iconName = 'person-add'; iconColor = '#2196F3'; bgColor = '#E3F2FD'; }
+                            else if (item.type === 'like') { iconName = 'heart'; iconColor = '#E84393'; bgColor = '#FDECF4'; }
+                            else if (item.type === 'comment') { iconName = 'chatbubble-ellipses'; iconColor = '#6C5CE7'; bgColor = '#F0EDFD'; }
+
+                            return (
+                                <Swipeable renderRightActions={() => renderRightActions(item.id)}>
+                                    <TouchableOpacity style={[styles.notificationItem, { backgroundColor: theme.cardBg }]} onPress={() => handleNotificationItemClick(item)}>
+                                        <View style={styles.notifIconContainer}>
+                                                {item.fromUserAvatar ? (
+                                                    <Image source={{ uri: item.fromUserAvatar }} style={styles.notifAvatar} />
+                                                ) : (
+                                                    <View style={[styles.notifIconPlaceholder, { backgroundColor: bgColor }]}>
+                                                        <Ionicons name={iconName} size={22} color={iconColor} />
+                                                    </View>
+                                                )}
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                                <Text style={[styles.notifText, { color: theme.text }]}>{item.message}</Text>
+                                                <Text style={{ fontSize: 11, color: theme.subText, marginTop: 4 }}>
+                                                    {new Date(item.date).toLocaleDateString()} • {new Date(item.date).toLocaleTimeString().slice(0,5)}
+                                                </Text>
+                                        </View>
+                                        <Ionicons name="chevron-forward" size={18} color={theme.subText} style={{marginLeft: 10}} />
+                                    </TouchableOpacity>
+                                </Swipeable>
+                            );
+                        }}
                     />
                 ) : (
                     <View style={{ alignItems: 'center', marginTop: 80 }}>
@@ -978,7 +999,7 @@ const HomeScreen = ({ navigation }) => {
         </GestureHandlerRootView>
       </Modal>
 
-      {/* EKLEME MODALI */}
+   {/* EKLEME MODALI */}
       <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { backgroundColor: theme.cardBg }]}>
@@ -988,21 +1009,36 @@ const HomeScreen = ({ navigation }) => {
                         <Ionicons name="close" size={24} color={theme.icon} />
                     </TouchableOpacity>
                 </View>
-                {[
-                    { label: activeLang === 'TR' ? 'Eş Bulma İlanı' : 'Find Mate', val: 'Find Mate', icon: 'heart' },
-                    { label: activeLang === 'TR' ? 'Yuva Bulma' : 'Adopt', val: 'Adopt', icon: 'paw' },
-                    { label: activeLang === 'TR' ? 'Veteriner Kliniği' : 'Vet Clinics', val: 'Vet Clinics', icon: 'medkit' },
-                    { label: activeLang === 'TR' ? 'Bakıcı İlanı' : 'Pet Sitter', val: 'Pet Sitter', icon: 'people' },
-                    { label: activeLang === 'TR' ? 'Pet Kuaför İlanı' : 'Pet Groomer', val: 'Pet Groomer', icon: 'cut' } 
-                ].map((opt, index) => (
-                    <TouchableOpacity key={index} style={[styles.optionBtn, { borderBottomColor: theme.border }]} onPress={() => navigateToAdd(opt.val)}>
-                        <View style={[styles.iconBox, { backgroundColor: '#FF6B6B20' }]}> 
-                            <Ionicons name={opt.icon} size={24} color="#FF6B6B" /> 
-                        </View>
-                        <Text style={[styles.optionText, { color: theme.text }]}>{opt.label}</Text>
-                        <Ionicons name="chevron-forward" size={20} color={theme.subText} />
-                    </TouchableOpacity>
-                ))}
+                
+                {/* DİNAMİK BUTON LİSTESİ */}
+                {(() => {
+                    // 1. Herkesin göreceği standart ilanlar
+                    let addOptions = [
+                        { label: activeLang === 'TR' ? 'Eş Bulma İlanı' : 'Find Mate', val: 'Find Mate', icon: 'heart' },
+                        { label: activeLang === 'TR' ? 'Yuva Bulma' : 'Adopt', val: 'Adopt', icon: 'paw' }
+                    ];
+
+                    // 2. Kullanıcının rolüne göre eklenecek özel ilanlar
+                    if (user?.account_type === 'vet') {
+                        addOptions.push({ label: activeLang === 'TR' ? 'Veteriner Kliniği' : 'Vet Clinics', val: 'Vet Clinics', icon: 'medkit' });
+                    } else if (user?.account_type === 'sitter') {
+                        addOptions.push({ label: activeLang === 'TR' ? 'Bakıcı İlanı' : 'Pet Sitter', val: 'Pet Sitter', icon: 'people' });
+                    } else if (user?.account_type === 'groomer') {
+                        addOptions.push({ label: activeLang === 'TR' ? 'Pet Kuaför İlanı' : 'Pet Groomer', val: 'Pet Groomer', icon: 'cut' });
+                    }
+
+                    // 3. Ekrana Bas
+                    return addOptions.map((opt, index) => (
+                        <TouchableOpacity key={index} style={[styles.optionBtn, { borderBottomColor: theme.border }]} onPress={() => navigateToAdd(opt.val)}>
+                            <View style={[styles.iconBox, { backgroundColor: '#FF6B6B20' }]}> 
+                                <Ionicons name={opt.icon} size={24} color="#FF6B6B" /> 
+                            </View>
+                            <Text style={[styles.optionText, { color: theme.text }]}>{opt.label}</Text>
+                            <Ionicons name="chevron-forward" size={20} color={theme.subText} />
+                        </TouchableOpacity>
+                    ));
+                })()}
+
             </View>
         </View>
       </Modal>
@@ -1090,8 +1126,12 @@ const styles = StyleSheet.create({
   homeFoundBadge: { position: 'absolute', top: 10, right: 10, backgroundColor: '#55EFC4', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, zIndex: 10 },
   homeFoundText: { color: '#000', fontSize: 10, fontWeight: 'bold' },
 
+  // BOTTOM BAR BİRAZ YUKARI KALDIRILDI
   bottomBar: { 
-    position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingVertical: 12, borderTopLeftRadius: 35, borderTopRightRadius: 35, elevation: 30, shadowColor: "#000", shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.2, shadowRadius: 15 
+    position: 'absolute', bottom: 15, left: 0, right: 0, 
+    flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', 
+    paddingVertical: 12, borderTopLeftRadius: 35, borderTopRightRadius: 35, 
+    elevation: 30, shadowColor: "#000", shadowOffset: { width: 0, height: -10 }, shadowOpacity: 0.1, shadowRadius: 15 
   },
   
   // ✅ MODERN APERTURE BUTON (Mor-Pembe-Sarı Karışımı)

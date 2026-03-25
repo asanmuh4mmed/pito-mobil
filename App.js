@@ -46,6 +46,8 @@ import BubbleScreen from './src/screens/BubbleScreen';
 import FlappyPetScreen from './src/screens/FlappyPetScreen';
 import TowerGameScreen from './src/screens/TowerGameScreen';
 import QuizGameScreen from './src/screens/QuizGameScreen';
+// ✅ YENİ: Tile Match oyunu import edildi
+import TileMatchScreen from './src/screens/TileMatchScreen';
 
 import ProductDetailScreen from './src/screens/ProductDetailScreen';
 import ShopAdminScreen from './src/screens/ShopAdminScreen';
@@ -99,6 +101,8 @@ const AppNavigator = () => {
         <Stack.Screen name="BubbleScreen" component={BubbleScreen} />
         <Stack.Screen name="TowerGame" component={TowerGameScreen} />
         <Stack.Screen name="QuizGame" component={QuizGameScreen} />
+        {/* ✅ YENİ: Tile Match oyunu stack'e eklendi */}
+        <Stack.Screen name="TileMatch" component={TileMatchScreen} />
         <Stack.Screen name="Shop" component={ShopScreen} />
         <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
         <Stack.Screen name="Checkout" component={CheckoutScreen} />

@@ -149,7 +149,7 @@ const EditProfileScreen = ({ navigation }) => {
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: theme.text }]}>{t.headerTitle}</Text>
           <TouchableOpacity onPress={handleSavePress} disabled={loading}>
-              {loading ? <ActivityIndicator color={COLORS.primary} /> : <Ionicons name="checkmark" size={28} color={COLORS.primary} />}
+              {loading ? <ActivityIndicator color="#4A40D4" /> : <Ionicons name="checkmark" size={28} color="#4A40D4" />}
           </TouchableOpacity>
       </View>
 
@@ -180,7 +180,7 @@ const EditProfileScreen = ({ navigation }) => {
                   </TouchableOpacity>
                   
                   <TouchableOpacity onPress={pickImage} style={{padding: 10}}>
-                    <Text style={[styles.changePhotoText, { color: COLORS.primary }]}>{t.changePhoto}</Text>
+                    <Text style={[styles.changePhotoText, { color: '#4A40D4' }]}>{t.changePhoto}</Text>
                   </TouchableOpacity>
               </View>
 
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
   
   avatarSection: { alignItems: 'center', marginBottom: 30 },
   avatarTouchable: { alignItems: 'center', justifyContent: 'center', padding: 5 }, 
-  avatarContainer: { width: 100, height: 100, borderRadius: 50, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', marginBottom: 5, position: 'relative' },
+  avatarContainer: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#4A40D4', justifyContent: 'center', alignItems: 'center', marginBottom: 5, position: 'relative' },
   avatarImage: { width: '100%', height: '100%', borderRadius: 50 },
   avatarText: { fontSize: 40, color: 'white', fontWeight: 'bold' },
   cameraIcon: { position: 'absolute', bottom: 0, right: 0, backgroundColor: COLORS.dark, padding: 6, borderRadius: 15, borderWidth: 2, borderColor: 'white' },

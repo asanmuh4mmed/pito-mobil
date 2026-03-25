@@ -109,8 +109,8 @@ const BubbleScreen = ({ navigation }) => {
   const [isSaved, setIsSaved] = useState(false);
   const [renderTrigger, setRenderTrigger] = useState(0);
 
-  // --- HAYATİ REFLER (Closure Bug'ını Çözen Sistem) ---
-  const scoreRef = useRef(0); // ✅ Puan kaydetme hatasını düzelten ref
+  // --- HAYATİ REFLER ---
+  const scoreRef = useRef(0); 
   const bestScoreRef = useRef(0);
   const levelRef = useRef(1);
 
@@ -211,7 +211,8 @@ const BubbleScreen = ({ navigation }) => {
 
   const fireProjectile = () => {
     isAnimating.current = true;
-    playSound('bubble_shoot');
+    // ✨ ÇÖZÜM: Ateş ederken bubble_pop sesi eklendi
+    playSound('bubble_pop');
     const rad = angleRef.current * (Math.PI / 180);
     projVel.current = {
       x: Math.sin(rad) * SPEED,
@@ -328,17 +329,18 @@ const BubbleScreen = ({ navigation }) => {
         return b;
       });
 
-      // Skor Güncelleme ✅ Ref kullanarak!
-      scoreRef.current += (popCount * 10);
+      // ✨ ÇÖZÜM: Patlayan her balon 1 puan verir
+      scoreRef.current += popCount;
       setScore(scoreRef.current);
 
-      if (Math.floor(scoreRef.current / 300) + 1 > levelRef.current) {
-        levelRef.current = Math.floor(scoreRef.current / 300) + 1;
+      // ✨ ÇÖZÜM: Seviye barajı orantılı olarak 30'a düşürüldü
+      if (Math.floor(scoreRef.current / 30) + 1 > levelRef.current) {
+        levelRef.current = Math.floor(scoreRef.current / 30) + 1;
         setLevel(levelRef.current);
         playSound('gamewin');
       }
 
-      removeOrphans(); // Kopanları düşür
+      removeOrphans(); 
 
     } else {
       playSound('error'); 
@@ -362,7 +364,7 @@ const BubbleScreen = ({ navigation }) => {
     }, 250); 
   };
 
-  // --- KOPANLARI (HAVADA ASILI KALANLARI) DÜŞÜRME ---
+  // --- KOPANLARI DÜŞÜRME ---
   const removeOrphans = () => {
     let connected = new Set();
     let queue = [];
@@ -397,7 +399,8 @@ const BubbleScreen = ({ navigation }) => {
     });
 
     if (orphanCount > 0) {
-      scoreRef.current += (orphanCount * 20); // Düşenler ekstra puan verir ✅
+      // ✨ ÇÖZÜM: Kopup düşen her balon 2 ekstra puan verir
+      scoreRef.current += (orphanCount * 2); 
       setScore(scoreRef.current);
     }
   };
@@ -408,7 +411,6 @@ const BubbleScreen = ({ navigation }) => {
     playSound('gameover');
     setRenderTrigger(p => p + 1); 
     
-    // ✅ BURASI ÇOK ÖNEMLİ: Final skoru her zaman GÜNCEL ref'ten okunacak
     const finalScore = scoreRef.current;
 
     if (finalScore > bestScoreRef.current) {
@@ -417,7 +419,6 @@ const BubbleScreen = ({ navigation }) => {
       AsyncStorage.setItem('pito_bubble_best', finalScore.toString());
     }
 
-    // Veritabanına Skoru Kaydet
     if (finalScore > 0 && saveGameScore) {
       setIsSaving(true);
       try {

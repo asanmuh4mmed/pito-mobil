@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 import { GameContext, GAME_IDS } from '../context/GameContext'; 
 import { playSound } from '../utils/SoundManager'; 
+import { supabase } from '../lib/supabase'; // ✨ REKOR ÇEKMEK İÇİN EKLENDİ
 
 const { width } = Dimensions.get('window');
 const CARD_SIZE = (width - 60) / 4; 
@@ -28,12 +29,13 @@ const TRANSLATIONS = {
         gameFinish: "MÜKEMMEL ZAFER! 🏆",
         totalScore: "KAZANILAN PUAN",
         playAgain: "BAŞA DÖN VE OYNA",
-        nextLevel: "SONRAKİ SEVİYE (+100 Puan)",
+        nextLevel: "SONRAKİ SEVİYE (+5 Puan)",
         exit: "Çıkış Yap",
         time: "Süre",
         saving: "Kaydediliyor...",
         saved: "Skor Hesabına Eklendi! 🏆",
-        jackpot: "+1000 PUAN JACKPOT!"
+        jackpot: "+50 PUAN JACKPOT!",
+        best: "REKOR"
     },
     AU: {
         moves: "Moves",
@@ -42,12 +44,13 @@ const TRANSLATIONS = {
         gameFinish: "FLAWLESS VICTORY! 🏆",
         totalScore: "EARNED SCORE",
         playAgain: "RESTART GAME",
-        nextLevel: "NEXT LEVEL (+100 Pts)",
+        nextLevel: "NEXT LEVEL (+5 Pts)",
         exit: "Exit",
         time: "Time",
         saving: "Saving...",
         saved: "Score Added to Account! 🏆",
-        jackpot: "+1000 POINTS JACKPOT!"
+        jackpot: "+50 POINTS JACKPOT!",
+        best: "BEST"
     }
 };
 
@@ -106,7 +109,7 @@ const Card = ({ item, index, onPress, isFlipped, isMatched, currentLevelData }) 
 };
 
 const MemoryGameScreen = ({ navigation }) => {
-    const { country } = useContext(AuthContext);
+    const { country, user } = useContext(AuthContext); // ✨ User alındı
     const { saveGameScore } = useContext(GameContext); 
     const t = TRANSLATIONS[country?.code === 'AU' ? 'AU' : 'TR'];
 
@@ -116,7 +119,8 @@ const MemoryGameScreen = ({ navigation }) => {
     const [cards, setCards] = useState([]);
     const [flippedIndices, setFlippedIndices] = useState([]); 
     const [matchedIds, setMatchedIds] = useState([]); 
-    const [score, setScore] = useState(0); // Sadece o levelin skorunu tutar
+    const [score, setScore] = useState(0); 
+    const [highScore, setHighScore] = useState(0); // ✨ REKOR STATE'İ
     const [moves, setMoves] = useState(0);
     const [timeLeft, setTimeLeft] = useState(currentLevelData.time);
     
@@ -129,7 +133,29 @@ const MemoryGameScreen = ({ navigation }) => {
     const [isSaved, setIsSaved] = useState(false);   
 
     const timerRef = useRef(null);
-    const scoreRef = useRef(0); // O bölümdeki toplam geçici skoru tutar
+    const scoreRef = useRef(0); 
+
+    // --- REKOR ÇEKME ---
+    useEffect(() => {
+        const fetchHighScore = async () => {
+            if (!user?.id) return;
+            try {
+                const { data } = await supabase
+                    .from('game_scores')
+                    .select('score')
+                    .eq('user_id', user.id)
+                    .eq('game_id', GAME_IDS.MEMORY)
+                    .order('score', { ascending: false })
+                    .limit(1)
+                    .single();
+                
+                if (data) setHighScore(data.score);
+            } catch (error) {
+                // Kayıt yoksa hata verir, sorun değil
+            }
+        };
+        fetchHighScore();
+    }, [user?.id, isSaved]);
 
     // --- SEVİYE BAŞLATICI ---
     useEffect(() => {
@@ -149,7 +175,7 @@ const MemoryGameScreen = ({ navigation }) => {
         setMoves(0);
         setTimeLeft(lvlData.time);
         
-        scoreRef.current = 0; // Her yeni levelde o levelin skoru sıfırdan başlar
+        scoreRef.current = 0; 
         setScore(0);
         
         setLevelCompleted(false);
@@ -180,8 +206,9 @@ const MemoryGameScreen = ({ navigation }) => {
         if (scoreRef.current > 0) {
             setIsSaving(true);
             try {
-                await saveGameScore(GAME_IDS.MEMORY, scoreRef.current); 
+                await saveGameScore(GAME_IDS.MEMORY, Math.floor(scoreRef.current)); 
                 setIsSaved(true);
+                if (scoreRef.current > highScore) setHighScore(Math.floor(scoreRef.current)); // Rekor anlık güncellenir
             } catch (error) {
                 console.log("Skor kaydedilirken hata:", error);
             } finally {
@@ -195,30 +222,29 @@ const MemoryGameScreen = ({ navigation }) => {
         clearInterval(timerRef.current);
         playSound('match_success'); 
 
-        // Kalan Süre Bonusu
-        const timeBonus = timeLeft * 2; 
+        // ✨ ÇÖZÜM: Kalan süre bonusu çok düşürüldü
+        const timeBonus = timeLeft * 0.1; 
         scoreRef.current += timeBonus;
         
         // Eğer 5. Seviyeyse (Son Seviye) JACKPOT!
         if (currentLevelIndex === LEVELS.length - 1) {
-            scoreRef.current += 1000; // Jackpot eklendi
-            setScore(scoreRef.current);
+            scoreRef.current += 50; // ✨ ÇÖZÜM: Jackpot 1000'den 50'ye düşürüldü
+            setScore(Math.floor(scoreRef.current));
             setGameWon(true);
             playSound('success2'); 
             
-            // Tüm oyun bitti, final skoru kaydet
             setIsSaving(true);
             try {
-                await saveGameScore(GAME_IDS.MEMORY, scoreRef.current); 
+                await saveGameScore(GAME_IDS.MEMORY, Math.floor(scoreRef.current)); 
                 setIsSaved(true);
+                if (scoreRef.current > highScore) setHighScore(Math.floor(scoreRef.current));
             } catch (error) {
                 console.log("Skor kaydedilirken hata:", error);
             } finally {
                 setIsSaving(false);
             }
         } else {
-            // Ara seviye bittiğinde SADECE bekle, "Sonraki Seviye" butonuna basınca kaydedecek
-            setScore(scoreRef.current);
+            setScore(Math.floor(scoreRef.current));
             setLevelCompleted(true);
         }
     };
@@ -240,8 +266,9 @@ const MemoryGameScreen = ({ navigation }) => {
                 playSound('success1'); 
                 setMatchedIds(prev => [...prev, cards[first].id, cards[second].id]);
                 
-                scoreRef.current += 20; // Eşleşme 20 Puan
-                setScore(scoreRef.current);
+                // ✨ ÇÖZÜM: Her doğru eşleşme 1 puan verir (Eskiden 20 idi)
+                scoreRef.current += 1; 
+                setScore(Math.floor(scoreRef.current));
                 
                 setFlippedIndices([]);
                 setIsProcessing(false);
@@ -259,18 +286,17 @@ const MemoryGameScreen = ({ navigation }) => {
         }
     };
 
-    // ✅ YENİ: SONRAKİ SEVİYEYE GEÇİŞ VE PUAN KAYDETME
+    // --- SONRAKİ SEVİYEYE GEÇİŞ VE PUAN KAYDETME ---
     const nextLevel = async () => {
         if (isSaving) return;
         
-        // Oynanan Seviyenin Skoru + Seviye Atlama Ödülü (+100) veritabanına kaydedilir
-        const levelBonus = 100;
-        const totalLevelScore = scoreRef.current + levelBonus;
+        // ✨ ÇÖZÜM: Seviye atlama bonusu 100'den 5'e düşürüldü
+        const levelBonus = 5;
+        const totalLevelScore = Math.floor(scoreRef.current + levelBonus);
         
         setIsSaving(true);
         try {
             await saveGameScore(GAME_IDS.MEMORY, totalLevelScore);
-            // Kayıt başarılıysa sonraki seviyeye geç
             if (currentLevelIndex < LEVELS.length - 1) {
                 setCurrentLevelIndex(prev => prev + 1);
             }
@@ -329,10 +355,17 @@ const MemoryGameScreen = ({ navigation }) => {
                 />
             </View>
 
-            {/* MEVCUT SEVİYE SKORU */}
+            {/* ✨ MEVCUT SEVİYE SKORU VE REKOR */}
             <View style={styles.scoreContainer}>
-                <Text style={styles.scoreLabel}>{t.totalScore}</Text>
-                <Text style={styles.scoreText}>{score}</Text>
+                <View style={{alignItems: 'center', marginHorizontal: 20}}>
+                    <Text style={styles.scoreLabel}>{t.totalScore}</Text>
+                    <Text style={styles.scoreText}>{score}</Text>
+                </View>
+                <View style={{width: 1, height: 40, backgroundColor: 'rgba(255,255,255,0.3)'}} />
+                <View style={{alignItems: 'center', marginHorizontal: 20}}>
+                    <Text style={styles.scoreLabel}>{t.best}</Text>
+                    <Text style={[styles.scoreText, {fontSize: 32}]}>{highScore}</Text>
+                </View>
             </View>
 
             {/* MODAL */}
@@ -434,7 +467,7 @@ const styles = StyleSheet.create({
     cardMatched: { backgroundColor: '#55EFC4', borderColor: '#00b894', opacity: 0.9 },
     cardEmoji: { fontSize: 36 },
 
-    scoreContainer: { alignItems: 'center', paddingBottom: 30, paddingTop: 10 },
+    scoreContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingBottom: 30, paddingTop: 10 },
     scoreLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: 'bold', letterSpacing: 2 },
     scoreText: { color: 'white', fontSize: 42, fontWeight: '900', textShadowColor:'rgba(0,0,0,0.3)', textShadowRadius: 5 },
 

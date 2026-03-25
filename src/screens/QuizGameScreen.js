@@ -116,6 +116,18 @@ const QuizGameScreen = ({ navigation }) => {
     const livesRef = useRef(3);
     const usedQuestionsRef = useRef([]); 
 
+    // ✨ YENİ BİLİM & DOĞA ARKA PLAN İKONLARI
+    const bgIcons = useRef([...Array(18)].map(() => {
+        const icons = ['earth', 'flask', 'leaf', 'planet', 'telescope', 'water', 'bug', 'analytics'];
+        return {
+            icon: icons[Math.floor(Math.random() * icons.length)],
+            left: Math.random() * SCREEN_WIDTH,
+            top: Math.random() * SCREEN_HEIGHT,
+            size: Math.random() * 50 + 30,
+            opacity: Math.random() * 0.08 + 0.02
+        };
+    })).current;
+
     useEffect(() => {
         loadBestScore();
         return () => clearInterval(timerRef.current);
@@ -191,7 +203,6 @@ const QuizGameScreen = ({ navigation }) => {
                 return !usedQuestionsRef.current.includes(identifier);
             });
 
-            // ✅ EĞER SORU HAVUZU BİTTİYSE HAFIZAYI SIFIRLA VE BAŞA SAR!
             if (unusedQuestions.length === 0 && sourceData.length > 0) {
                 console.log("♻️ Tüm sorular bitti, sorular baştan karıştırılıyor!");
                 usedQuestionsRef.current = [];
@@ -279,8 +290,10 @@ const QuizGameScreen = ({ navigation }) => {
         if (index === correctIndex) {
             playSound('success1'); 
             
-            // ✅ PUAN SİSTEMİ GÜNCELLENDİ (10 yerine 5)
-            setScore(prev => prev + 5);
+            // ✨ YENİ: ZORLUĞA GÖRE PUAN SİSTEMİ (Kolay:5, Orta:10, Zor:15)
+            const difficultyMultiplier = activeQuestion.difficulty || 1;
+            const pointsToAdd = difficultyMultiplier * 5;
+            setScore(prev => prev + pointsToAdd);
             
             const newCorrectCount = correctCount + 1;
             setCorrectCount(newCorrectCount);
@@ -292,9 +305,13 @@ const QuizGameScreen = ({ navigation }) => {
                 setLevel(nextLevel);
                 levelRef.current = nextLevel;
                 showLevelUpAnimation();
-                playSound('success2'); 
                 
-                // ✅ SEVİYE ATLAMA BONUSU GÜNCELLENDİ (50 yerine 25)
+                // ✨ YENİ: SADECE ZORLUK DEĞİŞTİĞİNDE SEVİYE ATLAMA SESİ ÇALAR
+                // (Seviye 6'da Orta'ya, Seviye 11'de Zor'a geçilir)
+                if (nextLevel === 6 || nextLevel === 11) {
+                    playSound('success2'); 
+                }
+                
                 setScore(prev => prev + 25); 
             }
 
@@ -465,11 +482,18 @@ const QuizGameScreen = ({ navigation }) => {
 
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+            <StatusBar barStyle="light-content" backgroundColor="#0A192F" />
             
-            <View style={styles.starsBg}>
-                {[...Array(15)].map((_, i) => (
-                    <View key={i} style={[styles.star, { left: Math.random()*SCREEN_WIDTH, top: Math.random()*SCREEN_HEIGHT, opacity: Math.random() }]} />
+            {/* ✨ YENİ BİLİM/DOĞA/COĞRAFYA ARKA PLANI */}
+            <View style={styles.scienceBg}>
+                {bgIcons.map((item, i) => (
+                    <Ionicons 
+                        key={i} 
+                        name={item.icon} 
+                        size={item.size} 
+                        color="white" 
+                        style={{ position: 'absolute', left: item.left, top: item.top, opacity: item.opacity }} 
+                    />
                 ))}
             </View>
 
@@ -526,9 +550,8 @@ const QuizGameScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#0f172a' },
-    starsBg: { ...StyleSheet.absoluteFillObject, backgroundColor: '#0f172a', zIndex: -1 },
-    star: { position: 'absolute', width: 4, height: 4, backgroundColor: 'rgba(255,255,255,0.4)', borderRadius: 2 },
+    container: { flex: 1, backgroundColor: '#0A192F' }, // ✨ Derin Bilim Mavisi
+    scienceBg: { ...StyleSheet.absoluteFillObject, backgroundColor: '#0A192F', zIndex: -1 },
 
     centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
     

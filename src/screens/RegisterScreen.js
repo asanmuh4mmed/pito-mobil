@@ -6,391 +6,458 @@ import { AuthContext } from '../context/AuthContext';
 import { CITY_DATA } from '../constants/cities'; 
 
 const RegisterScreen = ({ navigation }) => {
-  const { register, verifyEmail, isLoading, updateCountry } = useContext(AuthContext);
+    const { register, verifyEmail, isLoading, updateCountry } = useContext(AuthContext);
+    
+    // --- STATE'LER ---
+    const [localCountry, setLocalCountry] = useState('TR');
+    const [username, setUsername] = useState('');
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    
+    // YENİ EKLENEN YEREL YÜKLEME (LOADING) STATE'İ
+    const [isRegistering, setIsRegistering] = useState(false);
+    
+    // Şifre Göster/Gizle State'leri
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    
+    // Lokasyon State'leri
+    const [city, setCity] = useState('');
+    const [district, setDistrict] = useState('');
 
-  // --- STATE'LER ---
-  const [localCountry, setLocalCountry] = useState('TR');
-  const [username, setUsername] = useState('');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  
-  // Şifre Göster/Gizle State'leri
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
-  // Lokasyon State'leri
-  const [city, setCity] = useState('');
-  const [district, setDistrict] = useState('');
+    // ✨ YENİ: Hesap Türü State'leri
+    const [accountType, setAccountType] = useState('standard');
+    const [roleModalVisible, setRoleModalVisible] = useState(false);
 
-  // Modal Kontrolleri
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectionType, setSelectionType] = useState(null); 
-  const [verifyModalVisible, setVerifyModalVisible] = useState(false);
-  const [userCode, setUserCode] = useState(''); 
-  const [isVerifying, setIsVerifying] = useState(false); 
+    // Modal Kontrolleri
+    const [modalVisible, setModalVisible] = useState(false);
+    const [selectionType, setSelectionType] = useState(null); 
+    const [verifyModalVisible, setVerifyModalVisible] = useState(false);
+    const [userCode, setUserCode] = useState(''); 
+    const [isVerifying, setIsVerifying] = useState(false); 
 
-  // Başarı Modalı Kontrolleri
-  const [successModalVisible, setSuccessModalVisible] = useState(false);
-  const scaleAnim = useRef(new Animated.Value(0)).current;
+    // Başarı Modalı Kontrolleri
+    const [successModalVisible, setSuccessModalVisible] = useState(false);
+    const scaleAnim = useRef(new Animated.Value(0)).current;
 
-  // Yasal Metin Modalları & Checkbox
-  const [eulaVisible, setEulaVisible] = useState(false);
-  const [privacyVisible, setPrivacyVisible] = useState(false);
-  const [isAgreed, setIsAgreed] = useState(false); 
+    // Yasal Metin Modalları & Checkbox
+    const [eulaVisible, setEulaVisible] = useState(false);
+    const [privacyVisible, setPrivacyVisible] = useState(false);
+    const [isAgreed, setIsAgreed] = useState(false); 
 
-  // --- ANİMASYON ETKİLEŞİMİ ---
-  useEffect(() => {
-      if (successModalVisible) {
-          Animated.spring(scaleAnim, {
-              toValue: 1,
-              friction: 5,
-              tension: 40,
-              useNativeDriver: true
-          }).start();
-      } else {
-          scaleAnim.setValue(0);
-      }
-  }, [successModalVisible]);
+    // --- ANİMASYON ETKİLEŞİMİ ---
+    useEffect(() => {
+        if (successModalVisible) {
+            Animated.spring(scaleAnim, {
+                toValue: 1,
+                friction: 5,
+                tension: 40,
+                useNativeDriver: true
+            }).start();
+        } else {
+            scaleAnim.setValue(0);
+        }
+    }, [successModalVisible]);
 
-  // --- DİL PAKETİ ---
-  const TEXTS = {
-      TR: {
-          title: "Aramıza Katıl!",
-          subtitle: "Can dostlarımızı bulmak için hesap oluştur.",
-          labelUser: "Kullanıcı Adı",
-          labelName: "Ad Soyad",
-          labelEmail: "E-Posta",
-          labelPass: "Şifre",
-          labelPassConfirm: "Şifre (Tekrar)",
-          labelCity: "İl Seçiniz",
-          labelDistrict: "İlçe Seçiniz",
-          btnRegister: "Kayıt Ol",
-          linkLogin: "Zaten hesabın var mı? Giriş Yap",
-          errFill: "Lütfen tüm alanları doldurunuz.",
-          errSpace: "Kullanıcı adı boşluk içeremez ve küçük harf olmalıdır.",
-          errPass: "Girdiğiniz şifreler birbiriyle uyuşmuyor.",
-          errAgreed: "Lütfen kayıt olmak için Kullanım Koşulları ve Gizlilik Politikasını okuyup onaylayınız.", 
-          successTitle: "Tebrikler! 🎉",
-          successMsg: "Hesabınız başarıyla doğrulandı. Şimdi giriş yapabilirsiniz.",
-          modalCity: "İl Seçiniz",
-          modalDistrict: "İlçe Seçiniz",
-          city: "İl",
-          dist: "İlçe",
-          verifyTitle: "E-Posta Doğrulama",
-          verifyMsg: "E-posta adresine gönderilen 6 haneli kodu giriniz.",
-          btnVerify: "Doğrula ve Bitir",
-          errCode: "Hatalı kod veya süresi dolmuş.",
-          codeSentTitle: "Kod Gönderildi",
-          codeSentMsg: "adresine doğrulama kodu gönderildi. Spam kutusunu kontrol etmeyi unutma.",
-          agreeText: "Kayıt olarak, ",
-          agreeEnd: " kabul ediyorum.",
-          eula: "Kullanım Koşulları",
-          privacy: "Gizlilik Politikası",
-          and: " ve ",
-          close: "Kapat",
-          goLogin: "Giriş Yap"
-      },
-      AU: {
-          title: "Join Us!",
-          subtitle: "Create an account to find your best friends.",
-          labelUser: "Username",
-          labelName: "Full Name",
-          labelEmail: "Email",
-          labelPass: "Password",
-          labelPassConfirm: "Confirm Password",
-          labelCity: "Select State",
-          labelDistrict: "Select Suburb",
-          btnRegister: "Sign Up",
-          linkLogin: "Already have an account? Login",
-          errFill: "Please fill in all fields.",
-          errSpace: "Username cannot contain spaces.",
-          errPass: "Passwords do not match.",
-          errAgreed: "Please read and accept the Terms of Use and Privacy Policy to register.", 
-          successTitle: "Congratulations! 🎉",
-          successMsg: "Account verified successfully. You can login now.",
-          modalCity: "Select State",
-          modalDistrict: "Select Suburb",
-          city: "State",
-          dist: "Suburb",
-          verifyTitle: "Email Verification",
-          verifyMsg: "Enter the 6-digit verification code sent to your email.",
-          btnVerify: "Verify & Finish",
-          errCode: "Invalid code or expired.",
-          codeSentTitle: "Code Sent",
-          codeSentMsg: "Verification code sent to",
-          agreeText: "I agree to the ",
-          agreeEnd: ".",
-          eula: "Terms of Use",
-          privacy: "Privacy Policy",
-          and: " and ",
-          close: "Close",
-          goLogin: "Login"
-      }
-  };
+    // --- DİL PAKETİ ---
+    const TEXTS = {
+        TR: {
+            title: "Aramıza Katıl!",
+            subtitle: "Can dostlarımızı bulmak için hesap oluştur.",
+            labelUser: "Kullanıcı Adı",
+            labelName: "Ad Soyad",
+            labelEmail: "E-Posta",
+            labelPass: "Şifre",
+            labelPassConfirm: "Şifre (Tekrar)",
+            labelCity: "İl Seçiniz",
+            labelDistrict: "İlçe Seçiniz",
+            // ✨ YENİ DİL METİNLERİ
+            labelRole: "Hesap Türü",
+            roleStandard: "Standart Kullanıcı (Hayvansever)",
+            roleVet: "Veteriner Kliniği",
+            roleSitter: "Evcil Hayvan Bakıcısı",
+            roleGroomer: "Pet Kuaför",
 
-  const t = TEXTS[localCountry]; 
+            btnRegister: "Kayıt Ol",
+            linkLogin: "Zaten hesabın var mı? Giriş Yap",
+            errFill: "Lütfen tüm alanları doldurunuz.",
+            errSpace: "Kullanıcı adı boşluk içeremez ve küçük harf olmalıdır.",
+            errPass: "Girdiğiniz şifreler birbiriyle uyuşmuyor.",
+            errAgreed: "Lütfen kayıt olmak için Kullanım Koşulları ve Gizlilik Politikasını okuyup onaylayınız.", 
+            successTitle: "Tebrikler! 🎉",
+            successMsg: "Hesabınız başarıyla doğrulandı. Şimdi giriş yapabilirsiniz.",
+            modalCity: "İl Seçiniz",
+            modalDistrict: "İlçe Seçiniz",
+            city: "İl",
+            dist: "İlçe",
+            verifyTitle: "E-Posta Doğrulama",
+            verifyMsg: "E-posta adresine gönderilen 6 haneli kodu giriniz.",
+            btnVerify: "Doğrula ve Bitir",
+            errCode: "Hatalı kod veya süresi dolmuş.",
+            codeSentTitle: "Kod Gönderildi",
+            codeSentMsg: "adresine doğrulama kodu gönderildi. Spam kutusunu kontrol etmeyi unutma.",
+            agreeText: "Kayıt olarak, ",
+            agreeEnd: " kabul ediyorum.",
+            eula: "Kullanım Koşulları",
+            privacy: "Gizlilik Politikası",
+            and: " ve ",
+            close: "Kapat",
+            goLogin: "Giriş Yap"
+        },
+        AU: {
+            title: "Join Us!",
+            subtitle: "Create an account to find your best friends.",
+            labelUser: "Username",
+            labelName: "Full Name",
+            labelEmail: "Email",
+            labelPass: "Password",
+            labelPassConfirm: "Confirm Password",
+            labelCity: "Select State",
+            labelDistrict: "Select Suburb",
+            // ✨ YENİ DİL METİNLERİ
+            labelRole: "Account Type",
+            roleStandard: "Standard User (Pet Lover)",
+            roleVet: "Veterinary Clinic",
+            roleSitter: "Pet Sitter",
+            roleGroomer: "Pet Groomer",
 
-  // --- LOGIC ---
-  const handleSelection = (item) => {
-      if (selectionType === 'city') {
-          setCity(item);
-          setDistrict(''); 
-      } else {
-          setDistrict(item);
-      }
-      setModalVisible(false);
-  };
+            btnRegister: "Sign Up",
+            linkLogin: "Already have an account? Login",
+            errFill: "Please fill in all fields.",
+            errSpace: "Username cannot contain spaces.",
+            errPass: "Passwords do not match.",
+            errAgreed: "Please read and accept the Terms of Use and Privacy Policy to register.", 
+            successTitle: "Congratulations! 🎉",
+            successMsg: "Account verified successfully. You can login now.",
+            modalCity: "Select State",
+            modalDistrict: "Select Suburb",
+            city: "State",
+            dist: "Suburb",
+            verifyTitle: "Email Verification",
+            verifyMsg: "Enter the 6-digit verification code sent to your email.",
+            btnVerify: "Verify & Finish",
+            errCode: "Invalid code or expired.",
+            codeSentTitle: "Code Sent",
+            codeSentMsg: "Verification code sent to",
+            agreeText: "I agree to the ",
+            agreeEnd: ".",
+            eula: "Terms of Use",
+            privacy: "Privacy Policy",
+            and: " and ",
+            close: "Close",
+            goLogin: "Login"
+        }
+    };
 
-  const openModal = (type) => {
-      if (type === 'district' && !city) {
-          Alert.alert(localCountry === 'TR' ? "Uyarı" : "Warning", localCountry === 'TR' ? "Önce şehir seçmelisiniz." : "Please select a state first.");
-          return;
-      }
-      setSelectionType(type);
-      setModalVisible(true);
-  };
+    const t = TEXTS[localCountry]; 
 
-  const getListData = () => {
-      const countryData = CITY_DATA[localCountry] || {};
-      if (selectionType === 'city') {
-          return Object.keys(countryData).sort();
-      } else {
-          return countryData[city]?.sort() || [];
-      }
-  };
+    // --- LOGIC ---
+    const handleSelection = (item) => {
+        if (selectionType === 'city') {
+            setCity(item);
+            setDistrict(''); 
+        } else {
+            setDistrict(item);
+        }
+        setModalVisible(false);
+    };
 
-  const handleCountrySwitch = (code) => {
-      setLocalCountry(code);
-      setCity('');
-      setDistrict('');
-      updateCountry(code === 'TR' ? { name: 'Türkiye', code: 'TR', flag: '🇹🇷' } : { name: 'Australia', code: 'AU', flag: '🇦🇺' });
-  };
+    const openModal = (type) => {
+        if (type === 'district' && !city) {
+            Alert.alert(localCountry === 'TR' ? "Uyarı" : "Warning", localCountry === 'TR' ? "Önce şehir seçmelisiniz." : "Please select a state first.");
+            return;
+        }
+        setSelectionType(type);
+        setModalVisible(true);
+    };
 
-  const handleUsernameChange = (text) => {
-      const formattedText = text.replace(/\s/g, '').toLowerCase();
-      setUsername(formattedText);
-  };
+    const getListData = () => {
+        const countryData = CITY_DATA[localCountry] || {};
+        if (selectionType === 'city') {
+            return Object.keys(countryData).sort();
+        } else {
+            return countryData[city]?.sort() || [];
+        }
+    };
+
+    const handleCountrySwitch = (code) => {
+        setLocalCountry(code);
+        setCity('');
+        setDistrict('');
+        updateCountry(code === 'TR' ? { name: 'Türkiye', code: 'TR', flag: '🇹🇷' } : { name: 'Australia', code: 'AU', flag: '🇦🇺' });
+    };
+
+    const handleUsernameChange = (text) => {
+        const formattedText = text.replace(/\s/g, '').toLowerCase();
+        setUsername(formattedText);
+    };
 
   // 1️⃣ KAYIT OL
-  const handleRegister = async () => {
-    if (!isAgreed) {
-        Alert.alert(localCountry === 'TR' ? "Onay Gerekli" : "Agreement Required", t.errAgreed);
-        return;
-    }
-
-    const cleanEmail = email ? email.trim() : "";
-    
-    if (!username || !name || !cleanEmail || !password || !confirmPassword || !city || !district) {
-      Alert.alert(localCountry === 'TR' ? 'Eksik Bilgi' : 'Missing Info', t.errFill);
-      return;
-    }
-
-    if (username.includes(' ')) {
-        Alert.alert(localCountry === 'TR' ? 'Hata' : 'Error', t.errSpace);
-        return;
-    }
-
-    if (password !== confirmPassword) {
-      Alert.alert(localCountry === 'TR' ? 'Hata' : 'Error', t.errPass);
-      return;
-    }
-
-    const result = await register(username, name, cleanEmail, password, localCountry, city, district);
-
-    if (result.success) {
-        if (!result.session) {
-            setVerifyModalVisible(true);
-            Alert.alert(t.codeSentTitle, `${cleanEmail} ${t.codeSentMsg}`);
-        } else {
-            navigation.navigate('Login');
+    const handleRegister = async () => {
+        if (!isAgreed) {
+            Alert.alert(localCountry === 'TR' ? "Onay Gerekli" : "Agreement Required", t.errAgreed);
+            return;
         }
-    } else {
-        Alert.alert(localCountry === 'TR' ? 'Hata' : 'Error', result.message);
-    }
-  };
 
-  // 2️⃣ KODU DOĞRULA
-  const handleVerify = async () => {
-      if (!userCode || userCode.length < 6) {
-          Alert.alert(localCountry === 'TR' ? 'Hata' : 'Error', t.errCode);
-          return;
-      }
+        const cleanEmail = email ? email.trim() : "";
+        
+        if (!username || !name || !cleanEmail || !password || !confirmPassword || !city || !district) {
+            Alert.alert(localCountry === 'TR' ? 'Eksik Bilgi' : 'Missing Info', t.errFill);
+            return;
+        }
 
-      setIsVerifying(true);
-      const cleanEmail = email ? email.trim() : "";
+        if (username.includes(' ')) {
+            Alert.alert(localCountry === 'TR' ? 'Hata' : 'Error', t.errSpace);
+            return;
+        }
 
-      const result = await verifyEmail(cleanEmail, userCode);
+        if (password !== confirmPassword) {
+            Alert.alert(localCountry === 'TR' ? 'Hata' : 'Error', t.errPass);
+            return;
+        }
 
-      setIsVerifying(false);
-      
-      if (result.success) {
-          setVerifyModalVisible(false);
-          setSuccessModalVisible(true);
-      } else {
-          Alert.alert(localCountry === 'TR' ? 'Hata' : 'Error', result.message || t.errCode);
-      }
-  };
+        setIsRegistering(true);
 
-  return (
-    <ImageBackground 
-        source={{ uri: 'https://images.unsplash.com/photo-1573865526739-10659fec78a5?q=80&w=2030&auto=format&fit=crop' }} 
-        style={styles.backgroundImage}
-    >
-        <View style={styles.overlay}>
-            <SafeAreaView style={styles.container}>
-                <KeyboardAvoidingView 
-                    style={{ flex: 1 }} 
-                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                >
-                    <ScrollView 
-                        showsVerticalScrollIndicator={false}
-                        contentContainerStyle={{ flexGrow: 1, paddingBottom: 50 }} 
-                        keyboardShouldPersistTaps="handled"
+        // ✨ accountType BURAYA EKLENDİ
+        const result = await register(username, name, cleanEmail, password, localCountry, city, district, accountType);
+
+        setIsRegistering(false);
+
+        if (result.success) {
+            if (!result.session) {
+                setVerifyModalVisible(true);
+                Alert.alert(t.codeSentTitle, `${cleanEmail} ${t.codeSentMsg}`);
+            } else {
+                navigation.navigate('Login');
+            }
+        } else {
+            Alert.alert(localCountry === 'TR' ? 'Hata' : 'Error', result.message);
+        }
+    };
+
+    // 2️⃣ KODU DOĞRULA
+    const handleVerify = async () => {
+        if (!userCode || userCode.length < 6) {
+            Alert.alert(localCountry === 'TR' ? 'Hata' : 'Error', t.errCode);
+            return;
+        }
+
+        setIsVerifying(true);
+        const cleanEmail = email ? email.trim() : "";
+
+        const result = await verifyEmail(cleanEmail, userCode);
+
+        setIsVerifying(false);
+        
+        if (result.success) {
+            setVerifyModalVisible(false);
+            setSuccessModalVisible(true);
+        } else {
+            Alert.alert(localCountry === 'TR' ? 'Hata' : 'Error', result.message || t.errCode);
+        }
+    };
+
+    return (
+        <ImageBackground 
+            source={{ uri: 'https://images.unsplash.com/photo-1573865526739-10659fec78a5?q=80&w=2030&auto=format&fit=crop' }} 
+            style={styles.backgroundImage}
+        >
+            <View style={styles.overlay}>
+                <SafeAreaView style={styles.container}>
+                    <KeyboardAvoidingView 
+                        style={{ flex: 1 }} 
+                        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                     >
-                        
-                        <View style={styles.countrySwitchContainer}>
-                            <TouchableOpacity 
-                                style={[styles.countryBtn, localCountry === 'TR' && styles.countryBtnActive]} 
-                                onPress={() => handleCountrySwitch('TR')}
-                            >
-                                <Text style={styles.flag}>🇹🇷</Text>
-                                <Text style={[styles.countryText, localCountry === 'TR' && styles.countryTextActive]}>TR</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity 
-                                style={[styles.countryBtn, localCountry === 'AU' && styles.countryBtnActive]} 
-                                onPress={() => handleCountrySwitch('AU')}
-                            >
-                                <Text style={styles.flag}>🇦🇺</Text>
-                                <Text style={[styles.countryText, localCountry === 'AU' && styles.countryTextActive]}>AU</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        <View style={styles.header}>
-                            <Text style={styles.title}>{t.title}</Text>
-                            <Text style={styles.subtitle}>{t.subtitle}</Text>
-                        </View>
-
-                        <View style={styles.form}>
-                            <View style={styles.inputContainer}>
-                                <Text style={styles.label}>{t.labelUser}</Text>
-                                <TextInput 
-                                    style={styles.input} 
-                                    placeholder="..." 
-                                    placeholderTextColor="#999" 
-                                    value={username} 
-                                    onChangeText={handleUsernameChange} 
-                                    autoCapitalize="none" 
-                                />
-                            </View>
-
-                            <View style={styles.inputContainer}>
-                                <Text style={styles.label}>{t.labelName}</Text>
-                                <TextInput style={styles.input} placeholder="..." placeholderTextColor="#999" value={name} onChangeText={setName} />
-                            </View>
-
-                            <View style={{flexDirection:'row', justifyContent:'space-between'}}>
-                                <View style={[styles.inputContainer, {width:'48%'}]}>
-                                    <Text style={styles.label}>{t.city}</Text>
-                                    <TouchableOpacity style={styles.input} onPress={() => openModal('city')}>
-                                        <Text style={{color: city ? '#3700B3' : '#999'}}>{city || t.labelCity}</Text>
-                                    </TouchableOpacity>
-                                </View>
-
-                                <View style={[styles.inputContainer, {width:'48%'}]}>
-                                    <Text style={styles.label}>{t.dist}</Text>
-                                    <TouchableOpacity style={styles.input} onPress={() => openModal('district')}>
-                                        <Text style={{color: district ? '#3700B3' : '#999'}}>{district || t.labelDistrict}</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-
-                            <View style={styles.inputContainer}>
-                                <Text style={styles.label}>{t.labelEmail}</Text>
-                                <TextInput 
-                                    style={styles.input} 
-                                    placeholder="..." 
-                                    placeholderTextColor="#999" 
-                                    keyboardType="email-address" 
-                                    value={email} 
-                                    onChangeText={setEmail} 
-                                    autoCapitalize="none" 
-                                />
-                            </View>
-
-                            <View style={styles.inputContainer}>
-                                <Text style={styles.label}>{t.labelPass}</Text>
-                                <View style={styles.passwordContainer}>
-                                    <TextInput 
-                                        style={styles.passwordInput} 
-                                        placeholder="******" 
-                                        placeholderTextColor="#999" 
-                                        secureTextEntry={!showPassword} 
-                                        value={password} 
-                                        onChangeText={setPassword} 
-                                    />
-                                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
-                                        <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={22} color="#666" />
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-
-                            <View style={styles.inputContainer}>
-                                <Text style={styles.label}>{t.labelPassConfirm}</Text>
-                                <View style={styles.passwordContainer}>
-                                    <TextInput 
-                                        style={styles.passwordInput} 
-                                        placeholder="******" 
-                                        placeholderTextColor="#999" 
-                                        secureTextEntry={!showConfirmPassword} 
-                                        value={confirmPassword} 
-                                        onChangeText={setConfirmPassword} 
-                                    />
-                                    <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
-                                        <Ionicons name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} size={22} color="#666" />
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-
-                            <View style={styles.checkboxContainer}>
+                        <ScrollView 
+                            showsVerticalScrollIndicator={false}
+                            contentContainerStyle={{ flexGrow: 1, paddingBottom: 50 }} 
+                            keyboardShouldPersistTaps="handled"
+                        >
+                            
+                            <View style={styles.countrySwitchContainer}>
                                 <TouchableOpacity 
-                                    style={styles.checkbox} 
-                                    onPress={() => setIsAgreed(!isAgreed)}
-                                    activeOpacity={0.7}
+                                    style={[styles.countryBtn, localCountry === 'TR' && styles.countryBtnActive]} 
+                                    onPress={() => handleCountrySwitch('TR')}
                                 >
-                                    <Ionicons 
-                                        name={isAgreed ? "checkbox" : "square-outline"} 
-                                        size={26} 
-                                        color={isAgreed ? "#6200EE" : "#666"} 
-                                    />
+                                    <Text style={styles.flag}>🇹🇷</Text>
+                                    <Text style={[styles.countryText, localCountry === 'TR' && styles.countryTextActive]}>TR</Text>
                                 </TouchableOpacity>
-                                
-                                <View style={styles.checkboxTextContainer}>
-                                    <Text style={styles.legalText}>
-                                        {t.agreeText}
-                                        <Text style={styles.legalLink} onPress={() => setEulaVisible(true)}>{t.eula}</Text>
-                                        {t.and}
-                                        <Text style={styles.legalLink} onPress={() => setPrivacyVisible(true)}>{t.privacy}</Text>
-                                        {t.agreeEnd}
-                                    </Text>
-                                </View>
+                                <TouchableOpacity 
+                                    style={[styles.countryBtn, localCountry === 'AU' && styles.countryBtnActive]} 
+                                    onPress={() => handleCountrySwitch('AU')}
+                                >
+                                    <Text style={styles.flag}>🇦🇺</Text>
+                                    <Text style={[styles.countryText, localCountry === 'AU' && styles.countryTextActive]}>AU</Text>
+                                </TouchableOpacity>
                             </View>
 
-                            <TouchableOpacity 
-                                style={[styles.button, { opacity: isAgreed ? 1 : 0.6 }]} 
-                                onPress={handleRegister} 
-                                disabled={isLoading}
-                            >
-                                {isLoading ? <ActivityIndicator color="white" /> : <Text style={styles.buttonText}>{t.btnRegister}</Text>}
-                            </TouchableOpacity>
+                            <View style={styles.header}>
+                                <Text style={styles.title}>{t.title}</Text>
+                                <Text style={styles.subtitle}>{t.subtitle}</Text>
+                            </View>
 
-                            <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate('Login')}>
-                                <Text style={styles.linkText}>{t.linkLogin}</Text>
-                            </TouchableOpacity>
+                            <View style={styles.form}>
+                                <View style={styles.inputContainer}>
+                                    <Text style={styles.label}>{t.labelUser}</Text>
+                                    <TextInput 
+                                        style={styles.input} 
+                                        placeholder="..." 
+                                        placeholderTextColor="#999" 
+                                        value={username} 
+                                        onChangeText={handleUsernameChange} 
+                                        autoCapitalize="none" 
+                                    />
+                                </View>
+
+                                <View style={styles.inputContainer}>
+                                    <Text style={styles.label}>{t.labelName}</Text>
+                                    <TextInput style={styles.input} placeholder="..." placeholderTextColor="#999" value={name} onChangeText={setName} />
+                                </View>
+
+                                <View style={{flexDirection:'row', justifyContent:'space-between'}}>
+                                    <View style={[styles.inputContainer, {width:'48%'}]}>
+                                        <Text style={styles.label}>{t.city}</Text>
+                                        <TouchableOpacity style={styles.input} onPress={() => openModal('city')}>
+                                            <Text style={{color: city ? '#3700B3' : '#999'}}>{city || t.labelCity}</Text>
+                                        </TouchableOpacity>
+                                    </View>
+
+                                    <View style={[styles.inputContainer, {width:'48%'}]}>
+                                        <Text style={styles.label}>{t.dist}</Text>
+                                        <TouchableOpacity style={styles.input} onPress={() => openModal('district')}>
+                                            <Text style={{color: district ? '#3700B3' : '#999'}}>{district || t.labelDistrict}</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                <View style={styles.inputContainer}>
+                                    <Text style={styles.label}>{t.labelEmail}</Text>
+                                    <TextInput 
+                                        style={styles.input} 
+                                        placeholder="..." 
+                                        placeholderTextColor="#999" 
+                                        keyboardType="email-address" 
+                                        value={email} 
+                                        onChangeText={setEmail} 
+                                        autoCapitalize="none" 
+                                    />
+                                </View>
+
+                                <View style={styles.inputContainer}>
+                                    <Text style={styles.label}>{t.labelPass}</Text>
+                                    <View style={styles.passwordContainer}>
+                                        <TextInput 
+                                            style={styles.passwordInput} 
+                                            placeholder="******" 
+                                            placeholderTextColor="#999" 
+                                            secureTextEntry={!showPassword} 
+                                            value={password} 
+                                            onChangeText={setPassword} 
+                                        />
+                                        <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeIcon}>
+                                            <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={22} color="#666" />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                <View style={styles.inputContainer}>
+                                    <Text style={styles.label}>{t.labelPassConfirm}</Text>
+                                    <View style={styles.passwordContainer}>
+                                        <TextInput 
+                                            style={styles.passwordInput} 
+                                            placeholder="******" 
+                                            placeholderTextColor="#999" 
+                                            secureTextEntry={!showConfirmPassword} 
+                                            value={confirmPassword} 
+                                            onChangeText={setConfirmPassword} 
+                                        />
+                                        <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeIcon}>
+                                            <Ionicons name={showConfirmPassword ? "eye-off-outline" : "eye-outline"} size={22} color="#666" />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                {/* ✨ YENİ: Hesap Türü Seçimi */}
+                                <View style={styles.inputContainer}>
+                                    <Text style={styles.label}>{t.labelRole}</Text>
+                                    <TouchableOpacity style={styles.input} onPress={() => setRoleModalVisible(true)}>
+                                        <Text style={{color: '#3700B3', fontWeight: '500'}}>
+                                            {accountType === 'standard' ? t.roleStandard : 
+                                             accountType === 'vet' ? t.roleVet : 
+                                             accountType === 'sitter' ? t.roleSitter : t.roleGroomer}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <View style={styles.checkboxContainer}>
+                                    <TouchableOpacity 
+                                        style={styles.checkbox} 
+                                        onPress={() => setIsAgreed(!isAgreed)}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons 
+                                            name={isAgreed ? "checkbox" : "square-outline"} 
+                                            size={26} 
+                                            color={isAgreed ? "#6200EE" : "#666"} 
+                                        />
+                                    </TouchableOpacity>
+                                    
+                                    <View style={styles.checkboxTextContainer}>
+                                        <Text style={styles.legalText}>
+                                            {t.agreeText}
+                                            <Text style={styles.legalLink} onPress={() => setEulaVisible(true)}>{t.eula}</Text>
+                                            {t.and}
+                                            <Text style={styles.legalLink} onPress={() => setPrivacyVisible(true)}>{t.privacy}</Text>
+                                            {t.agreeEnd}
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                <TouchableOpacity 
+                                    style={[styles.button, { opacity: isAgreed ? 1 : 0.6 }]} 
+                                    onPress={handleRegister} 
+                                    disabled={isRegistering}
+                                >
+                                    {isRegistering ? <ActivityIndicator color="white" /> : <Text style={styles.buttonText}>{t.btnRegister}</Text>}
+                                </TouchableOpacity>
+
+                                <TouchableOpacity style={styles.linkButton} onPress={() => navigation.navigate('Login')}>
+                                    <Text style={styles.linkText}>{t.linkLogin}</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </ScrollView>
+                    </KeyboardAvoidingView>
+
+            {/* ✨ YENİ: HESAP TÜRÜ MODALI */}
+            <Modal visible={roleModalVisible} transparent={true} animationType="slide">
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, { height: 'auto', paddingBottom: 30 }]}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>{t.labelRole}</Text>
+                            <TouchableOpacity onPress={() => setRoleModalVisible(false)}><Ionicons name="close" size={24} color="#3700B3" /></TouchableOpacity>
                         </View>
-                    </ScrollView>
-                </KeyboardAvoidingView>
+                        {[
+                            { id: 'standard', label: t.roleStandard },
+                            { id: 'vet', label: t.roleVet },
+                            { id: 'sitter', label: t.roleSitter },
+                            { id: 'groomer', label: t.roleGroomer }
+                        ].map((item) => (
+                            <TouchableOpacity 
+                                key={item.id} 
+                                style={styles.modalItem} 
+                                onPress={() => { setAccountType(item.id); setRoleModalVisible(false); }}
+                            >
+                                <Text style={[styles.modalItemText, accountType === item.id && { color: '#6200EE', fontWeight: 'bold' }]}>
+                                    {item.label}
+                                </Text>
+                                {accountType === item.id && <Ionicons name="checkmark-circle" size={20} color="#6200EE" />}
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </View>
+            </Modal>
 
             {/* ŞEHİR/İLÇE MODALI */}
             <Modal visible={modalVisible} transparent={true} animationType="slide">
@@ -559,6 +626,7 @@ const styles = StyleSheet.create({
       flex: 1,
       padding: 15,
       fontSize: 16,
+      color: '#333', 
   },
   eyeIcon: {
       padding: 5,
@@ -572,7 +640,7 @@ const styles = StyleSheet.create({
   modalContent: { width: '85%', height: '60%', backgroundColor: 'white', borderRadius: 20, padding: 20, elevation: 10 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, borderBottomWidth: 1, borderBottomColor: '#eee', paddingBottom: 10 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#3700B3' },
-  modalItem: { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#eee' },
+  modalItem: { paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#eee', flexDirection: 'row', justifyContent: 'space-between' },
   modalItemText: { fontSize: 16 },
   
   checkboxContainer: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 20, paddingHorizontal: 5 },

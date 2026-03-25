@@ -65,13 +65,24 @@ const TRANSLATIONS = {
 const AllListingsScreen = ({ navigation, route }) => {
   const { title, data } = route.params;
   const { reviews } = useContext(ListingContext);
-  const { country } = useContext(AuthContext);
+  
+  // AuthContext'ten user bilgisini çekiyoruz
+  const { country, user } = useContext(AuthContext); 
   const { theme, isDarkMode } = useContext(ThemeContext);
 
   // Dil Seçimi
   const activeCountryCode = country?.code || 'TR';
   const activeLang = country?.code === 'AU' ? 'AU' : 'TR';
   const t = TRANSLATIONS[activeLang];
+
+  // --- VETERİNER İLAN EKLEME KONTROLÜ (AUTH CONTEXT'E GÖRE GÜNCELLENDİ) ---
+  const isVetCategory = title?.toLowerCase().includes('veteriner') || title?.toLowerCase().includes('vet');
+  
+  // account_type kontrolü yapıyoruz (Örn: 'Veteriner', 'veteriner', 'Vet')
+  const isUserVet = user?.account_type?.toLowerCase() === 'veteriner' || user?.account_type?.toLowerCase() === 'vet';
+  
+  // Eğer kategori veteriner kategorisiyse sadece veteriner hesabı olanlar butonu görebilir.
+  const showAddListingBtn = isVetCategory ? isUserVet : true;
 
   // --- FİLTRELEME STATE'LERİ ---
   const [displayedData, setDisplayedData] = useState([]);
@@ -87,10 +98,10 @@ const AllListingsScreen = ({ navigation, route }) => {
   
   const [selectionMode, setSelectionMode] = useState(null); // null | 'city' | 'district'
 
-  // Hayvan Türleri Listesi (Arka planda daima Türkçe çalışır ki filtreleme bozulmasın)
+  // Hayvan Türleri Listesi
   const ANIMAL_TYPES = ['Kedi', 'Köpek', 'Kuş', 'Balık', 'Kemirgen', 'Diğer'];
 
-  // Ekranda Görünen Tür İsimleri (Çeviri)
+  // Ekranda Görünen Tür İsimleri
   const typeLabels = {
       'Kedi': activeLang === 'AU' ? 'Cat' : 'Kedi',
       'Köpek': activeLang === 'AU' ? 'Dog' : 'Köpek',
@@ -100,7 +111,7 @@ const AllListingsScreen = ({ navigation, route }) => {
       'Diğer': activeLang === 'AU' ? 'Other' : 'Diğer',
   };
 
-  // Ekranda Görünen Cinsiyet İsimleri (Çeviri)
+  // Ekranda Görünen Cinsiyet İsimleri
   const genderLabels = {
       'Erkek': activeLang === 'AU' ? 'Male' : 'Erkek',
       'Dişi': activeLang === 'AU' ? 'Female' : 'Dişi',
@@ -108,28 +119,25 @@ const AllListingsScreen = ({ navigation, route }) => {
 
   // --- VERİ İŞLEME VE FİLTRELEME ---
   useEffect(() => {
-    let result = data.filter(item => {
-        if (item.countryCode) return item.countryCode === activeCountryCode;
-        return activeCountryCode === 'TR';
-    });
+    let result = [...data];
 
     if (selectedCity) result = result.filter(item => item.city === selectedCity);
     if (selectedDistrict) result = result.filter(item => item.district === selectedDistrict);
     if (selectedGender) result = result.filter(item => item.gender === selectedGender);
+    
     if (selectedType) {
         result = result.filter(item => 
-            (item.breed && item.breed.toLowerCase().includes(selectedType.toLowerCase())) ||
-            (item.name && item.name.toLowerCase().includes(selectedType.toLowerCase())) ||
-            (item.category && item.category.toLowerCase().includes(selectedType.toLowerCase()))
+            (item.pet_type && item.pet_type === selectedType) ||
+            (item.breed && item.breed.toLowerCase().includes(selectedType.toLowerCase()))
         );
     }
+    
     if (minAge !== '') result = result.filter(item => item.age >= parseInt(minAge));
     if (maxAge !== '') result = result.filter(item => item.age <= parseInt(maxAge));
 
     setDisplayedData(result);
-  }, [data, country, selectedCity, selectedDistrict, selectedGender, selectedType, minAge, maxAge]);
+  }, [data, selectedCity, selectedDistrict, selectedGender, selectedType, minAge, maxAge]);
 
-  // Filtreleri Temizle
   const clearFilters = () => {
       setSelectedCity(null);
       setSelectedDistrict(null);
@@ -209,7 +217,7 @@ const AllListingsScreen = ({ navigation, route }) => {
     );
   };
 
-  // --- ANA FİLTRE İÇERİĞİ (KOMPONENT) ---
+  // --- ANA FİLTRE İÇERİĞİ ---
   const FilterMainContent = () => (
       <ScrollView showsVerticalScrollIndicator={false}>
           {/* Hayvan Türü */}
@@ -284,7 +292,7 @@ const AllListingsScreen = ({ navigation, route }) => {
       </ScrollView>
   );
 
-  // --- LİSTE GÖRÜNÜMÜ (Şehir/İlçe Seçimi İçin) ---
+  // --- LİSTE GÖRÜNÜMÜ ---
   const SelectionListContent = () => {
       const dataList = selectionMode === 'city' 
           ? Object.keys(CITY_DATA[activeLang] || {}).sort() 
@@ -395,25 +403,25 @@ const AllListingsScreen = ({ navigation, route }) => {
         }
       />
 
-      {/* İLAN EKLE (YÜZEN BUTON - FAB) */}
-      <TouchableOpacity 
-          style={styles.fabButton}
-          onPress={() => navigation.navigate('AddListing', { category: title })} 
-          activeOpacity={0.9}
-      >
-          <Ionicons name="add" size={24} color="white" />
-          <Text style={styles.fabText}>{t.addListing}</Text>
-      </TouchableOpacity>
+      {/* İLAN EKLE (YÜZEN BUTON - FAB) - KOŞULLU RENDER */}
+      {showAddListingBtn && (
+          <TouchableOpacity 
+              style={styles.fabButton}
+              onPress={() => navigation.navigate('AddListing', { category: title })} 
+              activeOpacity={0.9}
+          >
+              <Ionicons name="add" size={24} color="white" />
+              <Text style={styles.fabText}>{t.addListing}</Text>
+          </TouchableOpacity>
+      )}
 
-      {/* TEK MODAL (İÇERİK DEĞİŞTİRMELİ) */}
+      {/* MODAL */}
       <Modal visible={filterModalVisible} animationType="slide" transparent={true} onRequestClose={() => {
           if (selectionMode) setSelectionMode(null); 
           else setFilterModalVisible(false);
       }}>
           <View style={styles.modalOverlay}>
               <View style={[styles.filterContent, { backgroundColor: theme.cardBg }]}>
-                  
-                  {/* Başlık */}
                   {!selectionMode && (
                       <View style={styles.modalHeader}>
                           <Text style={[styles.modalTitle, {color: theme.text}]}>{t.detailedFilter}</Text>
@@ -422,10 +430,7 @@ const AllListingsScreen = ({ navigation, route }) => {
                           </TouchableOpacity>
                       </View>
                   )}
-
-                  {/* İÇERİK */}
                   {selectionMode ? <SelectionListContent /> : <FilterMainContent />}
-
               </View>
           </View>
       </Modal>

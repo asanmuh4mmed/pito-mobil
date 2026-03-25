@@ -1,7 +1,17 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
+import * as Notifications from 'expo-notifications'; // 🔔 BİLDİRİM KÜTÜPHANESİ EKLENDİ
 import { supabase } from '../lib/supabase'; 
 import { AuthContext } from './AuthContext'; 
 import { playSound } from '../utils/SoundManager';
+
+// --- BİLDİRİM AYARLARI (Uygulama açıkken bildirimin nasıl görüneceği) ---
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true, // Ekranın üstünden düşsün
+    shouldPlaySound: true, // Expo'nun kendi sesi (SoundManager ile de destekliyoruz)
+    shouldSetBadge: true,
+  }),
+});
 
 export const ChatContext = createContext();
 
@@ -9,12 +19,15 @@ export const ChatProvider = ({ children }) => {
   const { user } = useContext(AuthContext);
   const [conversations, setConversations] = useState([]);
 
-  // 🔄 1. Uygulama açıldığında veya kullanıcı değiştiğinde mesajları çek ve dinlemeyi başlat
+  // 🔄 1. Uygulama açıldığında bildirim izni al, mesajları çek ve dinlemeyi başlat
   useEffect(() => {
     if (!user) {
       setConversations([]);
       return;
     }
+
+    // Bildirim izni isteme
+    requestNotificationPermissions();
 
     fetchMessages();
 
@@ -25,8 +38,25 @@ export const ChatProvider = ({ children }) => {
         event: '*', 
         schema: 'public', 
         table: 'messages' 
-      }, () => {
-        fetchMessages(); // Karşı taraftan mesaj geldiğinde veya silindiğinde listeyi tazele
+      }, (payload) => {
+        
+        // ✨ YENİ: EĞER BİZE YENİ BİR MESAJ GELDİYSE BİLDİRİM GÖSTER VE SES ÇAL
+        if (payload.eventType === 'INSERT') {
+            const newMessage = payload.new;
+            // Eğer mesajı gönderen biz değilsek ve alıcı bizsek
+            if (newMessage.sender_id !== user.id && newMessage.receiver_id === user.id) {
+                // Sesi çal (Yeni noti.mp3 sesini kullanıyoruz)
+                playSound('noti');
+                
+                // Üstten düşen lokal bildirimi tetikle
+                triggerLocalNotification(
+                    "PITO'dan Yeni Mesaj 🐾", 
+                    newMessage.image ? "📷 Fotoğraf gönderdi." : newMessage.text
+                );
+            }
+        }
+
+        fetchMessages(); // Listeyi tazele
       })
       .subscribe();
 
@@ -34,6 +64,25 @@ export const ChatProvider = ({ children }) => {
       supabase.removeChannel(channel);
     };
   }, [user]);
+
+  // 🔔 BİLDİRİM İZNİ VE GÖNDERME FONKSİYONLARI
+  const requestNotificationPermissions = async () => {
+    const { status } = await Notifications.requestPermissionsAsync();
+    if (status !== 'granted') {
+        console.log("Bildirim izni verilmedi!");
+    }
+  };
+
+  const triggerLocalNotification = async (title, body) => {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: title,
+        body: body,
+        sound: true, 
+      },
+      trigger: null, // null demek "hemen şimdi göster" demek
+    });
+  };
 
   // ✅ VERİTABANINDAN MESAJLARI ÇEK VE SOHBET LİSTESİ OLUŞTUR
   const fetchMessages = async () => {
@@ -98,19 +147,19 @@ export const ChatProvider = ({ children }) => {
     }
   };
 
-  // 📤 MESAJ GÖNDER (Anında Ekrana Bas + Resmi Yükle + Veritabanına Kaydet)
+  // 📤 MESAJ GÖNDER
   const sendMessage = async (chatId, sender, receiver, text, listingId, listingName, image = null, type = 'text', relatedId = null) => {
     if (!user) return;
 
-    playSound('message');
+    // Kendi gönderdiğimiz mesajlarda da ses çalıyoruz (Yeni noti.mp3 sesini kullanıyoruz)
+    playSound('noti');
 
     const room_id = chatId || [sender.id, receiver.id].sort().join('_');
     
-    // ⚡ OPTIMISTIC UI: Mesajı/Fotoğrafı anında GÖNDERENİN ekranına bas (Sıfır Gecikme)
     const tempMessage = {
       id: Date.now(), 
       text: text || '',
-      image: image, // Yerel dosya yolunu kullanıyoruz, senin ekranında hemen görünür
+      image: image, 
       type: image ? 'image' : 'text',
       senderId: sender.id,
       createdAt: new Date().toISOString(),
@@ -144,19 +193,16 @@ export const ChatProvider = ({ children }) => {
     try {
       let finalImageUrl = image;
 
-      // 🚀 FOTOĞRAF YÜKLEME İŞLEMİ (SUPABASE STORAGE)
       if (image && image.startsWith('file://')) {
           const ext = image.split('.').pop() || 'jpeg';
           const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
           
-          // Resmi Supabase'e gönderilebilir bir Blob formata çeviriyoruz
           const response = await fetch(image);
           const blob = await response.blob();
 
-          // Storage'a yükleme işlemi
           const { error: uploadError } = await supabase
               .storage
-              .from('chat-images') // ✅ KURAL: Supabase'de bu isimde PUBLIC bir bucket olmalı!
+              .from('chat-images')
               .upload(fileName, blob, {
                   contentType: `image/${ext === 'png' ? 'png' : 'jpeg'}`,
               });
@@ -166,12 +212,10 @@ export const ChatProvider = ({ children }) => {
               throw uploadError;
           }
 
-          // Yüklenen resmin herkesin görebileceği genel linkini (Public URL) alıyoruz
           const { data: publicUrlData } = supabase.storage.from('chat-images').getPublicUrl(fileName);
           finalImageUrl = publicUrlData.publicUrl;
       }
 
-      // Arka planda veritabanına yaz (Gerçek URL ile)
       const { error } = await supabase
         .from('messages')
         .insert([{
@@ -179,19 +223,18 @@ export const ChatProvider = ({ children }) => {
           sender_id: sender.id,
           receiver_id: receiver.id,
           text: text || '',
-          image: finalImageUrl, // ✅ Karşı tarafın görebileceği gerçek internet linki!
+          image: finalImageUrl, 
           is_read: false
         }]);
 
       if (error) throw error;
-      // Veritabanına yazıldığında Realtime tetiklenip fetchMessages() ile kalıcı URL'yi herkese güncelleyecektir.
 
     } catch (e) {
       console.log("Mesaj gönderme hatası:", e);
     }
   };
 
-  // ❤️ MESAJ REAKSİYONU (Anında Ekrana Bas + Update)
+  // ❤️ MESAJ REAKSİYONU
   const reactToMessage = async (chatId, messageId, reactionType = '🐾') => {
     if (reactionType === '🐾') playSound('paw');
 
@@ -202,7 +245,7 @@ export const ChatProvider = ({ children }) => {
     }
   };
 
-  // 🗑️ MESAJ SİL (Anında Ekrandan Sil + Veritabanından Sil)
+  // 🗑️ MESAJ SİL
   const deleteMessage = async (chatId, messageId) => {
     if (!user) return;
 

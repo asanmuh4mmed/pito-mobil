@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext'; 
 import { GameContext, GAME_IDS } from '../context/GameContext'; 
 import { playSound } from '../utils/SoundManager'; 
+import { supabase } from '../lib/supabase'; // ✨ REKOR İÇİN EKLENDİ
 
 const { width, height } = Dimensions.get('window');
 
@@ -19,12 +20,12 @@ const GRAVITY = 0.6;
 const JUMP_FORCE = -13; 
 const BASE_SPEED = 6; 
 
-// --- KARAKTER EVRİM AŞAMALARI (Puanlar ilk oyunla eşitlendi) ---
+// --- KARAKTER EVRİM AŞAMALARI (1 puanlık sisteme göre oranlandı) ---
 const EVOLUTION_STAGES = [
     { score: 0, emoji: '🐶', name: 'Dog', color: '#feca57' },   
-    { score: 50, emoji: '🐱', name: 'Cat', color: '#ff9ff3' },  
-    { score: 150, emoji: '🐰', name: 'Rabbit', color: '#00d2d3' }, 
-    { score: 300, emoji: '🐆', name: 'Cheetah', color: '#ff6b6b' } 
+    { score: 5, emoji: '🐱', name: 'Cat', color: '#ff9ff3' },  
+    { score: 15, emoji: '🐰', name: 'Rabbit', color: '#00d2d3' }, 
+    { score: 30, emoji: '🐆', name: 'Cheetah', color: '#ff6b6b' } 
 ];
 
 const OBSTACLES = ['🌵', '🪨', '👻', '🔥'];
@@ -33,6 +34,7 @@ const OBSTACLES = ['🌵', '🪨', '👻', '🔥'];
 const TRANSLATIONS = {
     TR: {
         score: "SKOR",
+        best: "REKOR",
         gameOver: "YANDIN!",
         start: "KOŞUYA BAŞLA",
         retry: "TEKRAR DENE",
@@ -46,6 +48,7 @@ const TRANSLATIONS = {
     },
     AU: {
         score: "SCORE",
+        best: "BEST",
         gameOver: "GAME OVER!",
         start: "START RUN",
         retry: "TRY AGAIN",
@@ -60,11 +63,12 @@ const TRANSLATIONS = {
 };
 
 const EndlessRunnerScreen = ({ navigation }) => {
-    const { country } = useContext(AuthContext);
+    const { country, user } = useContext(AuthContext); // ✨ User çekildi
     const { saveGameScore } = useContext(GameContext); 
     const t = TRANSLATIONS[country?.code === 'AU' ? 'AU' : 'TR'];
 
     const [score, setScore] = useState(0);
+    const [highScore, setHighScore] = useState(0); // ✨ Rekor state'i
     const [isPlaying, setIsPlaying] = useState(false);
     const [gameOver, setGameOver] = useState(false);
     const [isSaving, setIsSaving] = useState(false); 
@@ -83,6 +87,37 @@ const EndlessRunnerScreen = ({ navigation }) => {
     const gameSpeed = useRef(BASE_SPEED); 
     const isJumping = useRef(false); 
     const scoreRef = useRef(0); 
+    const bestScoreRef = useRef(0); // ✨ Rekor referansı
+    const startTimeRef = useRef(0); 
+    
+    // ✨ ÇÖZÜM: Seslerin üst üste (spam) çalmasını engelleyen hafızalar
+    const characterNameRef = useRef(EVOLUTION_STAGES[0].name); 
+    const lastSpeedUpScoreRef = useRef(0); 
+
+    // --- REKOR ÇEKME ---
+    useEffect(() => {
+        const fetchHighScore = async () => {
+            if (!user?.id) return;
+            try {
+                const { data } = await supabase
+                    .from('game_scores')
+                    .select('score')
+                    .eq('user_id', user.id)
+                    .eq('game_id', GAME_IDS.RUNNER)
+                    .order('score', { ascending: false })
+                    .limit(1)
+                    .single();
+                
+                if (data) {
+                    setHighScore(data.score);
+                    bestScoreRef.current = data.score;
+                }
+            } catch (error) {
+                // Kayıt yoksa hata verir, göz ardı et
+            }
+        };
+        fetchHighScore();
+    }, [user?.id, isSaved]);
 
     const startGame = () => {
         playSound('game_start'); 
@@ -93,6 +128,11 @@ const EndlessRunnerScreen = ({ navigation }) => {
         obstacleX.current = width;
         gameSpeed.current = BASE_SPEED;
         isJumping.current = false;
+        startTimeRef.current = Date.now(); 
+        
+        // Hafızaları Sıfırla
+        characterNameRef.current = EVOLUTION_STAGES[0].name;
+        lastSpeedUpScoreRef.current = 0;
         
         setCharacter(EVOLUTION_STAGES[0]); 
         setGameOver(false);
@@ -107,14 +147,18 @@ const EndlessRunnerScreen = ({ navigation }) => {
         requestRef.current = requestAnimationFrame(gameLoop);
     };
 
-    // ✅ OYUN BİTİRME VE ANINDA KAYIT (ASYNC)
     const handleGameOver = async (finalScore = 0) => {
         setGameOver(true);
         setIsPlaying(false);
         cancelAnimationFrame(requestRef.current);
         playSound('game_over'); 
 
-        // Eğer puan 0'dan büyükse veritabanına kaydet
+        // ✨ Rekor kontrolü
+        if (finalScore > bestScoreRef.current) {
+            bestScoreRef.current = finalScore;
+            setHighScore(finalScore);
+        }
+
         if (finalScore > 0) {
             setIsSaving(true);
             try {
@@ -129,6 +173,8 @@ const EndlessRunnerScreen = ({ navigation }) => {
     };
 
     const gameLoop = () => {
+        const currentTime = Date.now();
+        
         playerVelocity.current += GRAVITY;
         playerY.current += playerVelocity.current;
 
@@ -138,13 +184,16 @@ const EndlessRunnerScreen = ({ navigation }) => {
             isJumping.current = false;
         }
 
-        obstacleX.current -= gameSpeed.current;
+        if (currentTime - startTimeRef.current < 2000) {
+            obstacleX.current = width;
+        } else {
+            obstacleX.current -= gameSpeed.current;
+        }
 
         if (obstacleX.current < -OBSTACLE_SIZE) {
             obstacleX.current = width; 
             
-            // ✅ PUANLAMA İLK OYUNLA AYNI HALE GETİRİLDİ (+10)
-            scoreRef.current += 10;
+            scoreRef.current += 1;
             setScore(scoreRef.current); 
             
             setObstacleEmoji(OBSTACLES[Math.floor(Math.random() * OBSTACLES.length)]);
@@ -162,7 +211,6 @@ const EndlessRunnerScreen = ({ navigation }) => {
             playerHitbox.y < obstacleHitbox.y + obstacleHitbox.h &&
             playerHitbox.h + playerHitbox.y > obstacleHitbox.y
         ) {
-            // ✅ EKSİK PUAN GİTMESİN DİYE DİREKT PARAMETRE YOLUYORUZ
             handleGameOver(scoreRef.current);
             return; 
         }
@@ -176,11 +224,15 @@ const EndlessRunnerScreen = ({ navigation }) => {
     const checkEvolution = (currentScore) => {
         const stage = [...EVOLUTION_STAGES].reverse().find(s => currentScore >= s.score);
         
-        if (stage && stage.name !== character.name) {
+        // ✨ ÇÖZÜM: State yerine hızlı "Ref" ile kontrol ederek saniyede 60 kez çalmasını engelliyoruz
+        if (stage && stage.name !== characterNameRef.current) {
+            characterNameRef.current = stage.name; // Gördüğü ilk an kilitler
             setCharacter(stage); 
             showNotification(`${t.levelUp} ${stage.emoji}`);
-            playSound('match_success'); 
-        } else if (currentScore % 100 === 0 && currentScore > 0) { // Puanlamaya göre uyarlandı
+            playSound('match_success'); // Sadece BİR KERE çalar
+        } 
+        else if (currentScore % 10 === 0 && currentScore > 0 && currentScore !== lastSpeedUpScoreRef.current) {
+            lastSpeedUpScoreRef.current = currentScore; // Hızlanma uyarısını da kilitler
             showNotification(t.speedUp);
         }
     };
@@ -212,7 +264,12 @@ const EndlessRunnerScreen = ({ navigation }) => {
                 <StatusBar hidden />
                 
                 <View style={styles.topHud}>
-                    <Text style={[styles.scoreText, { color: character.color }]}>{t.score}: {score}</Text>
+                    {/* ✨ Skorlar yan yana */}
+                    <View style={styles.scoreRow}>
+                        <Text style={[styles.scoreText, { color: character.color }]}>{t.score}: {score}</Text>
+                        <Text style={[styles.scoreText, { color: character.color, fontSize: 18, opacity: 0.8 }]}>{t.best}: {highScore}</Text>
+                    </View>
+                    
                     {notification ? (
                         <Animated.View style={styles.notifBadge}>
                             <Text style={styles.notifText}>{notification}</Text>
@@ -257,11 +314,20 @@ const EndlessRunnerScreen = ({ navigation }) => {
                             <Text style={styles.title}>{gameOver ? t.gameOver : "SONSUZ KOŞU"}</Text>
                             
                             {gameOver && (
-                                <View style={{alignItems:'center', marginVertical:10}}>
-                                    <Text style={styles.finalLabel}>{t.finalScore}</Text>
-                                    <Text style={[styles.finalScore, { color: character.color }]}>{score}</Text>
+                                <View style={{alignItems:'center', marginVertical:10, width: '100%'}}>
+                                    {/* ✨ Modal içi skor ve rekor görünümü */}
+                                    <View style={styles.modalScoreContainer}>
+                                        <View style={styles.modalScoreCol}>
+                                            <Text style={styles.finalLabel}>{t.score}</Text>
+                                            <Text style={[styles.finalScore, { color: character.color }]}>{score}</Text>
+                                        </View>
+                                        <View style={{width: 1, backgroundColor: '#eee', height: '80%'}} />
+                                        <View style={styles.modalScoreCol}>
+                                            <Text style={styles.finalLabel}>{t.best}</Text>
+                                            <Text style={[styles.finalScore, { color: '#a4b0be', fontSize: 32 }]}>{highScore}</Text>
+                                        </View>
+                                    </View>
                                     
-                                    {/* ✅ Kayıt Animasyonu ve Bildirimi */}
                                     {isSaving ? (
                                         <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 10}}>
                                             <ActivityIndicator size="small" color={character.color} />
@@ -306,6 +372,7 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#81ECEC' },
     
     topHud: { position: 'absolute', top: 40, width: '100%', alignItems: 'center', zIndex: 50 },
+    scoreRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', paddingHorizontal: 25 },
     scoreText: { fontSize: 32, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.2)', textShadowRadius: 5 },
     notifBadge: { marginTop: 10, backgroundColor: '#FFD700', paddingHorizontal: 15, paddingVertical: 5, borderRadius: 15, elevation: 5 },
     notifText: { color: 'black', fontWeight: 'bold', fontSize: 14 },
@@ -360,6 +427,8 @@ const styles = StyleSheet.create({
     title: { fontSize: 28, fontWeight: '900', color: '#2f3542', marginBottom: 5 },
     desc: { textAlign: 'center', color: '#747d8c', marginBottom: 25, fontSize: 15, lineHeight: 22 },
     
+    modalScoreContainer: { flexDirection: 'row', width: '100%', justifyContent: 'center', alignItems: 'center', marginBottom: 10 },
+    modalScoreCol: { flex: 1, alignItems: 'center' },
     finalLabel: { fontSize: 12, fontWeight: 'bold', color: '#a4b0be' },
     finalScore: { fontSize: 50, fontWeight: '900' },
 

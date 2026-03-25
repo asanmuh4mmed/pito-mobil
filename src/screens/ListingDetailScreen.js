@@ -20,7 +20,9 @@ const TRANSLATIONS = {
         loginMsg: "İşlem yapmak için lütfen giriş yapın.", cancel: "İptal", login: "Giriş Yap",
         warning: "Uyarı", ownListingMsg: "Kendi ilanınıza mesaj gönderemezsiniz.",
         noInfo: "Bu ilan için henüz detaylı bir açıklama girilmemiş.", noContact: "İletişim numarası bulunamadı.",
-        error: "Hata", userNotFound: "Kullanıcı profili bulunamadı."
+        error: "Hata", userNotFound: "Kullanıcı profili bulunamadı.",
+        report: "Şikayet Et", alreadyReported: "Bu ilanı zaten şikayet ettiniz.", reportSuccess: "İlan bildirildi.", reportFail: "Şikayet gönderilemedi.",
+        options: "Seçenekler"
     },
     AU: {
         category: "Category", rating: "Rating", breed: "Breed", date: "Date", about: "About",
@@ -31,7 +33,9 @@ const TRANSLATIONS = {
         loginMsg: "Please login to perform this action.", cancel: "Cancel", login: "Login",
         warning: "Warning", ownListingMsg: "You cannot message your own listing.",
         noInfo: "No detailed description provided for this listing.", noContact: "Contact number not found.",
-        error: "Error", userNotFound: "User profile not found."
+        error: "Error", userNotFound: "User profile not found.",
+        report: "Report", alreadyReported: "You have already reported this listing.", reportSuccess: "Listing reported.", reportFail: "Failed to send report.",
+        options: "Options"
     }
 };
 
@@ -164,6 +168,48 @@ const ListingDetailScreen = ({ navigation, route }) => {
         }
     };
 
+    // Şikayet Fonksiyonu
+    const handleReportListing = async () => {
+        checkAuth(async () => {
+            try {
+                const { error } = await supabase
+                    .from('reports')
+                    .insert([
+                        { 
+                            listing_id: item.id,
+                            reporter_id: user.id, 
+                            reason: 'Topluluk Kuralları İhlali'
+                        }
+                    ]);
+                
+                if (error) {
+                    if (error.code === '23505') {
+                        Alert.alert(t.warning, t.alreadyReported);
+                    } else {
+                        throw error;
+                    }
+                } else {
+                    Alert.alert(activeLang === 'TR' ? "Başarılı" : "Success", t.reportSuccess);
+                }
+            } catch (err) {
+                console.error("Şikayet Hatası:", err);
+                Alert.alert(t.error, t.reportFail);
+            }
+        });
+    };
+
+    // ✨ YENİ: 3 Nokta Menüsünü Açan Fonksiyon
+    const showMenu = () => {
+        Alert.alert(
+            t.options,
+            "",
+            [
+                { text: t.cancel, style: "cancel" },
+                { text: t.report, style: "destructive", onPress: handleReportListing }
+            ]
+        );
+    };
+
     if (loading && !fetchedItem) {
         return (
             <View style={[styles.container, { backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }]}>
@@ -209,6 +255,14 @@ const ListingDetailScreen = ({ navigation, route }) => {
                 <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.8}>
                     <Ionicons name="arrow-back" size={24} color="#333" />
                 </TouchableOpacity>
+
+                {/* ✨ YENİ: SAĞ ÜST KÖŞEDEKİ 3 NOKTA (SEÇENEKLER) BUTONU */}
+                {!isMyListing && (
+                    <TouchableOpacity style={styles.menuBtn} onPress={showMenu} activeOpacity={0.8}>
+                        <Ionicons name="ellipsis-vertical" size={24} color="#333" />
+                    </TouchableOpacity>
+                )}
+
             </View>
 
             {/* DETAYLAR ALANI */}
@@ -328,6 +382,9 @@ const styles = StyleSheet.create({
     // ŞIK GERİ BUTONU (CAM EFEKTİ GİBİ)
     backBtn: { position: 'absolute', top: Platform.OS === 'ios' ? 50 : 30, left: 20, backgroundColor: 'rgba(255,255,255,0.9)', width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', elevation: 5, shadowColor: '#000', shadowOffset: {width: 0, height: 2}, shadowOpacity: 0.2 },
     
+    // ✨ YENİ: SAĞ ÜST 3 NOKTA MENÜSÜ STİLİ (Geri butonuyla tamamen simetrik)
+    menuBtn: { position: 'absolute', top: Platform.OS === 'ios' ? 50 : 30, right: 20, backgroundColor: 'rgba(255,255,255,0.9)', width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', elevation: 5, shadowColor: '#000', shadowOffset: {width: 0, height: 2}, shadowOpacity: 0.2 },
+
     // YENİ NESİL DETAY KUTUSU
     detailsContainer: { flex: 1, marginTop: -35, borderTopLeftRadius: 35, borderTopRightRadius: 35, paddingHorizontal: 20, paddingTop: 30, elevation: 10, shadowColor: '#000', shadowOffset: {width: 0, height: -5}, shadowOpacity: 0.1, shadowRadius: 10 },
     headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 25 },

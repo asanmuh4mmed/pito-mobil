@@ -6,7 +6,8 @@ import { playSound } from '../utils/SoundManager';
 export const ListingContext = createContext();
 
 export const ListingProvider = ({ children }) => {
-    const { user } = useContext(AuthContext); 
+    // ✨ 1. country objesini AuthContext'ten çekiyoruz
+    const { user, country } = useContext(AuthContext); 
     
     const [urgentList, setUrgentList] = useState([]);
     const [mateList, setMateList] = useState([]);
@@ -19,7 +20,6 @@ export const ListingProvider = ({ children }) => {
     useEffect(() => {
         fetchListings();
         
-        // 'listings' tablosunu dinle (Anlık güncelleme için)
         const subscription = supabase
             .channel('public:listings')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'listings' }, () => {
@@ -30,16 +30,20 @@ export const ListingProvider = ({ children }) => {
         return () => {
             supabase.removeChannel(subscription);
         };
-    }, []);
+    }, [country]); // ✨ 2. Ülke değiştiğinde listeyi anında yenilemesi için eklendi
 
     // --- VERİLERİ ÇEK (listings tablosundan) ---
     const fetchListings = async () => {
         try {
             setLoading(true);
             
+            // ✨ 3. Aktif ülkenin kodunu belirliyoruz
+            const activeLang = country?.code || 'TR';
+            
             const { data, error } = await supabase
                 .from('listings')
                 .select('*, users ( fullname, avatar, id )') 
+                .eq('country_code', activeLang) // ✨ 4. Sadece bu ülkenin ilanlarını çek
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -48,19 +52,25 @@ export const ListingProvider = ({ children }) => {
                 const formattedData = data.map(item => ({
                     ...item,
                     ownerId: item.owner_id, 
-                    
                     ownerName: item.users?.fullname || 'Kullanıcı',
                     ownerAvatar: item.users?.avatar || null,
-                    
                     img: (item.images && item.images.length > 0) ? item.images[0] : (item.img || 'https://via.placeholder.com/150'),
-                    
                     subtitle: item.breed || item.city || 'Detay Yok'
                 }));
 
-                setUrgentList(formattedData.filter(item => item.category === 'Sahiplendirme' || item.category === 'Adopt'));
-                setMateList(formattedData.filter(item => item.category === 'Eş Arayanlar' || item.category === 'Find Mate'));
-                setVetList(formattedData.filter(item => item.category === 'Veteriner Klinikleri' || item.category === 'Vet Clinics'));
-                setSitterList(formattedData.filter(item => item.category === 'Bakıcı' || item.category === 'Pet Sitter'));
+                // ✨ 5. Her iki dilin kategori isimlerini kapsayan filtreleme
+                setUrgentList(formattedData.filter(item => 
+                    ['Sahiplendirme', 'Adopt', 'Looking for Home'].includes(item.category)
+                ));
+                setMateList(formattedData.filter(item => 
+                    ['Eş Arayanlar', 'Find Mate', 'Looking for Mate'].includes(item.category)
+                ));
+                setVetList(formattedData.filter(item => 
+                    ['Veteriner Klinikleri', 'Vet Clinics', 'Veterinary Clinics'].includes(item.category)
+                ));
+                setSitterList(formattedData.filter(item => 
+                    ['Bakıcı', 'Pet Sitter', 'Find Pet Sitter'].includes(item.category)
+                ));
             }
 
         } catch (e) {
@@ -83,7 +93,7 @@ export const ListingProvider = ({ children }) => {
             const { error } = await supabase
                 .from('listings')
                 .insert({
-                    owner_id: user.id, // Sahip ID'si ekleniyor
+                    owner_id: user.id,
                     name: newListing.name, 
                     description: newListing.description,
                     category: category, 
@@ -103,7 +113,6 @@ export const ListingProvider = ({ children }) => {
             if (error) throw error;
             
             await fetchListings();
-            
             return { success: true };
 
         } catch (e) {
@@ -112,19 +121,18 @@ export const ListingProvider = ({ children }) => {
         }
     };
 
-    // --- İLAN SİLME (GÜVENLİK YAMASI YAPILDI) ---
+    // --- İLAN SİLME ---
     const deleteListing = async (listingId) => {
-        if (!user) return; // Kullanıcı giriş yapmamışsa engelle
+        if (!user) return; 
 
         try {
             const { error } = await supabase
                 .from('listings')
                 .delete()
                 .eq('id', listingId)
-                .eq('owner_id', user.id); // 🚨 GÜVENLİK: Sadece bana ait olan ilanı sil!
+                .eq('owner_id', user.id); 
 
             if (error) throw error;
-            
             fetchListings();
             
         } catch (e) {
@@ -132,9 +140,9 @@ export const ListingProvider = ({ children }) => {
         }
     };
 
-    // --- İLAN GÜNCELLEME (GÜVENLİK YAMASI YAPILDI) ---
+    // --- İLAN GÜNCELLEME ---
     const updateListing = async (listingId, updates) => {
-        if (!user) return; // Kullanıcı giriş yapmamışsa engelle
+        if (!user) return; 
 
         try {
             const dbUpdates = {};
@@ -145,10 +153,9 @@ export const ListingProvider = ({ children }) => {
                 .from('listings')
                 .update(dbUpdates)
                 .eq('id', listingId)
-                .eq('owner_id', user.id); // 🚨 GÜVENLİK: Sadece bana ait olan ilanı güncelle!
+                .eq('owner_id', user.id); 
 
             if (error) throw error;
-            
             fetchListings(); 
             
         } catch (e) {

@@ -8,18 +8,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AuthContext } from '../context/AuthContext'; 
 import { GameContext, GAME_IDS } from '../context/GameContext'; 
 import { playSound } from '../utils/SoundManager'; 
+import { supabase } from '../lib/supabase'; 
 
 const { width, height } = Dimensions.get('window');
 const PLAYER_SIZE = 90;
 const ITEM_SIZE = 60;
 const FLOOR_HEIGHT = 100;
 
-// --- EVRİM AŞAMALARI (Skora göre değişen hayvanlar) ---
+// --- EVRİM AŞAMALARI (1 Puanlık sisteme göre oranlandı) ---
 const EVOLUTION_STAGES = [
     { threshold: 0, image: 'https://cdn-icons-png.flaticon.com/512/616/616408.png' },   // Köpek
-    { threshold: 50, image: 'https://cdn-icons-png.flaticon.com/512/616/616430.png' },  // Kedi
-    { threshold: 150, image: 'https://cdn-icons-png.flaticon.com/512/616/616412.png' }, // Tavşan
-    { threshold: 300, image: 'https://cdn-icons-png.flaticon.com/512/616/616439.png' }  // Kaplan
+    { threshold: 5, image: 'https://cdn-icons-png.flaticon.com/512/616/616430.png' },   // Kedi
+    { threshold: 15, image: 'https://cdn-icons-png.flaticon.com/512/616/616412.png' },  // Tavşan
+    { threshold: 30, image: 'https://cdn-icons-png.flaticon.com/512/616/616439.png' }   // Kaplan
 ];
 
 // --- VARLIKLAR ---
@@ -42,7 +43,8 @@ const TRANSLATIONS = {
         finalScore: "TOPLAM PUAN",
         levelUp: "SEVİYE ATLADIN!",
         saving: "Liderlik Tablosuna Kaydediliyor...",
-        saved: "Puanlar Tabloya Eklendi! 🏆"
+        saved: "Puanlar Tabloya Eklendi! 🏆",
+        best: "Rekor:"
     },
     AU: {
         score: "SCORE",
@@ -56,11 +58,12 @@ const TRANSLATIONS = {
         finalScore: "TOTAL SCORE",
         levelUp: "LEVEL UP!",
         saving: "Saving to Leaderboard...",
-        saved: "Points Added to Board! 🏆"
+        saved: "Points Added to Board! 🏆",
+        best: "Best:"
     }
 };
 
-// --- FEEDBACK BİLEŞENİ (Animasyonlu Puan/Hasar) ---
+// --- FEEDBACK BİLEŞENİ ---
 const FeedbackItem = ({ x, y, text, color, onComplete }) => {
     const anim = useRef(new Animated.Value(0)).current;
 
@@ -84,13 +87,14 @@ const FeedbackItem = ({ x, y, text, color, onComplete }) => {
 
 const GameScreen = ({ navigation }) => {
     // --- CONTEXT ---
-    const { country } = useContext(AuthContext);
+    const { user, country } = useContext(AuthContext);
     const { saveGameScore } = useContext(GameContext); 
     const activeLang = country?.code === 'AU' ? 'AU' : 'TR';
     const t = TRANSLATIONS[activeLang];
 
     // --- STATE ---
     const [score, setScore] = useState(0);
+    const [highScore, setHighScore] = useState(0);
     const [lives, setLives] = useState(3);
     const [items, setItems] = useState([]); 
     const [gameOver, setGameOver] = useState(false);
@@ -109,10 +113,35 @@ const GameScreen = ({ navigation }) => {
     const lastSpawnTime = useRef(0);
     const speedMultiplier = useRef(1);
     const requestRef = useRef(); 
+    
+    // ✨ ÇÖZÜM: Karakterin anlık evrim resmini tutacak hızlı hafıza eklendi
+    const playerImageRef = useRef(EVOLUTION_STAGES[0].image); 
 
     // --- ANIMASYON ---
     const playerX = useRef(new Animated.Value(width / 2 - PLAYER_SIZE / 2)).current;
     const gameAreaPan = useRef(new Animated.ValueXY()).current; 
+
+    // --- REKOR ÇEKME ---
+    useEffect(() => {
+        const fetchHighScore = async () => {
+            if (!user?.id) return;
+            try {
+                const { data } = await supabase
+                    .from('game_scores')
+                    .select('score')
+                    .eq('user_id', user.id)
+                    .eq('game_id', GAME_IDS.CATCH)
+                    .order('score', { ascending: false })
+                    .limit(1)
+                    .single();
+                
+                if (data) setHighScore(data.score);
+            } catch (error) {
+                // Hata yok sayıldı
+            }
+        };
+        fetchHighScore();
+    }, [user?.id, isSaved]);
 
     // --- DOKUNMATİK KONTROL ---
     const panResponder = useRef(
@@ -136,6 +165,7 @@ const GameScreen = ({ navigation }) => {
         livesRef.current = 3;
         itemsRef.current = [];
         speedMultiplier.current = 1;
+        playerImageRef.current = EVOLUTION_STAGES[0].image; // ✨ Hafızayı da sıfırla
         
         setScore(0);
         setLives(3);
@@ -158,16 +188,14 @@ const GameScreen = ({ navigation }) => {
         if (requestRef.current) cancelAnimationFrame(requestRef.current);
         setIsPlaying(false);
         setGameOver(true);
-        
-        // ✅ DEĞİŞİKLİK: 3 hak bittiğinde gameover sesi çalacak
         playSound('gameover');
         
-        // Skoru Veri Tabanına Kaydet
         if (finalScore > 0) {
             setIsSaving(true);
             try {
                 await saveGameScore(GAME_IDS.CATCH, finalScore);
                 setIsSaved(true);
+                if (finalScore > highScore) setHighScore(finalScore);
             } catch (error) {
                 console.log("Skor kaydedilirken hata:", error);
             } finally {
@@ -187,11 +215,12 @@ const GameScreen = ({ navigation }) => {
 
     const checkEvolution = (currentScore) => {
         const stage = [...EVOLUTION_STAGES].reverse().find(s => currentScore >= s.threshold);
-        if (stage && stage.image !== playerImage) {
-            setPlayerImage(stage.image);
-            
-            // ✅ DEĞİŞİKLİK: Seviye atlandığında (Hayvan değiştiğinde) gamewin sesi çalacak
-            playSound('gamewin'); 
+        
+        // ✨ ÇÖZÜM: State (playerImage) yerine, anlık Ref (playerImageRef) ile kontrol ediyoruz
+        if (stage && stage.image !== playerImageRef.current) {
+            playerImageRef.current = stage.image; // Gördüğü an hafızayı kilitler
+            setPlayerImage(stage.image);          // UI'ı günceller
+            playSound('gamewin');                 // Sesi sadece BİR KEZ çalar
         }
     };
 
@@ -216,8 +245,8 @@ const GameScreen = ({ navigation }) => {
 
     const gameLoop = () => {
         const now = Date.now();
-        speedMultiplier.current = 1 + (scoreRef.current / 50) * 0.1;
-        const spawnRate = Math.max(400, 1200 - (scoreRef.current * 5));
+        speedMultiplier.current = 1 + (scoreRef.current / 5) * 0.15; 
+        const spawnRate = Math.max(350, 1200 - (scoreRef.current * 40)); 
 
         if (now - lastSpawnTime.current > spawnRate) {
             spawnItem();
@@ -227,29 +256,24 @@ const GameScreen = ({ navigation }) => {
         itemsRef.current = itemsRef.current.filter(item => {
             item.y += 4 * speedMultiplier.current;
             
-            // ✅ DEĞİŞİKLİK: Daha hassas ve adil hitbox (Çarpışma Alanı) hesaplaması
-            // Karakterin sadece kafa (üst) kısmı çarpışma sayılır. Bomba alt tarafa (gövdeye) indiyse çarpsan bile yanmazsın.
             const playerTop = height - FLOOR_HEIGHT - 65; 
-            const playerBottom = playerTop + 45; // Sadece 45px'lik ince bir çarpışma alanı
+            const playerBottom = playerTop + 45; 
             
             const collisionY = item.y + ITEM_SIZE > playerTop && item.y < playerBottom;
             const collisionX = item.x + ITEM_SIZE > playerPosRef.current + 25 && item.x < playerPosRef.current + PLAYER_SIZE - 25;
 
             if (collisionY && collisionX) {
-                // ÇARPIŞMA OLDU
                 if (item.type === 'good') {
-                    scoreRef.current += 10;
+                    scoreRef.current += 1;
                     setScore(scoreRef.current);
                     checkEvolution(scoreRef.current); 
-                    triggerFeedback(item.x, playerTop - 30, "+10", "#FFD700"); 
-                    playSound('score'); // ✅ DEĞİŞİKLİK: Mama alınca score.mp3
+                    triggerFeedback(item.x, playerTop - 30, "+1", "#FFD700"); 
+                    playSound('score'); 
                 } else {
                     livesRef.current -= 1;
                     setLives(livesRef.current); 
                     shakeScreen();
                     triggerFeedback(item.x, playerTop - 30, "💔", "#FF4757"); 
-                    
-                    // ✅ DEĞİŞİKLİK: Yasaklı (Bomba) maddeye çarpıldığında error.mp3
                     playSound('error'); 
                     
                     if (livesRef.current <= 0) {
@@ -257,9 +281,9 @@ const GameScreen = ({ navigation }) => {
                         return false; 
                     }
                 }
-                return false; // Çarpılan eşyayı listeden sil
+                return false; 
             }
-            if (item.y > height) return false; // Ekrandan çıkana kadar silme
+            if (item.y > height) return false; 
             return true; 
         });
 
@@ -323,10 +347,13 @@ const GameScreen = ({ navigation }) => {
                     <Text style={styles.scoreLabel}>{t.score}</Text>
                     <Text style={styles.scoreValue}>{score}</Text>
                 </View>
-                <View style={styles.livesBoard}>
-                    {[1, 2, 3].map((h) => (
-                        <Ionicons key={h} name="heart" size={28} color={h <= lives ? "#FF4757" : "rgba(0,0,0,0.2)"} style={{marginLeft: 2}} />
-                    ))}
+                <View style={{ alignItems: 'flex-end' }}>
+                    <View style={styles.livesBoard}>
+                        {[1, 2, 3].map((h) => (
+                            <Ionicons key={h} name="heart" size={28} color={h <= lives ? "#FF4757" : "rgba(0,0,0,0.2)"} style={{marginLeft: 2}} />
+                        ))}
+                    </View>
+                    <Text style={styles.highScoreText}>{t.best} {highScore}</Text>
                 </View>
             </View>
 
@@ -390,16 +417,16 @@ const styles = StyleSheet.create({
     player: { position: 'absolute', bottom: FLOOR_HEIGHT - 25, left: 0, width: PLAYER_SIZE, height: PLAYER_SIZE, zIndex: 20 },
     item: { position: 'absolute', width: ITEM_SIZE, height: ITEM_SIZE, justifyContent: 'center', alignItems: 'center', zIndex: 15 },
     
-    // Feedback Animasyon Stilleri
     feedbackItem: { position: 'absolute', zIndex: 50, alignItems: 'center', justifyContent: 'center' },
     feedbackText: { fontSize: 32, fontWeight: '900', textShadowOffset: {width: 2, height: 2}, textShadowRadius: 3 },
 
-    uiContainer: { position: 'absolute', top: 20, left: 20, right: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', zIndex: 100 },
-    backBtn: { width: 45, height: 45, borderRadius: 25, backgroundColor: 'white', justifyContent: 'center', alignItems: 'center', elevation: 5 },
+    uiContainer: { position: 'absolute', top: 20, left: 20, right: 20, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', zIndex: 100 },
+    backBtn: { width: 45, height: 45, borderRadius: 25, backgroundColor: 'white', justifyContent: 'center', alignItems: 'center', elevation: 5, marginTop: 5 },
     scoreBox: { backgroundColor: 'white', paddingVertical: 8, paddingHorizontal: 30, borderRadius: 25, alignItems: 'center', elevation: 5, borderWidth: 3, borderColor: '#6C5CE7' },
     scoreLabel: { fontSize: 10, fontWeight: '900', color: '#6C5CE7' },
     scoreValue: { fontSize: 26, fontWeight: '900', color: '#2d3436' },
     livesBoard: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.9)', padding: 8, borderRadius: 20, elevation: 5 },
+    highScoreText: { fontSize: 14, fontWeight: '900', color: 'white', marginTop: 6, textShadowColor: 'rgba(0,0,0,0.4)', textShadowOffset: {width: 1, height: 1}, textShadowRadius: 2, marginRight: 5 },
     
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
     modalContent: { width: '85%', backgroundColor: 'white', borderRadius: 30, padding: 30, alignItems: 'center', elevation: 20 },

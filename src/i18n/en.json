@@ -55,5 +55,21 @@
   "favorites": "Favorites",
   "listings_count": "Listings",
   "add_new": "+ Add New",
-  "add_first": "Add First Listing"
+  "add_first": "Add First Listing",
+  
+  "free_listing": "Post Free Listing",
+  "petsgram": "Petsgram",
+  "pito_games": "Pito Game World",
+  "play_and_donate": "Play, Compete & Earn Points! 🎮",
+  "ai_vet": "Your Veterinarian (AI)",
+  "ai_breed": "Ask AI for Pet Breed ✨",
+  "qr_tag": "Buy QR Code Tag",
+  "follow": "Follow",
+  "unfollow": "Unfollow",
+  "followers": "Followers",
+  "following": "Following",
+  "block_user": "Block User",
+  "donation_points": "Donation Points",
+  "camera_permission": "Camera Permission Needed",
+  "gallery_permission": "Gallery Permission Needed"
 }

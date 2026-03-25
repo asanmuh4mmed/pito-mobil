@@ -12,6 +12,7 @@ export const GAME_IDS = {
     BUBBLE: '5', 
     TOWER: '6', 
     QUIZ: '7', // ✅ Pito Quiz Eklendi
+    TILE: '8', // ✅ Pito Karoları (Tile Match) Eklendi
     DONATE: 'donate' 
 };
 

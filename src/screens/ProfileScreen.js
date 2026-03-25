@@ -82,7 +82,7 @@ const TRANSLATIONS = {
     }
 };
 
-// ✅ Izgara Görünümü İçin Tekil Öğe
+// ✅ Izgara Görünümü İçin Tekil Öğe (Yorum Sayısı Eklendi)
 const GridItem = ({ post, navigation, onPress }) => {
     const player = useVideoPlayer(post.type === 'video' ? post.image : null, player => {
         player.muted = true; 
@@ -114,6 +114,10 @@ const GridItem = ({ post, navigation, onPress }) => {
                 <View style={{flexDirection:'row', alignItems:'center', marginRight:8}}>
                     <Ionicons name="heart" size={10} color="white" />
                     <Text style={{color:'white', fontSize:9, marginLeft:2, fontWeight:'bold'}}>{post.likes || 0}</Text>
+                </View>
+                <View style={{flexDirection:'row', alignItems:'center'}}>
+                    <Ionicons name="chatbubble" size={10} color="white" />
+                    <Text style={{color:'white', fontSize:9, marginLeft:2, fontWeight:'bold'}}>{post.comments?.length || 0}</Text>
                 </View>
             </View>
         </TouchableOpacity>
@@ -161,7 +165,7 @@ const ProfileScreen = ({ navigation, route }) => {
 
     if (!viewUser) return null;
 
-    // ✅ DİNAMİK ROZET HESAPLAYICI
+    // ✅ DİNAMİK ROZET HESAPLAYICI (donation_count üzerinden hesaplar)
     const calculateDynamicBadge = (points) => {
         const p = points || 0;
         if (p >= 50) return { name: t.badgeDiamond, icon: 'diamond', color: '#00E5FF' }; // Siyan Mavi
@@ -180,8 +184,9 @@ const ProfileScreen = ({ navigation, route }) => {
         return { next: p, current: p, name: t.badgeDiamond, max: true }; 
     };
 
-    const displayBadge = viewUser.activeBadge || calculateDynamicBadge(viewUser.donation_points);
-    const badgeProgressInfo = getBadgeProgress(user?.donation_points || 0);
+    // ✅ donation_points yerine donation_count kullanıldı
+    const displayBadge = viewUser.activeBadge || calculateDynamicBadge(viewUser.donation_count);
+    const badgeProgressInfo = getBadgeProgress(user?.donation_count || 0);
     const badgeProgressPercent = badgeProgressInfo.max ? 100 : (badgeProgressInfo.current / badgeProgressInfo.next) * 100;
 
     const unreadCount = user ? getUnreadCount(user.id) : 0;
@@ -385,8 +390,16 @@ const ProfileScreen = ({ navigation, route }) => {
                                 <Text style={styles.avatarText}>{viewUser.fullname?.charAt(0)}</Text>
                             </View>
                         )}
+                        
                         {viewUser.isPremium && (
                             <View style={styles.premiumBadgeAvatar}><Ionicons name="checkmark-circle" size={22} color="white" /></View>
+                        )}
+
+                        {/* ✅ ROZET PROFİL RESMİNİN ETRAFINA (SOL ALTA) EKLENDİ */}
+                        {displayBadge && (
+                            <View style={[styles.avatarBadge, { backgroundColor: theme.cardBg, borderColor: displayBadge.color }]}>
+                                <Ionicons name={displayBadge.icon} size={20} color={displayBadge.color} />
+                            </View>
                         )}
                     </View>
                     
@@ -401,14 +414,6 @@ const ProfileScreen = ({ navigation, route }) => {
                                 color="#00E5FF" 
                                 style={{ marginLeft: 6, marginTop: 4 }} 
                             />
-                        )}
-
-                        {/* ✅ DİNAMİK ROZET GÖSTERİMİ */}
-                        {displayBadge && (
-                            <View style={{marginLeft: 8, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', backgroundColor: displayBadge.color + '20', borderRadius: 12, marginTop: 4}}>
-                                <Ionicons name={displayBadge.icon} size={14} color={displayBadge.color} />
-                                <Text style={{fontSize: 10, fontWeight: 'bold', color: displayBadge.color, marginLeft: 4}}>{displayBadge.name}</Text>
-                            </View>
                         )}
                     </View>
 
@@ -481,12 +486,12 @@ const ProfileScreen = ({ navigation, route }) => {
                                     <Ionicons name="chevron-forward" size={22} color={theme.subText} />
                                 </TouchableOpacity>
                                 
-                                {/* ✅ BAĞIŞ VE ROZETLER İLERLEME ÇUBUĞU */}
+                                {/* ✅ BAĞIŞ VE ROZETLER İLERLEME ÇUBUĞU (donation_count kullanıldı) */}
                                 <TouchableOpacity style={[styles.shopOptionCard, {backgroundColor: theme.cardBg}]} onPress={() => navigation.navigate('Badges')} activeOpacity={0.8}>
                                     <View style={[styles.iconCircle, {backgroundColor:'rgba(253, 203, 110, 0.1)'}]}><Ionicons name="trophy" size={26} color="#FDCB6E" /></View>
                                     <View style={{flex:1}}>
                                         <Text style={[styles.shopOptionText, {color: theme.text}]}>{t.donationPoints}</Text>
-                                        <Text style={{fontSize:12, color:theme.subText}}>{t.totalPoints} {user?.donation_points || 0} {t.points}</Text>
+                                        <Text style={{fontSize:12, color:theme.subText}}>{t.totalPoints} {user?.donation_count || 0} {t.points}</Text>
                                         
                                         {/* Progress Bar (Gelişim Çubuğu) */}
                                         <View style={{marginTop: 8, height: 6, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 3, overflow: 'hidden', width: '90%'}}>
@@ -772,13 +777,32 @@ const styles = StyleSheet.create({
     header: { flexDirection: 'row', justifyContent: 'space-between', padding: 15, paddingTop: 50, alignItems: 'center' },
     headerTitle: { fontSize: 18, fontWeight: 'bold' },
     iconBtn: { padding: 8, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.05)', marginLeft: 5 },
-    badge: { position: 'absolute', top: 5, right: 5, backgroundColor: '#FF4D4D', borderRadius: 8, width: 16, height: 16, justifyContent: 'center', alignItems: 'center' },
-    badgeText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
+    badge: { position: 'absolute', top: 5, right: 5, backgroundColor: '#FFD700', borderRadius: 8, width: 16, height: 16, justifyContent: 'center', alignItems: 'center' },
+    badgeText: { color: 'black', fontSize: 10, fontWeight: 'bold' },
     profileSection: { alignItems: 'center', padding: 25, borderRadius: 25, margin: 15, elevation: 4, shadowColor: '#000', shadowOffset:{width:0, height:3}, shadowOpacity:0.15 },
     avatarContainer: { marginBottom: 15, shadowColor: '#000', shadowOffset:{width:0, height:4}, shadowOpacity:0.25, shadowRadius:6, position: 'relative' },
     avatar: { width: 90, height: 90, borderRadius: 45 },
     avatarText: { fontSize: 40, fontWeight: 'bold', color: 'white' },
     premiumBadgeAvatar: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#00E5FF', borderRadius: 15, padding: 2, borderWidth: 2, borderColor: 'white' },
+    
+    // ✅ ROZET İÇİN YENİ STİL BURADA
+    avatarBadge: {
+        position: 'absolute',
+        // Değerleri -5'ten -15'e (veya isteğine göre daha fazla) çekerek dışarı itiyoruz
+        bottom: -15, 
+        left: -15,   
+        borderRadius: 20,
+        padding: 6,
+        borderWidth: 2.5,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 5,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.3,
+        shadowRadius: 3
+    },
+
     userName: { fontSize: 24, fontWeight: 'bold', marginTop: 5 },
     userEmail: { fontSize: 14, marginTop: 2, marginBottom: 10 },
     userBio: { textAlign: 'center', marginHorizontal: 20, marginTop: 10, fontStyle: 'italic', lineHeight: 20 },
@@ -824,8 +848,8 @@ const styles = StyleSheet.create({
     userListItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1, paddingHorizontal: 20 },
     listAvatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#6C5CE7', justifyContent: 'center', alignItems: 'center', marginRight: 15, overflow: 'hidden' },
     listName: { fontSize: 16, fontWeight: '600' },
-    notificationItem: { flexDirection: 'row', padding: 15, borderBottomWidth: 1, alignItems: 'center', position: 'relative' },
-    unreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FF4D4D', position: 'absolute', top: 15, left: 5, zIndex: 10 }, 
+    notificationItem: { flexDirection: 'row', padding: 15, borderBottomWidth: 1, alignItems: 'center', position: 'relative', backgroundColor: '#FFD700' },
+    unreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FFD700', position: 'absolute', top: 15, left: 5, zIndex: 10 }, 
     userInfoSection: { backgroundColor: 'rgba(108, 92, 231, 0.05)', padding: 15, borderRadius: 10, marginBottom: 15 },
     sectionHeader: { fontSize: 16, fontWeight: 'bold', marginBottom: 10 },
     infoText: { fontSize: 14, marginBottom: 5 },

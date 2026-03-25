@@ -31,10 +31,10 @@ const BADGES_DATA = {
 const TRANSLATIONS = {
     TR: {
         header: "Başarılarım",
-        totalPoints: "Toplam Puan",
-        infoBtn: "Puanlarım ile ne yapabilirim?",
-        infoTitle: "Puanlar ve Rozetler Hakkında",
-        infoMsg: "🐾 **Puanlar:** Pito üzerinden yaptığın bağışlar ve iyilikler sana puan kazandırır.\n\n🏆 **Rozetler:** Puanın arttıkça yeni rozetlerin kilidi açılır. Bu rozetleri profiline takarak toplulukta ne kadar yardımsever olduğunu gösterebilirsin.\n\n✨ **Prestij:** Rozetler herhangi bir maddi karşılık taşımaz, ancak topluluk içindeki güvenilirliğini artırır.",
+        earnedBadges: "Kazanılan Rozetler", // ✅ Güncellendi
+        infoBtn: "Rozetlerim ne işe yarar?", // ✅ Güncellendi
+        infoTitle: "Bağışlar ve Rozetler", // ✅ Güncellendi
+        infoMsg: "🐾 **Bağışlar:** Pito üzerinden yaptığın her mama bağışı, patili dostlarımıza umut olur ve sistemde kayıt altına alınır.\n\n🏆 **Rozetler:** Bağış sayın arttıkça yeni rozetlerin kilidi açılır. Bu rozetleri profiline takarak toplulukta ne kadar yardımsever olduğunu gösterebilirsin.\n\n✨ **Prestij:** Rozetler profilini süsler ve diğer hayvanseverlere ilham kaynağı olmanı sağlar.", // ✅ Güncellendi
         ok: "Anladım",
         nextBadge: "Sonraki Rozet:",
         collection: "Rozet Koleksiyonu",
@@ -42,14 +42,15 @@ const TRANSLATIONS = {
         equip: "Profile Ekle",
         equipAlertTitle: "Harika!",
         equipAlertMsg: "rozeti profiline eklendi.",
-        pointsReq: "Puan Gerekli"
+        pointsReq: "Bağış",
+        noBadgesYet: "Henüz rozetin yok" // ✅ Eklendi
     },
     AU: {
         header: "My Achievements",
-        totalPoints: "Total Points",
-        infoBtn: "What can I do with points?",
-        infoTitle: "About Points & Badges",
-        infoMsg: "🐾 **Points:** Donations and kindness on Pito earn you points.\n\n🏆 **Badges:** As your points increase, new badges unlock. Equip these to show the community your helpfulness.\n\n✨ **Prestige:** Badges have no monetary value but increase your reliability within the community.",
+        earnedBadges: "Earned Badges",
+        infoBtn: "What do my badges do?",
+        infoTitle: "Donations & Badges",
+        infoMsg: "🐾 **Donations:** Every food donation you make on Pito brings hope to our furry friends and is recorded in the system.\n\n🏆 **Badges:** As your donation count increases, new badges unlock. Equip these to show the community your helpfulness.\n\n✨ **Prestige:** Badges decorate your profile and inspire other animal lovers.",
         ok: "Got it",
         nextBadge: "Next Badge:",
         collection: "Badge Collection",
@@ -57,7 +58,8 @@ const TRANSLATIONS = {
         equip: "Equip to Profile",
         equipAlertTitle: "Awesome!",
         equipAlertMsg: "badge has been added to your profile.",
-        pointsReq: "Points Required"
+        pointsReq: "Donations",
+        noBadgesYet: "No badges yet"
     }
 };
 
@@ -70,23 +72,27 @@ const BadgesScreen = ({ navigation }) => {
     const t = TRANSLATIONS[activeLang];
     const currentBadges = BADGES_DATA[activeLang];
 
-    // Kullanıcının puanı
-    const userPoints = user?.points || 0;
+    // Kullanıcının bağış sayısı (Rozet kilitlerini açmak için)
+    const userDonations = user?.donation_count || 0;
     const activeBadgeId = user?.activeBadge?.id;
 
+    // ✅ Kazanılan rozetleri hesapla
+    const earnedBadges = currentBadges.filter(b => userDonations >= b.minPoints);
+    const earnedBadgesCount = earnedBadges.length;
+
     // Bir sonraki seviyeye ne kadar kaldı?
-    const nextBadge = currentBadges.find(b => b.minPoints > userPoints);
+    const nextBadge = currentBadges.find(b => b.minPoints > userDonations);
     const progress = nextBadge 
-        ? (userPoints / nextBadge.minPoints) * 100 
+        ? (userDonations / nextBadge.minPoints) * 100 
         : 100;
 
-    // ✅ Rozet Takma İşlemi
+    // Rozet Takma İşlemi
     const handleEquip = (item) => {
         equipBadge(item);
         Alert.alert(t.equipAlertTitle, `${item.title} ${t.equipAlertMsg}`);
     };
 
-    // ✅ YENİ BİLGİLENDİRME BUTONU İŞLEVİ
+    // Bilgilendirme Butonu İşlevi
     const handleInfoPress = () => {
         Alert.alert(
             t.infoTitle,
@@ -96,14 +102,14 @@ const BadgesScreen = ({ navigation }) => {
     };
 
     const renderBadge = ({ item }) => {
-        const isUnlocked = userPoints >= item.minPoints;
+        const isUnlocked = userDonations >= item.minPoints;
         const isEquipped = activeBadgeId === item.id;
 
         return (
             <View style={[
                 styles.badgeCard, 
                 { backgroundColor: theme.cardBg, opacity: isUnlocked ? 1 : 0.6 },
-                isEquipped && { borderColor: item.color, borderWidth: 2 } // Seçili ise çerçeve ekle
+                isEquipped && { borderColor: '#6C5CE7', borderWidth: 2 } // ✅ Seçili çerçeve rengi mor yapıldı
             ]}>
                 <View style={[styles.iconContainer, { backgroundColor: isUnlocked ? item.color + '20' : '#ccc' }]}>
                     <Ionicons 
@@ -118,18 +124,18 @@ const BadgesScreen = ({ navigation }) => {
                     
                     {/* Durum Metni veya Buton */}
                     {isEquipped ? (
-                        <Text style={{color: item.color, fontWeight:'bold', marginTop:5}}>{t.equipped}</Text>
+                        <Text style={{color: '#6C5CE7', fontWeight:'bold', marginTop:5}}>{t.equipped}</Text> // ✅ Renk mor
                     ) : isUnlocked ? (
-                        <TouchableOpacity style={[styles.equipBtn, {borderColor: item.color}]} onPress={() => handleEquip(item)}>
-                            <Text style={{color: item.color, fontSize:12, fontWeight:'bold'}}>{t.equip}</Text>
+                        <TouchableOpacity style={[styles.equipBtn, {borderColor: '#6C5CE7'}]} onPress={() => handleEquip(item)}>
+                            <Text style={{color: '#6C5CE7', fontSize:12, fontWeight:'bold'}}>{t.equip}</Text> 
                         </TouchableOpacity>
                     ) : (
                         <Text style={[styles.badgeReq, { color: theme.subText }]}>{item.minPoints} {t.pointsReq}</Text>
                     )}
                 </View>
                 
-                {isUnlocked && !isEquipped && <Ionicons name="lock-open-outline" size={24} color="#4CAF50" style={styles.checkIcon} />}
-                {isEquipped && <Ionicons name="checkmark-circle" size={24} color={item.color} style={styles.checkIcon} />}
+                {isUnlocked && !isEquipped && <Ionicons name="lock-open-outline" size={24} color="#6C5CE7" style={styles.checkIcon} />}
+                {isEquipped && <Ionicons name="checkmark-circle" size={24} color="#6C5CE7" style={styles.checkIcon} />}
             </View>
         );
     };
@@ -147,19 +153,31 @@ const BadgesScreen = ({ navigation }) => {
 
             <ScrollView contentContainerStyle={styles.content}>
                 
-                {/* ÜST BİLGİ KARTI */}
+                {/* ✅ YENİ ÜST BİLGİ KARTI (Mor Tema & Rozet İkonları) */}
                 <View style={styles.summaryCard}>
-                    <View>
-                        <Text style={styles.summaryTitle}>{t.totalPoints}</Text>
-                        <Text style={styles.pointsText}>{userPoints} ⭐</Text>
+                    <View style={{ flex: 1 }}>
+                        <Text style={styles.summaryTitle}>{t.earnedBadges}</Text>
+                        <Text style={styles.pointsText}>{earnedBadgesCount} 🏆</Text>
+                        
+                        <View style={styles.earnedBadgesRow}>
+                            {earnedBadgesCount === 0 ? (
+                                <Text style={styles.noBadgesText}>{t.noBadgesYet}</Text>
+                            ) : (
+                                earnedBadges.map((badge) => (
+                                    <View key={badge.id} style={[styles.smallBadgeIcon, { borderColor: badge.color }]}>
+                                        <Ionicons name={badge.icon} size={14} color={badge.color} />
+                                    </View>
+                                ))
+                            )}
+                        </View>
                     </View>
-                    <Ionicons name="ribbon" size={60} color="white" />
+                    <Ionicons name="ribbon-outline" size={70} color="rgba(255,255,255,0.2)" style={{ position: 'absolute', right: 20, top: 20 }} />
                 </View>
 
-                {/* ✅ YENİ BİLGİLENDİRME BUTONU (Premium Kutusu Yerine) */}
+                {/* ✅ YENİ BİLGİLENDİRME BUTONU */}
                 <TouchableOpacity style={styles.infoBtn} onPress={handleInfoPress}>
-                    <Ionicons name="information-circle-outline" size={20} color={COLORS.primary} />
-                    <Text style={[styles.infoText, { color: COLORS.primary }]}>{t.infoBtn}</Text>
+                    <Ionicons name="information-circle-outline" size={20} color="#6C5CE7" />
+                    <Text style={[styles.infoText, { color: "#6C5CE7" }]}>{t.infoBtn}</Text>
                 </TouchableOpacity>
 
                 {/* İLERLEME ÇUBUĞU */}
@@ -169,10 +187,10 @@ const BadgesScreen = ({ navigation }) => {
                             {t.nextBadge} <Text style={{fontWeight:'bold', color: nextBadge.color}}>{nextBadge.title}</Text>
                         </Text>
                         <View style={styles.progressBarBg}>
-                            <View style={[styles.progressBarFill, { width: `${progress}%`, backgroundColor: nextBadge.color }]} />
+                            <View style={[styles.progressBarFill, { width: `${progress}%`, backgroundColor: '#6C5CE7' }]} />
                         </View>
                         <Text style={{textAlign:'right', fontSize:12, color:theme.subText, marginTop:5}}>
-                            {userPoints} / {nextBadge.minPoints}
+                            {userDonations} / {nextBadge.minPoints}
                         </Text>
                     </View>
                 )}
@@ -198,8 +216,9 @@ const styles = StyleSheet.create({
     headerTitle: { fontSize: 20, fontWeight: 'bold' },
     content: { padding: 20, paddingBottom: 50 },
     
+    // ✅ Mor temalı yeni kart stili
     summaryCard: {
-        backgroundColor: COLORS.primary,
+        backgroundColor: '#6C5CE7', // Ana Pito mor rengi
         borderRadius: 20,
         padding: 25,
         flexDirection: 'row',
@@ -207,27 +226,59 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginBottom: 10, 
         elevation: 10,
-        shadowColor: COLORS.primary,
+        shadowColor: '#6C5CE7',
         shadowOffset: { width: 0, height: 5 },
-        shadowOpacity: 0.3,
+        shadowOpacity: 0.4,
         shadowRadius: 10,
+        position: 'relative',
+        overflow: 'hidden'
     },
     summaryTitle: { color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: 'bold', textTransform: 'uppercase' },
     pointsText: { color: 'white', fontSize: 36, fontWeight: '800', marginTop: 5 },
+    
+    // ✅ Kazanılan rozet ikonları sırası
+    earnedBadgesRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginTop: 15,
+        alignItems: 'center'
+    },
+    smallBadgeIcon: {
+        backgroundColor: 'white',
+        width: 28,
+        height: 28,
+        borderRadius: 14,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 6,
+        marginBottom: 6,
+        borderWidth: 1,
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 2
+    },
+    noBadgesText: {
+        color: 'rgba(255,255,255,0.7)',
+        fontSize: 12,
+        fontStyle: 'italic'
+    },
 
-    // ✅ YENİ BİLGİ BUTONU STİLİ
     infoBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 10,
         marginBottom: 25,
+        backgroundColor: 'rgba(108, 92, 231, 0.1)', // Morumsu arka plan
+        borderRadius: 15,
+        marginHorizontal: 10
     },
     infoText: {
         marginLeft: 5,
         fontSize: 14,
-        fontWeight: '600',
-        textDecorationLine: 'underline',
+        fontWeight: 'bold',
     },
 
     progressContainer: { marginBottom: 30 },
@@ -255,7 +306,7 @@ const styles = StyleSheet.create({
     badgeReq: { fontSize: 12, fontWeight: 'bold' },
     checkIcon: { marginLeft: 10 },
     
-    equipBtn: { marginTop: 5, borderWidth: 1, borderRadius: 15, paddingVertical: 4, paddingHorizontal: 12, alignSelf: 'flex-start' }
+    equipBtn: { marginTop: 5, borderWidth: 1, borderRadius: 15, paddingVertical: 5, paddingHorizontal: 15, alignSelf: 'flex-start', backgroundColor: 'rgba(108, 92, 231, 0.05)' }
 });
 
 export default BadgesScreen;

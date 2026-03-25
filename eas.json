@@ -24,7 +24,8 @@
         "EXPO_PUBLIC_EMAILJS_TEMPLATE_ID": "template_wo2a1mr",
         "EXPO_PUBLIC_EMAILJS_PUBLIC_KEY": "QYBAh1dR0CkFvFiGA",
         "EXPO_PUBLIC_AI_ENDPOINT": "https://text.pollinations.ai",
-        "EXPO_PUBLIC_HF_TOKEN": "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"
+        "EXPO_PUBLIC_HF_TOKEN": "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",
+        "EXPO_PUBLIC_GROQ_API_KEY": "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"
       }
     }
   },

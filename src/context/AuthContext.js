@@ -1,6 +1,8 @@
 import React, { createContext, useState, useEffect } from 'react';
-import { Alert } from 'react-native'; 
+import { Alert, Platform } from 'react-native'; 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications'; // ✅ Uzaktan bildirimler için eklendi
+import Constants from 'expo-constants'; // ✅ YENİ: Proje kimliğini (projectId) bulmak için eklendi
 import { supabase } from '../lib/supabase'; 
 import { playSound } from '../utils/SoundManager'; 
 
@@ -38,17 +40,92 @@ export const AuthProvider = ({ children }) => {
         return () => subscription?.unsubscribe();
     }, []);
 
+    // ✅ GÜNCELLENDİ: CİHAZIN PUSH TOKEN'INI ALMA FONKSİYONU
+    const registerForPushNotificationsAsync = async () => {
+        let token;
+        try {
+            if (Platform.OS === 'android') {
+                await Notifications.setNotificationChannelAsync('default', {
+                    name: 'default',
+                    importance: Notifications.AndroidImportance.MAX,
+                    vibrationPattern: [0, 250, 250, 250],
+                    lightColor: '#FF231F7C',
+                });
+            }
+
+            const { status: existingStatus } = await Notifications.getPermissionsAsync();
+            let finalStatus = existingStatus;
+            
+            if (existingStatus !== 'granted') {
+                const { status } = await Notifications.requestPermissionsAsync();
+                finalStatus = status;
+            }
+            
+            if (finalStatus !== 'granted') {
+                console.log('Bildirim izni verilmedi!');
+                return null;
+            }
+            
+            // ✨ YENİ: Standalone (Play Store) uygulamaları için Proje Kimliği (projectId) gerekiyor
+            const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
+            
+            if (!projectId) {
+                console.log("Project ID bulunamadı, token alınamıyor!");
+            }
+
+            // Token alırken projectId'yi parametre olarak gönderiyoruz
+            token = (await Notifications.getExpoPushTokenAsync({
+                projectId: projectId,
+            })).data;
+            
+            return token;
+        } catch (error) {
+            console.log("Push Token hatası:", error);
+            return null;
+        }
+    };
+
+    // ✅ BİLDİRİMLER İÇİN LOKAL UYARI FONKSİYONU
+    const triggerLocalNotification = async (title, body) => {
+        await Notifications.scheduleNotificationAsync({
+            content: {
+                title: title,
+                body: body,
+                sound: true, 
+            },
+            trigger: null, // Hemen göster
+        });
+    };
+
     // ✅ KULLANICI BİLGİLERİNİ CANLI DİNLEME (REALTIME)
     useEffect(() => {
         if (!user?.id) return;
 
         const channel = supabase
-            .channel('public:users')
+            .channel(`user_changes_${user.id}`)
             .on(
                 'postgres_changes',
                 { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${user.id}` },
                 (payload) => {
-                    // Puan, admin durumu veya profil değiştiğinde kullanıcıyı güncelle
+                    const oldNotifs = user?.notifications || [];
+                    const newNotifs = payload.new.notifications || [];
+
+                    if (newNotifs.length > oldNotifs.length) {
+                        const latestNotif = newNotifs[0]; 
+                        
+                        // Kullanıcının bildirim ayarını kontrol et (Kapalıysa false döner)
+                        const isNotificationsEnabled = payload.new.notification_settings?.enabled !== false;
+                        
+                        // Eğer bildirim okunmamışsa VE kullanıcı ayarlardan bildirimleri kapatmadıysa banner göster
+                        if (latestNotif && !latestNotif.read && isNotificationsEnabled) {
+                            playSound('noti');
+                            triggerLocalNotification(
+                                "Petsgram'dan Yeni Bildirim 🐾", 
+                                latestNotif.message
+                            );
+                        }
+                    }
+
                     setUser(prev => ({ ...prev, ...payload.new }));
                 }
             )
@@ -74,7 +151,6 @@ export const AuthProvider = ({ children }) => {
 
     const fetchUserDetails = async (userId) => {
         try {
-            // 1. Kullanıcı tablosundan verileri çek
             const { data: dbUser, error } = await supabase
                 .from('users')
                 .select('*') 
@@ -89,7 +165,6 @@ export const AuthProvider = ({ children }) => {
             if (dbUser) {
                 const { data: { user: authUser } } = await supabase.auth.getUser();
                 
-                // 2. Takip edilenleri çek
                 const { data: followingData } = await supabase
                     .from('follows')
                     .select('following_id')
@@ -97,7 +172,6 @@ export const AuthProvider = ({ children }) => {
 
                 const followingIds = followingData ? followingData.map(f => f.following_id) : [];
 
-                // 3. Kullanıcı objesini oluştur
                 const finalUser = {
                     ...dbUser,
                     email: authUser?.email || dbUser.email,
@@ -105,6 +179,13 @@ export const AuthProvider = ({ children }) => {
                     donation_points: dbUser.donation_points || 0,
                     is_admin: dbUser.is_admin || false 
                 };
+
+                // GİRİŞTE PUSH TOKEN AL VE GEREKİRSE DB GÜNCELLE
+                const pushToken = await registerForPushNotificationsAsync();
+                if (pushToken && dbUser.expo_push_token !== pushToken) {
+                    await supabase.from('users').update({ expo_push_token: pushToken }).eq('id', userId);
+                    finalUser.expo_push_token = pushToken;
+                }
 
                 setUser(finalUser);
                 
@@ -198,7 +279,6 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    // ✅ BAĞIŞ YAPILDIĞINDA BAĞIŞ SAYISINI (+1) ARTIRAN FONKSİYON
     const incrementDonationPoints = async () => {
         if (!user) return { success: false };
 
@@ -213,7 +293,6 @@ export const AuthProvider = ({ children }) => {
 
             if (error) throw error;
 
-            // Local state'i de güncelle
             setUser(prev => ({ ...prev, donation_points: newPoints }));
             return { success: true, newPoints };
         } catch (error) {
@@ -222,10 +301,18 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    // --- AUTH OPERATIONS ---
+    // ✅ EKSİK OLAN ROZET TAKMA FONKSİYONU BURAYA EKLENDİ
+    const equipBadge = async (badgeItem) => {
+        if (!user) return;
+        try {
+            // Zaten var olan updateUser fonksiyonunu kullanarak hem DB'yi hem state'i güncelliyoruz
+            await updateUser({ activeBadge: badgeItem });
+        } catch (error) {
+            console.log("Rozet takma hatası:", error);
+        }
+    };
 
-    const register = async (username, fullname, email, password, countryCode, city, district) => {
-        setLoading(true);
+    const register = async (username, fullname, email, password, countryCode, city, district, accountType) => {
         try {
             const { data, error } = await supabase.auth.signUp({
                 email,
@@ -237,22 +324,20 @@ export const AuthProvider = ({ children }) => {
                         country: countryCode, 
                         city: city, 
                         district: district,
-                        donation_points: 0 // Başlangıçta 0 bağış puanı 
+                        account_type: accountType,
+                        donation_points: 0 
                     } 
                 }
             });
 
             if (error) throw error;
-            setLoading(false);
             return { success: true, session: data.session }; 
         } catch (e) { 
-            setLoading(false); 
             return { success: false, message: e.message }; 
         }
     };
 
     const verifyEmail = async (email, token) => {
-        setLoading(true);
         try {
             const { data, error } = await supabase.auth.verifyOtp({
                 email,
@@ -261,23 +346,18 @@ export const AuthProvider = ({ children }) => {
             });
 
             if (error) throw error;
-            setLoading(false);
             return { success: true, session: data.session };
         } catch (e) {
-            setLoading(false);
             return { success: false, message: "Invalid or expired code." };
         }
     };
 
     const login = async (email, password) => {
-        setLoading(true);
         try {
             const { error } = await supabase.auth.signInWithPassword({ email, password });
             if (error) throw error;
-            setLoading(false);
             return { success: true };
         } catch (e) { 
-            setLoading(false); 
             return { success: false, message: "Invalid email or password." }; 
         }
     };
@@ -290,7 +370,6 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
     };
 
-    // --- FOLLOW SYSTEM ---
     const toggleFollow = async (targetUserId) => {
         if (!user) return;
         if (user.id === targetUserId) return; 
@@ -306,11 +385,9 @@ export const AuthProvider = ({ children }) => {
             let newFollowingList = user.following ? [...user.following] : [];
 
             if (existingFollow) {
-                // UNFOLLOW
                 await supabase.from('follows').delete().eq('id', existingFollow.id);
                 newFollowingList = newFollowingList.filter(id => id !== targetUserId);
             } else {
-                // FOLLOW
                 await supabase.from('follows').insert({ 
                     follower_id: user.id, 
                     following_id: targetUserId 
@@ -357,20 +434,16 @@ export const AuthProvider = ({ children }) => {
         } catch (e) { console.log(e); } 
     };
 
-    // --- OTHER FUNCTIONS ---
     const updateCountry = async (newC) => { setCountry(newC); if (user) await updateUser({ country: newC.code }); };
     
     const changePassword = async (newPassword) => {
         try { const { error } = await supabase.auth.updateUser({ password: newPassword }); return error ? { success: false, message: error.message } : { success: true, message: "Password updated." }; } catch (e) { return { success: false, message: e.message }; }
     };
 
-    // ✅ GÜNCELLENDİ: Hata Yönetimi İyileştirildi (RLS Engeli Aşımı)
     const deleteUserAccount = async () => {
         if (!user) return;
         try {
             setLoading(true);
-            
-            // 1. Arşive eklemeyi dener. RLS engellerse Catch bloğuna düşer ama işlemi durdurmaz.
             try {
                 await supabase.from('deleted_users_archive').insert({
                     original_user_id: user.id, 
@@ -379,10 +452,9 @@ export const AuthProvider = ({ children }) => {
                     phone: user.phone || null
                 });
             } catch (archiveError) {
-                console.log("Arşive eklenemedi (RLS kuralı kapalı olabilir):", archiveError.message);
+                console.log("Arşive eklenemedi:", archiveError.message);
             }
 
-            // 2. Ana kullanıcı silinir.
             const { error } = await supabase.from('users').delete().eq('id', user.id);
             if (error) throw error;
             
@@ -404,18 +476,38 @@ export const AuthProvider = ({ children }) => {
         try { const { data } = await supabase.from('users').select('id').eq('email', email).single(); return !!data; } catch { return false; }
     };
 
-    const resetPassword = async (email, newPassword) => { /* Reset password flow */ };
-    const deleteNotification = async () => {}; 
-    const markNotificationsAsRead = async () => {};
+    const deleteNotification = async (notifId) => {
+        if (!user || !user.notifications) return;
+        const updatedNotifs = user.notifications.filter(n => n.id !== notifId);
+        setUser(prev => ({ ...prev, notifications: updatedNotifs })); 
+        try {
+            await supabase.from('users').update({ notifications: updatedNotifs }).eq('id', user.id);
+        } catch (e) {
+            console.log("Bildirim silme hatası:", e);
+        }
+    }; 
+
+    const markNotificationsAsRead = async () => {
+        if (!user || !user.notifications) return;
+        const hasUnread = user.notifications.some(n => !n.read);
+        if (!hasUnread) return;
+        const updatedNotifs = user.notifications.map(n => ({ ...n, read: true }));
+        setUser(prev => ({ ...prev, notifications: updatedNotifs })); 
+        try {
+            await supabase.from('users').update({ notifications: updatedNotifs }).eq('id', user.id);
+        } catch (e) {
+            console.log("Bildirim okundu yapma hatası:", e);
+        }
+    };
 
     return (
         <AuthContext.Provider value={{ 
             user, session, allUsers, isLoading: loading, country, 
             register, login, logout, updateUser, verifyEmail,
             toggleFollow, removeFollower, blockUser,
-            changePassword, updateCountry, checkEmailExists, resetPassword,
+            changePassword, updateCountry, checkEmailExists,
             deleteUserAccount, updateNotificationPreference, deleteNotification, markNotificationsAsRead,
-            incrementDonationPoints // ✅ DIŞARIYA AÇILDI
+            incrementDonationPoints, equipBadge // ✅ equipBadge BURAYA EKLENDİ
         }}>
             {children}
         </AuthContext.Provider>

@@ -13,10 +13,10 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // --- OYUN AYARLARI ---
 const BOX_HEIGHT = 65; 
-const MIN_BOX_SIZE = 65;  // En küçük kutu boyutu
-const MAX_BOX_SIZE = 120; // En büyük kutu boyutu
-const DROP_HEIGHT = 250;  // Yukarıdan düşme mesafesi
-const PERFECT_TOLERANCE = 10; // Kusursuz oturtma payı
+const MIN_BOX_SIZE = 65;  
+const MAX_BOX_SIZE = 120; 
+const DROP_HEIGHT = 250;  
+const PERFECT_TOLERANCE = 10; 
 
 const ANIMALS = ['🐱', '🐶', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯', '🦁', '🐮', '🐸', '🐵'];
 
@@ -59,13 +59,13 @@ const TowerGameScreen = ({ navigation }) => {
     const t = TRANSLATIONS[country?.code === 'AU' ? 'AU' : 'TR'];
 
     // --- STATE'LER ---
-    const [gameState, setGameState] = useState('START'); // START, COUNTDOWN, PLAYING, DROPPING, GAMEOVER
+    const [gameState, setGameState] = useState('START'); 
     const [score, setScore] = useState(0);
     const [bestScore, setBestScore] = useState(0);
     const [combo, setCombo] = useState(0);
     const [level, setLevel] = useState(1);
-    const [countdown, setCountdown] = useState(3);
-    const [stack, setStack] = useState([]); // Yerdeki kutular
+    const [countdown, setCountdown] = useState(1); // Geri sayım 1'e düşürüldü
+    const [stack, setStack] = useState([]); 
     const [currentBoxSize, setCurrentBoxSize] = useState(MAX_BOX_SIZE);
     
     const [isSaving, setIsSaving] = useState(false);
@@ -79,6 +79,7 @@ const TowerGameScreen = ({ navigation }) => {
     const perfectAnim = useRef(new Animated.Value(0)).current;
     const levelUpAnim = useRef(new Animated.Value(0)).current;
     const fallOffRot = useRef(new Animated.Value(0)).current; 
+    const boxScaleAnim = useRef(new Animated.Value(1)).current; // Kutu animasyonu için eklendi
 
     useEffect(() => {
         loadBestScore();
@@ -91,8 +92,13 @@ const TowerGameScreen = ({ navigation }) => {
     };
 
     const getRandomAnimal = () => ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
-    const getBoxColor = (index) => `hsl(${(index * 35) % 360}, 85%, 55%)`; 
-    const getRandomSize = () => Math.floor(Math.random() * (MAX_BOX_SIZE - MIN_BOX_SIZE + 1)) + MIN_BOX_SIZE;
+    const getBoxColor = (index) => `hsl(${(index * 35) % 360}, 85%, 65%)`; // Açık tema için doygunluk ayarı
+    const getRandomSize = (currentLevel) => {
+        // Seviye arttıkça maksimum kutu boyutu küçülür (Zorluk artışı)
+        let dynamicMax = MAX_BOX_SIZE - (currentLevel * 3);
+        if (dynamicMax < MIN_BOX_SIZE + 10) dynamicMax = MIN_BOX_SIZE + 10;
+        return Math.floor(Math.random() * (dynamicMax - MIN_BOX_SIZE + 1)) + MIN_BOX_SIZE;
+    };
 
     const initBaseTower = () => {
         movingBoxX.stopAnimation();
@@ -112,14 +118,15 @@ const TowerGameScreen = ({ navigation }) => {
         movingBoxX.setValue(startX);
         cameraY.setValue(0);
         fallOffRot.setValue(0);
+        boxScaleAnim.setValue(1);
     };
 
-    // --- 3, 2, 1 GERİ SAYIM ---
+    // --- 1'DEN GERİ SAYIM ---
     const startCountdown = () => {
         playSound('button_click');
         setGameState('COUNTDOWN');
-        setCountdown(3);
-        let current = 3;
+        setCountdown(1);
+        let current = 1;
 
         const interval = setInterval(() => {
             current -= 1;
@@ -132,28 +139,26 @@ const TowerGameScreen = ({ navigation }) => {
                 setGameState('PLAYING');
                 spawnNewBox(0, 1); 
             }
-        }, 1000);
+        }, 800);
     };
 
-    // --- YENİ KUTU OLUŞTURMA VE SÜREKLİ HAREKET (PİNG-PONG) ---
+    // --- YENİ KUTU OLUŞTURMA VE ZORLUK (HIZ) ARTIŞI ---
     const spawnNewBox = (currentStackLength, currentLevel) => {
-        const newSize = getRandomSize();
+        const newSize = getRandomSize(currentLevel);
         setCurrentBoxSize(newSize);
 
-        // Seviyeye göre hızı hesapla
-        let duration = 2000 - (currentLevel * 150);
-        if (duration < 700) duration = 700; 
+        // Zorluk Modeli: Seviye arttıkça hareket süresi kısalır (hızlanır)
+        let duration = 2000 - (currentLevel * 180);
+        if (duration < 600) duration = 600; 
 
         const startSide = 0; 
         const targetSide = SCREEN_WIDTH - newSize; 
 
-        // Kutuyu havaya yerleştir
         const dropStartHeight = currentStackLength * BOX_HEIGHT + DROP_HEIGHT;
         fallingBoxY.setValue(dropStartHeight);
         movingBoxX.setValue(startSide);
         fallOffRot.setValue(0); 
 
-        // Sürekli Sola-Sağa Gidip Gelme Animasyonu (Ping-Pong)
         Animated.loop(
             Animated.sequence([
                 Animated.timing(movingBoxX, {
@@ -172,7 +177,6 @@ const TowerGameScreen = ({ navigation }) => {
         ).start();
     };
 
-    // --- EKRANA DOKUNMA (DÜŞÜŞ) ---
     const handleTap = () => {
         if (gameState === 'START') {
             startCountdown();
@@ -194,45 +198,37 @@ const TowerGameScreen = ({ navigation }) => {
         });
     };
 
-    // --- DÜŞÜŞ SONRASI FİZİK VE ÇARPIŞMA KONTROLÜ ---
     const evaluateDrop = (currentX) => {
         const topBox = stack[stack.length - 1];
         
-        // Ağırlık Merkezi Hesaplaması
         const currentCenter = currentX + (currentBoxSize / 2);
         const topBoxLeft = topBox.x;
         const topBoxRight = topBox.x + topBox.size;
 
-        // 1. DURUM: AĞIRLIK MERKEZİ DIŞARIDA (DEVRİLİR)
         if (currentCenter < topBoxLeft || currentCenter > topBoxRight) {
             triggerGameOver(currentX, topBox.x + (topBox.size/2));
             return;
         }
 
-        // 2. DURUM: BAŞARILI YERLEŞTİRME
         let finalX = currentX;
         const diffCenter = Math.abs(currentCenter - (topBoxLeft + topBox.size / 2));
 
         if (diffCenter <= PERFECT_TOLERANCE) {
-            // Kusursuz Oturtma
             finalX = topBoxLeft + (topBox.size / 2) - (currentBoxSize / 2);
             showPerfectAnimation();
             setCombo(c => c + 1);
         } else {
-            // Normal Oturtma
             setCombo(0);
         }
 
-        // ✅ BAŞARILI HAMLE SESİ (Her Başarılı Hamlede Çalar)
         playSound('jump');
 
-        // ✅ HER HAMLEDE SABİT 5 PUAN ARTIŞI
-        const earnedPoints = 5;
-        const newScore = score + earnedPoints;
+        // PUAN SİSTEMİ 1 OLARAK GÜNCELLENDİ
+        const newScore = score + 1;
         setScore(newScore);
 
-        // SEVİYE (LEVEL) KONTROLÜ (Her 25 puanda / 5 hamlede bir level atlar)
-        const calculatedLevel = Math.floor(newScore / 25) + 1; 
+        // SEVİYE SİSTEMİ: Her 5 puanda 1 seviye atlar
+        const calculatedLevel = Math.floor(newScore / 5) + 1; 
         let currentLevel = level;
         
         if (calculatedLevel > level) {
@@ -240,16 +236,15 @@ const TowerGameScreen = ({ navigation }) => {
             setLevel(currentLevel);
             showLevelUpAnimation();
             
-            // ✅ SEVİYE ATLAMA SESİ
+            // SEVİYE ATLAMA SESİ VE KUTU ANİMASYONU
             playSound('match_success'); 
+            triggerBoxLevelUpAnimation();
         }
 
-        // Kutuyu kuleye ekle
         const newBox = { id: stack.length, x: finalX, size: currentBoxSize, color: getBoxColor(stack.length), animal: getRandomAnimal() };
         const newStack = [...stack, newBox];
         setStack(newStack);
 
-        // KAMERA KAYDIRMA (Kule Yükseldikçe Aşağı İner)
         if (newStack.length > 3) {
             Animated.timing(cameraY, {
                 toValue: (newStack.length - 3) * BOX_HEIGHT, 
@@ -263,11 +258,8 @@ const TowerGameScreen = ({ navigation }) => {
         spawnNewBox(newStack.length, currentLevel);
     };
 
-    // --- DEVRİLME ANİMASYONU VE OYUN BİTİŞİ ---
     const triggerGameOver = async (boxX, targetCenter) => {
         setGameState('GAMEOVER');
-        
-        // ✅ OYUN BİTTİ (YANMA) SESİ
         playSound('gameover');
         
         const fallDirection = boxX + (currentBoxSize/2) > targetCenter ? 1 : -1;
@@ -296,11 +288,9 @@ const TowerGameScreen = ({ navigation }) => {
             AsyncStorage.setItem('pito_tower_best', score.toString());
         }
 
-        // Skor 0'dan büyükse veritabanına kaydet
         if (score > 0 && saveGameScore) {
             setIsSaving(true);
             try {
-                // Skoru 5'er 5'er artan net sayıyla doğrudan veritabanına (haftalık/toplam) kaydeder
                 await saveGameScore('6', score);
                 setIsSaved(true);
             } catch (err) {
@@ -327,23 +317,34 @@ const TowerGameScreen = ({ navigation }) => {
         ]).start();
     };
 
+    // YENİ: SEVİYE ATLAYINCA KUTULARIN ZIPLAMASI
+    const triggerBoxLevelUpAnimation = () => {
+        boxScaleAnim.setValue(1);
+        Animated.sequence([
+            Animated.timing(boxScaleAnim, { toValue: 1.15, duration: 150, useNativeDriver: true }),
+            Animated.timing(boxScaleAnim, { toValue: 1, duration: 150, useNativeDriver: true })
+        ]).start();
+    };
+
     return (
         <SafeAreaView style={styles.container}>
-            <StatusBar barStyle="light-content" backgroundColor="#0f172a" />
+            <StatusBar barStyle="dark-content" backgroundColor="#E0F2FE" />
             
             <TouchableOpacity style={styles.gameArea} activeOpacity={1} onPress={handleTap}>
                 
-                {/* ARKAPLAN EFEKTİ */}
+                {/* AÇIK RENK ARKAPLAN (GÖKYÜZÜ) */}
                 <View style={styles.starsBg}>
-                    {[...Array(15)].map((_, i) => (
-                        <View key={i} style={[styles.star, { left: Math.random()*SCREEN_WIDTH, top: Math.random()*SCREEN_HEIGHT, opacity: Math.random() }]} />
-                    ))}
+                    {/* Bulut Efekti (Yuvarlak Şekiller) */}
+                    <View style={[styles.cloud, { top: 50, left: 20, width: 100, height: 40 }]} />
+                    <View style={[styles.cloud, { top: 150, right: 30, width: 120, height: 50 }]} />
+                    <View style={[styles.cloud, { top: 300, left: -20, width: 90, height: 35 }]} />
+                    <View style={[styles.cloud, { top: 450, right: -10, width: 150, height: 60 }]} />
                 </View>
 
-                {/* HEADER (SKOR BİLGİSİ) */}
+                {/* HEADER */}
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}>
-                        <Ionicons name="arrow-back" size={26} color="white" />
+                        <Ionicons name="arrow-back" size={26} color="#0f172a" />
                     </TouchableOpacity>
                     
                     <View style={styles.scoreBox}>
@@ -353,17 +354,17 @@ const TowerGameScreen = ({ navigation }) => {
                     
                     <View style={styles.statsContainer}>
                         <View style={styles.levelBox}>
-                            <Ionicons name="star" size={14} color="#38bdf8" />
+                            <Ionicons name="star" size={14} color="#0284c7" />
                             <Text style={styles.levelText}>{t.level} {level}</Text>
                         </View>
                         <View style={styles.bestBox}>
-                            <Ionicons name="trophy" size={14} color="#f59e0b" />
+                            <Ionicons name="trophy" size={14} color="#d97706" />
                             <Text style={styles.bestText}>{bestScore}</Text>
                         </View>
                     </View>
                 </View>
 
-                {/* BİLDİRİMLER (PERFECT & LEVEL UP) */}
+                {/* BİLDİRİMLER */}
                 <Animated.View style={[styles.notificationBanner, { opacity: perfectAnim, transform: [{ scale: perfectAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.2] }) }] }]}>
                     <Text style={styles.perfectText}>{t.perfect}</Text>
                     {combo > 1 && <Text style={styles.comboText}>{t.combo}{combo}</Text>}
@@ -373,21 +374,25 @@ const TowerGameScreen = ({ navigation }) => {
                     <Text style={styles.levelUpText}>{t.levelUp}</Text>
                 </Animated.View>
 
-                {/* KULE (KAMERA - Yükseldikçe aşağı doğru translate olur) */}
+                {/* KULE */}
                 <Animated.View style={[styles.camera, { transform: [{ translateY: cameraY }] }]}>
                     
                     {/* YERLEŞMİŞ KUTULAR */}
                     {stack.map((box) => (
-                        <View 
+                        <Animated.View 
                             key={box.id} 
-                            style={[styles.box, { left: box.x, width: box.size, bottom: box.id * BOX_HEIGHT, backgroundColor: box.color }]}
+                            style={[
+                                styles.box, 
+                                { left: box.x, width: box.size, bottom: box.id * BOX_HEIGHT, backgroundColor: box.color },
+                                { transform: [{ scale: boxScaleAnim }] } // Level atlama animasyonu buraya bağlandı
+                            ]}
                         >
                             <View style={styles.boxInnerGlow} />
                             <Text style={styles.boxEmoji}>{box.animal}</Text>
-                        </View>
+                        </Animated.View>
                     ))}
 
-                    {/* HAREKETLİ VE DÜŞEN KUTU */}
+                    {/* HAREKETLİ KUTU */}
                     {(gameState === 'PLAYING' || gameState === 'DROPPING' || gameState === 'GAMEOVER') && stack.length > 0 && (
                         <Animated.View 
                             style={[
@@ -408,20 +413,19 @@ const TowerGameScreen = ({ navigation }) => {
                             <Text style={styles.boxEmoji}>{getRandomAnimal()}</Text>
                         </Animated.View>
                     )}
-
                 </Animated.View>
 
                 {/* BAŞLANGIÇ EKRANI */}
                 {gameState === 'START' && (
                     <View style={styles.overlay}>
                         <View style={styles.pulseCircle}>
-                            <Ionicons name="play" size={50} color="white" style={{marginLeft: 8}} />
+                            <Ionicons name="play" size={50} color="#0284c7" style={{marginLeft: 8}} />
                         </View>
                         <Text style={styles.startText}>{t.tapToStart}</Text>
                     </View>
                 )}
 
-                {/* GERİ SAYIM (3, 2, 1) */}
+                {/* GERİ SAYIM */}
                 {gameState === 'COUNTDOWN' && (
                     <View style={styles.overlay}>
                         <Text style={styles.countdownText}>{countdown}</Text>
@@ -429,7 +433,7 @@ const TowerGameScreen = ({ navigation }) => {
                 )}
             </TouchableOpacity>
 
-            {/* OYUN BİTTİ MODALI */}
+            {/* OYUN BİTTİ MODALI (Açık Tema) */}
             <Modal transparent={true} visible={gameState === 'GAMEOVER'} animationType="fade">
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
@@ -452,7 +456,7 @@ const TowerGameScreen = ({ navigation }) => {
 
                         {isSaving ? (
                             <View style={styles.saveContainer}>
-                                <ActivityIndicator color="#3b82f6" />
+                                <ActivityIndicator color="#0284c7" />
                                 <Text style={styles.saveText}>{t.saving}</Text>
                             </View>
                         ) : isSaved ? (
@@ -475,74 +479,71 @@ const TowerGameScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#0f172a' },
+    container: { flex: 1, backgroundColor: '#E0F2FE' }, // Gökyüzü Mavisi
     gameArea: { flex: 1, overflow: 'hidden' },
     
-    starsBg: { ...StyleSheet.absoluteFillObject, backgroundColor: '#0f172a', zIndex: -1 },
-    star: { position: 'absolute', width: 4, height: 4, backgroundColor: 'rgba(255,255,255,0.5)', borderRadius: 2 },
+    starsBg: { ...StyleSheet.absoluteFillObject, backgroundColor: '#E0F2FE', zIndex: -1 },
+    cloud: { position: 'absolute', backgroundColor: 'rgba(255, 255, 255, 0.6)', borderRadius: 50 },
 
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, zIndex: 10, paddingTop: 40 },
-    iconBtn: { width: 45, height: 45, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
+    iconBtn: { width: 45, height: 45, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.6)', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 3, elevation: 2 },
     scoreBox: { alignItems: 'center' },
-    scoreText: { color: 'white', fontSize: 42, fontWeight: '900', textShadowColor: 'rgba(0,0,0,0.5)', textShadowRadius: 10 },
-    scoreLabel: { color: '#38bdf8', fontSize: 13, fontWeight: 'bold', letterSpacing: 2 },
+    scoreText: { color: '#0f172a', fontSize: 46, fontWeight: '900', textShadowColor: 'rgba(255,255,255,0.8)', textShadowRadius: 10 },
+    scoreLabel: { color: '#0284c7', fontSize: 14, fontWeight: 'bold', letterSpacing: 2 },
     
     statsContainer: { alignItems: 'flex-end' },
-    levelBox: { flexDirection: 'row', backgroundColor: 'rgba(56, 189, 248, 0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15, alignItems: 'center', marginBottom: 8, borderWidth: 1, borderColor: 'rgba(56, 189, 248, 0.4)' },
-    levelText: { color: '#38bdf8', fontWeight: 'bold', marginLeft: 5, fontSize: 12 },
-    bestBox: { flexDirection: 'row', backgroundColor: 'rgba(245, 158, 11, 0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.4)' },
-    bestText: { color: '#f59e0b', fontWeight: 'bold', marginLeft: 5, fontSize: 12 },
+    levelBox: { flexDirection: 'row', backgroundColor: 'rgba(255, 255, 255, 0.7)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15, alignItems: 'center', marginBottom: 8, elevation: 2 },
+    levelText: { color: '#0284c7', fontWeight: 'bold', marginLeft: 5, fontSize: 13 },
+    bestBox: { flexDirection: 'row', backgroundColor: 'rgba(255, 255, 255, 0.7)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15, alignItems: 'center', elevation: 2 },
+    bestText: { color: '#d97706', fontWeight: 'bold', marginLeft: 5, fontSize: 13 },
 
     notificationBanner: { position: 'absolute', top: SCREEN_HEIGHT * 0.25, width: '100%', alignItems: 'center', zIndex: 20 },
-    perfectText: { color: '#10b981', fontSize: 34, fontWeight: '900', textShadowColor: 'rgba(16, 185, 129, 0.5)', textShadowRadius: 15 },
-    comboText: { color: '#f59e0b', fontSize: 22, fontWeight: 'bold', marginTop: 5 },
-    levelUpText: { color: '#f472b6', fontSize: 38, fontWeight: '900', textShadowColor: 'rgba(244, 114, 182, 0.6)', textShadowRadius: 20 },
+    perfectText: { color: '#10b981', fontSize: 36, fontWeight: '900', textShadowColor: 'white', textShadowRadius: 8 },
+    comboText: { color: '#f59e0b', fontSize: 24, fontWeight: 'bold', marginTop: 5, textShadowColor: 'white', textShadowRadius: 5 },
+    levelUpText: { color: '#e11d48', fontSize: 40, fontWeight: '900', textShadowColor: 'white', textShadowRadius: 10 },
 
     camera: { flex: 1, position: 'absolute', bottom: 100, width: '100%', height: SCREEN_HEIGHT },
 
-    // KARE VE FARKLI BOYUTLARDA KUTU TASARIMI
     box: { 
         position: 'absolute', 
         height: BOX_HEIGHT, 
         borderRadius: 12, 
         borderWidth: 3, 
-        borderColor: 'rgba(255,255,255,0.9)', 
+        borderColor: 'rgba(255,255,255,0.95)', 
         justifyContent: 'center', 
         alignItems: 'center', 
-        elevation: 10, 
+        elevation: 8, 
         shadowColor: '#000', 
-        shadowOffset: { width: 0, height: 5 }, 
-        shadowOpacity: 0.4, 
-        shadowRadius: 5 
+        shadowOffset: { width: 0, height: 4 }, 
+        shadowOpacity: 0.2, 
+        shadowRadius: 4 
     },
-    boxInnerGlow: { position: 'absolute', top: 0, left: 0, right: 0, height: '40%', backgroundColor: 'rgba(255,255,255,0.3)', borderTopLeftRadius: 8, borderTopRightRadius: 8 },
-    boxEmoji: { fontSize: 28, textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 3 },
+    boxInnerGlow: { position: 'absolute', top: 0, left: 0, right: 0, height: '40%', backgroundColor: 'rgba(255,255,255,0.4)', borderTopLeftRadius: 8, borderTopRightRadius: 8 },
+    boxEmoji: { fontSize: 28, textShadowColor: 'rgba(255,255,255,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
 
-    // OVERLAY (Geri Sayım & Başlangıç)
-    overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(15, 23, 42, 0.75)', zIndex: 30 },
-    pulseCircle: { width: 110, height: 110, borderRadius: 55, backgroundColor: 'rgba(56, 189, 248, 0.2)', justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#38bdf8', marginBottom: 20 },
-    startText: { color: 'white', fontSize: 26, fontWeight: '900', letterSpacing: 2 },
-    countdownText: { color: 'white', fontSize: 130, fontWeight: '900', textShadowColor: '#38bdf8', textShadowRadius: 25 },
+    overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(224, 242, 254, 0.85)', zIndex: 30 },
+    pulseCircle: { width: 110, height: 110, borderRadius: 55, backgroundColor: 'white', justifyContent: 'center', alignItems: 'center', borderWidth: 4, borderColor: '#38bdf8', marginBottom: 20, elevation: 5 },
+    startText: { color: '#0284c7', fontSize: 28, fontWeight: '900', letterSpacing: 2 },
+    countdownText: { color: '#0284c7', fontSize: 140, fontWeight: '900', textShadowColor: 'white', textShadowRadius: 15 },
 
-    // MODAL TASARIMI
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' },
-    modalContent: { width: '85%', backgroundColor: '#1e293b', borderRadius: 35, padding: 30, alignItems: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.1)', elevation: 20 },
-    iconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(239, 68, 68, 0.1)', justifyContent: 'center', alignItems: 'center', marginTop: -70, marginBottom: 15, borderWidth: 4, borderColor: '#1e293b' },
-    modalTitle: { fontSize: 26, fontWeight: '900', color: 'white', marginBottom: 25 },
-    modalScoreRow: { flexDirection: 'row', width: '100%', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 20, paddingVertical: 20, marginBottom: 25 },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
+    modalContent: { width: '85%', backgroundColor: 'white', borderRadius: 35, padding: 30, alignItems: 'center', elevation: 20 },
+    iconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#fee2e2', justifyContent: 'center', alignItems: 'center', marginTop: -70, marginBottom: 15, borderWidth: 4, borderColor: 'white', elevation: 5 },
+    modalTitle: { fontSize: 26, fontWeight: '900', color: '#0f172a', marginBottom: 25 },
+    modalScoreRow: { flexDirection: 'row', width: '100%', backgroundColor: '#f1f5f9', borderRadius: 20, paddingVertical: 20, marginBottom: 25 },
     modalScoreCol: { flex: 1, alignItems: 'center' },
-    modalScoreLabel: { color: '#94a3b8', fontSize: 13, fontWeight: 'bold', marginBottom: 5 },
-    modalScoreValue: { color: '#38bdf8', fontSize: 40, fontWeight: '900' },
-    modalScoreDivider: { width: 2, backgroundColor: 'rgba(255,255,255,0.1)' },
+    modalScoreLabel: { color: '#64748b', fontSize: 14, fontWeight: 'bold', marginBottom: 5 },
+    modalScoreValue: { color: '#0ea5e9', fontSize: 44, fontWeight: '900' },
+    modalScoreDivider: { width: 2, backgroundColor: '#e2e8f0' },
     
     saveContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
-    saveText: { color: '#94a3b8', marginLeft: 10, fontWeight: 'bold' },
+    saveText: { color: '#64748b', marginLeft: 10, fontWeight: 'bold' },
     savedSuccessText: { color: '#10b981', fontWeight: 'bold', marginBottom: 15, fontSize: 16 },
     
-    btnPrimary: { flexDirection: 'row', width: '100%', backgroundColor: '#38bdf8', paddingVertical: 18, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginBottom: 12, elevation: 5 },
-    btnText: { color: '#0f172a', fontSize: 18, fontWeight: '900', marginRight: 10 },
+    btnPrimary: { flexDirection: 'row', width: '100%', backgroundColor: '#0ea5e9', paddingVertical: 18, borderRadius: 18, justifyContent: 'center', alignItems: 'center', marginBottom: 12, elevation: 4 },
+    btnText: { color: 'white', fontSize: 18, fontWeight: '900', marginRight: 10 },
     btnSecondary: { width: '100%', paddingVertical: 15, justifyContent: 'center', alignItems: 'center' },
-    btnSecText: { color: '#94a3b8', fontSize: 16, fontWeight: 'bold' }
+    btnSecText: { color: '#64748b', fontSize: 16, fontWeight: 'bold' }
 });
 
 export default TowerGameScreen;

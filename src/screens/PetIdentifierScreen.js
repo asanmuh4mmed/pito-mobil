@@ -3,13 +3,12 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Ani
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { COLORS } from '../constants/colors';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
-// 🔒 GÜVENLİ TOKEN ÇEKİMİ (.env dosyasından geliyor)
+// 🔒 GÜVENLİ TOKEN ÇEKİMİ (.env dosyasından geliyor - Yeni Pito Token'ı)
 const HF_TOKEN = process.env.EXPO_PUBLIC_HF_TOKEN; 
 
 // ✅ Hugging Face Router URL - En stabil görüntü sınıflandırma modeli
@@ -84,13 +83,13 @@ const PetIdentifierScreen = ({ navigation }) => {
             mediaTypes: ['images'],
             allowsEditing: true,
             aspect: [1, 1],
-            quality: 0.4, 
-            base64: true,
+            quality: 0.5, 
+            // base64: true kaldırıldı, sadece URI kullanılacak
         });
 
         if (!result.canceled) {
             setImageUri(result.assets[0].uri);
-            analyzeImage(result.assets[0].base64);
+            analyzeImage(result.assets[0].uri); // API'ye URI gönderiliyor
         }
     };
 
@@ -100,7 +99,7 @@ const PetIdentifierScreen = ({ navigation }) => {
         return { text: t.certainConfidence, color: '#00B894', icon: 'shield-checkmark' };
     };
 
-    const analyzeImage = async (base64Image, retryCount = 0) => {
+    const analyzeImage = async (uri, retryCount = 0) => {
         setLoading(true);
         if (retryCount === 0) {
             setResultData({ text: "", score: 0, level: "" });
@@ -110,39 +109,29 @@ const PetIdentifierScreen = ({ navigation }) => {
         const MAX_RETRIES = 3; 
 
         try {
+            // Resmi Blob (Binary) formatına çevirme işlemi
+            const imgResponse = await fetch(uri);
+            const blob = await imgResponse.blob();
+
             const response = await fetch(HF_MODEL_URL, {
                 method: "POST",
                 headers: { 
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
                     "Authorization": `Bearer ${HF_TOKEN}`
+                    // Content-Type belirtilmedi, fetch Blob için otomatik ayarlar
                 },
-                body: JSON.stringify({ inputs: base64Image }),
+                body: blob,
             });
 
-            const contentType = response.headers.get("content-type");
-            
-            if (!contentType || !contentType.includes("application/json")) {
-                if (retryCount < MAX_RETRIES) {
-                    setResultData({ text: t.loadingModel, score: 0, level: 'loading' });
-                    setTimeout(() => analyzeImage(base64Image, retryCount + 1), 5000);
-                    return;
-                } else {
-                    setResultData({ text: t.serverError, score: 0, level: 'error' });
-                    setLoading(false);
-                    stopScanAnimation();
-                    return;
-                }
-            }
-
             const data = await response.json();
+            console.log("Hugging Face Yanıtı:", data);
 
-            if (data.error && data.error.includes("loading")) {
-                if (retryCount < MAX_RETRIES) {
+            if (data.error) {
+                if (data.error.includes("loading") && retryCount < MAX_RETRIES) {
                     setResultData({ text: t.loadingModel, score: 0, level: 'loading' });
-                    setTimeout(() => analyzeImage(base64Image, retryCount + 1), 5000);
+                    setTimeout(() => analyzeImage(uri, retryCount + 1), 5000);
                     return;
                 }
+                throw new Error(data.error);
             }
 
             if (Array.isArray(data) && data.length > 0) {
@@ -160,7 +149,7 @@ const PetIdentifierScreen = ({ navigation }) => {
             }
         } catch (err) {
             setResultData({ text: t.error, score: 0, level: 'error' });
-            console.log("Fetch Error:", err);
+            console.log("Fetch Error / API Hatası:", err.message || err);
         } finally {
             if (retryCount >= MAX_RETRIES || !loading) {
                 setLoading(false);
@@ -324,7 +313,6 @@ const styles = StyleSheet.create({
     resText: { fontSize: 24, fontWeight: '900', textAlign: 'center', lineHeight: 32 },
     scoreText: { fontSize: 16, fontWeight: '600', marginTop: 5, opacity: 0.8 },
     
-    // YENİ EKLENEN GÜVEN KUTUSU STİLLERİ
     confidenceBox: { flexDirection: 'row', alignItems: 'center', marginTop: 15, paddingVertical: 10, paddingHorizontal: 15, borderRadius: 12, borderWidth: 1 },
     confidenceText: { fontSize: 12, fontWeight: '700', flex: 1, flexWrap: 'wrap' }
 });

@@ -10,54 +10,82 @@ export const AIProvider = ({ children }) => {
 
   const activeLang = country?.code || 'TR';
   
-  // Botun kişiliği (Prompt)
   const systemInstruction = activeLang === 'TR' 
-    ? "Sen Pito uygulamasının veteriner asistanı VeterinerBOT'sun. Kedi, köpek ve kuşlar hakkında kısa, samimi ve emojili tavsiyeler ver. Tıbbi teşhis koyma."
+    ? "Sen Pito'nun veteriner asistanı VeterinerBOT'sun. Sadece hayvan bakımı hakkında kısa, tatlı ve emojili cevaplar ver. Tıbbi teşhis koyma."
     : "You are VetBOT. Give short, friendly advice about pets with emojis. No medical diagnosis.";
 
-  // ✅ AI API Endpoint'i artık .env dosyasından çekiliyor
-  const AI_BASE_URL = process.env.EXPO_PUBLIC_AI_ENDPOINT || 'https://text.pollinations.ai';
+  // ✨ YENİ: Groq API Endpoint'i ve Şifresi
+  const GROQ_API_KEY = process.env.EXPO_PUBLIC_GROQ_API_KEY;
+  const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
   const sendMessageToBot = async (userMessage) => {
-    // 1. Kullanıcı mesajını ekrana bas
-    const newUserMsg = { id: Date.now().toString(), text: userMessage, sender: 'user' };
-    const newHistory = [...messages, newUserMsg];
-    setMessages(newHistory);
+    const newUserMsg = { id: Date.now().toString() + Math.random().toString(36).substring(7), text: userMessage, sender: 'user' };
+    setMessages(prev => [...prev, newUserMsg]);
     setIsTyping(true);
 
-    try {
-      // 2. AI İsteği
-      // Prompt'u URL uyumlu hale getiriyoruz
-      const fullPrompt = `${systemInstruction} Kullanıcı dedi ki: "${userMessage}"`;
-      const encodedPrompt = encodeURIComponent(fullPrompt);
-      
-      // Rastgele seed ekliyoruz ki aynı soruya hep aynı cevabı vermesin (Canlılık katar)
-      const randomSeed = Math.floor(Math.random() * 10000);
+    // 📸 Fotoğraf kontrolü (Yapay zekanın çökmesini engeller)
+    if (userMessage.startsWith('IMAGE_CODE::')) {
+        setTimeout(() => {
+            const botImageReply = activeLang === 'TR' 
+                ? "Ne kadar tatlı bir fotoğraf! 🐾 Şu an fotoğrafları tam olarak göremiyorum ama bana sorunu yazarak anlatırsan seve seve yardımcı olurum!" 
+                : "What a cute photo! 🐾 I can't see images clearly right now, but if you describe the issue to me, I'll gladly help!";
+            
+            setMessages(prev => [...prev, { id: Date.now().toString(), text: botImageReply, sender: 'bot' }]);
+            setIsTyping(false);
+        }, 1500);
+        return; 
+    }
 
-      // Model olarak 'openai' (GPT-4o mini) kullanıyoruz. 
-      const response = await fetch(
-        `${AI_BASE_URL}/${encodedPrompt}?model=openai&seed=${randomSeed}`
-      );
+    try {
+      // 15 Saniyelik Zaman Aşımı Koruyucusu
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); 
+
+      const response = await fetch(GROQ_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${GROQ_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+            model: "llama-3.1-8b-instant", // Güncel model buraya eklendi
+            messages: [
+                { role: "system", content: systemInstruction },
+                { role: "user", content: userMessage }
+            ],
+            temperature: 0.7,
+            max_tokens: 200
+        }),
+        signal: controller.signal 
+      });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
-        throw new Error("Sunucu yanıt vermedi");
+        const errText = await response.text();
+        console.log("Groq Red Kodu:", response.status, errText);
+        throw new Error(`Groq reddetti: Kod ${response.status}`);
       }
 
-      // Bu API direkt metin (text) döner, JSON değil.
-      const botReply = await response.text();
-
-      // 3. Botun cevabını ekrana bas
-      const newBotMsg = { id: (Date.now() + 1).toString(), text: botReply, sender: 'bot' };
+      const data = await response.json();
+      
+      let botReply = data.choices[0]?.message?.content || "Miyav! Şu an kafam biraz karışık 🐾";
+      
+      const newBotMsg = { id: Date.now().toString(), text: botReply.trim(), sender: 'bot' };
       setMessages(prev => [...prev, newBotMsg]);
 
     } catch (error) {
-      console.error("AI Hatası:", error);
+      console.error("AI Hatası Detayı:", error);
+      
       const errorMsg = { 
-        id: (Date.now() + 1).toString(), 
-        text: "İnternet bağlantısında bir sorun var sanırım, şu an ulaşamıyorum 📡", 
+        id: Date.now().toString(), 
+        text: activeLang === 'TR' 
+          ? "İnternet bağlantısında bir sorun var veya sunucu çok yoğun. Lütfen birazdan tekrar dene 📡" 
+          : "There is a network issue or the server is busy. Please try again later 📡", 
         sender: 'bot' 
       };
       setMessages(prev => [...prev, errorMsg]);
+
     } finally {
       setIsTyping(false);
     }

@@ -70,7 +70,6 @@ const TRANSLATIONS = {
     }
 };
 
-// ✅ Pati Animasyonu Bileşeni
 const BigPawAnimation = ({ visible }) => {
     const scaleValue = useRef(new Animated.Value(0)).current;
     const opacityValue = useRef(new Animated.Value(0)).current;
@@ -132,17 +131,14 @@ const PostItem = React.memo(({ item, isVisible, user, activeLang, t, handlers })
         }
     };
 
-    // ✅ JSON PARSE İŞLEMİ (Veritabanındaki overlay_text JSON mı düz yazı mı?)
     let overlayData = null;
     try {
         if (item.overlay_text) {
-            // Eğer JSON formatındaysa parse et, değilse düz yazı olarak kabul et
             overlayData = item.overlay_text.startsWith('{') 
                 ? JSON.parse(item.overlay_text) 
                 : { text: item.overlay_text, x: 0, y: 0, fontSize: 24, hasBg: true, font: 'System' };
         }
     } catch (e) {
-        // Hata durumunda varsayılan
         overlayData = { text: item.overlay_text, x: 0, y: 0, fontSize: 24, hasBg: true, font: 'System' };
     }
 
@@ -155,13 +151,11 @@ const PostItem = React.memo(({ item, isVisible, user, activeLang, t, handlers })
                     <Image source={{ uri: item.image }} style={styles.fullImage} resizeMode="contain" />
                 )}
 
-                {/* ✅ DİNAMİK YAZI GÖSTERİMİ */}
                 {overlayData && overlayData.text && (
                     <View style={[
                         styles.overlayTextContainer, 
                         { 
                             transform: [{ translateX: overlayData.x || 0 }, { translateY: overlayData.y || 0 }],
-                            // Eğer pozisyon 0,0 ise (eski veri) ortala
                             ...(overlayData.x === 0 && overlayData.y === 0 ? { position: 'absolute', top: '50%', left: 0, right: 0, alignItems: 'center' } : { position: 'absolute', top: 0, left: 0 })
                         }
                     ]}>
@@ -217,11 +211,9 @@ const PostItem = React.memo(({ item, isVisible, user, activeLang, t, handlers })
     );
 });
 
-// ✅ GELİŞMİŞ UPLOAD ÖNİZLEME (EDİTÖR)
 const UploadEditor = ({ uri, type, overlayData, setOverlayData, showControls, setShowControls }) => {
     const player = useVideoPlayer(type === 'video' ? uri : null, player => { player.loop = true; player.play(); });
     
-    // PanResponder: Sürükle Bırak İşlemleri
     const pan = useRef(new Animated.ValueXY()).current;
     
     const panResponder = useRef(
@@ -239,7 +231,6 @@ const UploadEditor = ({ uri, type, overlayData, setOverlayData, showControls, se
             ),
             onPanResponderRelease: () => {
                 pan.flattenOffset();
-                // Konumu State'e kaydet
                 setOverlayData(prev => ({ ...prev, x: pan.x._value, y: pan.y._value }));
             }
         })
@@ -262,7 +253,6 @@ const UploadEditor = ({ uri, type, overlayData, setOverlayData, showControls, se
                 )}
             </View>
 
-            {/* ✅ SÜRÜKLENEBİLİR YAZI KATMANI */}
             {overlayData.text ? (
                 <Animated.View
                     {...panResponder.panHandlers}
@@ -289,7 +279,6 @@ const UploadEditor = ({ uri, type, overlayData, setOverlayData, showControls, se
                 </Animated.View>
             ) : null}
 
-            {/* ✅ DÜZENLEME ARAÇ ÇUBUĞU */}
             {showControls && overlayData.text ? (
                 <View style={styles.editorToolbar}>
                     <TouchableOpacity onPress={() => setOverlayData(prev => ({ ...prev, fontSize: Math.max(12, prev.fontSize - 2) }))} style={styles.toolBtn}>
@@ -325,7 +314,6 @@ const PetsgramScreen = ({ navigation, route }) => {
   const [mediaType, setMediaType] = useState('image'); 
   const [caption, setCaption] = useState('');
   
-  // ✅ YENİ: Gelişmiş Yazı State'i (JSON olarak saklanacak)
   const [overlayData, setOverlayData] = useState({
       text: '',
       x: 0,
@@ -344,6 +332,33 @@ const PetsgramScreen = ({ navigation, route }) => {
   const [menuVisible, setMenuVisible] = useState(false);
   const [selectedPostForMenu, setSelectedPostForMenu] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  // ✅ ÇÖZÜM: Parametreden gelen ID'yi yakala ve gönderileri buna göre yeniden sırala
+  const { targetPostId } = route.params || {};
+  const [displayPosts, setDisplayPosts] = useState([]);
+
+  useEffect(() => {
+      if (posts && posts.length > 0) {
+          if (targetPostId) {
+              const postIndex = posts.findIndex(p => String(p.id) === String(targetPostId));
+              if (postIndex > -1) {
+                  // Orijinal listeyi kopyala
+                  const newPosts = [...posts];
+                  // Hedef gönderiyi bulunduğu yerden çıkar
+                  const targetPost = newPosts.splice(postIndex, 1)[0];
+                  // Listenin başına ekle
+                  newPosts.unshift(targetPost);
+                  setDisplayPosts(newPosts);
+              } else {
+                  // ID bulunamadıysa orijinal sırayı kullan
+                  setDisplayPosts(posts);
+              }
+          } else {
+              // Parametre yoksa orijinal sırayı kullan
+              setDisplayPosts(posts);
+          }
+      }
+  }, [posts, targetPostId]);
   
   const commentInputRef = useRef(null);
   const flatListRef = useRef(null);
@@ -382,7 +397,6 @@ const PetsgramScreen = ({ navigation, route }) => {
             const asset = result.assets[0];
             setTempMedia(asset.uri); 
             setMediaType(asset.type); 
-            // Reset overlay data
             setOverlayData({ text: '', x: 0, y: 0, fontSize: 24, hasBg: true, font: 'System' });
             setUploadModalVisible(true); 
         }
@@ -406,7 +420,6 @@ const PetsgramScreen = ({ navigation, route }) => {
 
         const { data: publicUrlData } = supabase.storage.from('posts').getPublicUrl(fileName);
         
-        // ✅ VERİTABANINA JSON OLARAK KAYDET
         const overlayJson = overlayData.text ? JSON.stringify(overlayData) : null;
 
         const newPostData = {
@@ -414,7 +427,7 @@ const PetsgramScreen = ({ navigation, route }) => {
             description: caption,
             image: publicUrlData.publicUrl,
             type: mediaType,
-            overlay_text: overlayJson, // JSON String
+            overlay_text: overlayJson,
             likes: 0,
             liked_by: [],
             created_at: new Date()
@@ -451,11 +464,45 @@ const PetsgramScreen = ({ navigation, route }) => {
     Keyboard.dismiss();
   };
 
-  const handleMenuAction = (action) => {
+  const handleMenuAction = async (action) => {
       setMenuVisible(false);
-      if (!selectedPostForMenu) return;
-      if (action === 'delete') deletePost(selectedPostForMenu.id);
-      if (action === 'report') Alert.alert(t.reported);
+      if (!selectedPostForMenu || !user) return;
+      
+      if (action === 'delete') {
+          deletePost(selectedPostForMenu.id);
+      }
+      
+      if (action === 'report') {
+          try {
+              // Supabase'e şikayeti kaydet
+              const { error } = await supabase
+                  .from('reports')
+                  .insert([
+                      { 
+                          post_id: selectedPostForMenu.id, 
+                          reporter_id: user.id, 
+                          reason: 'Topluluk Kuralları İhlali' // Varsayılan sebep
+                      }
+                  ]);
+              
+              if (error) {
+                  // Kullanıcı zaten şikayet etmişse UNIQUE kısıtlaması hata verir
+                  if (error.code === '23505') {
+                      Alert.alert("Bilgi", "Bu gönderiyi zaten şikayet ettiniz.");
+                  } else {
+                      throw error;
+                  }
+              } else {
+                  Alert.alert("Başarılı", t.reported);
+                  
+                  // OPTIONAL: Kullanıcının ekranından bu postu hemen gizlemek istersen
+                  // setDisplayPosts(prev => prev.filter(p => p.id !== selectedPostForMenu.id));
+              }
+          } catch (err) {
+              console.error("Şikayet Hatası:", err);
+              Alert.alert("Hata", "Şikayet gönderilemedi.");
+          }
+      }
   };
 
   const renderCommentItem = ({ item }) => {
@@ -483,7 +530,8 @@ const PetsgramScreen = ({ navigation, route }) => {
         <TouchableOpacity onPress={pickMedia} style={styles.headerBtn}><Ionicons name="add-circle-outline" size={28} color="white" /></TouchableOpacity>
       </View>
       
-      {posts.length === 0 ? (
+      {/* ✅ ÇÖZÜM: 'posts' yerine yeniden sıralanmış 'displayPosts' kullanılıyor */}
+      {displayPosts.length === 0 ? (
         <View style={styles.emptyContainer}>
             <Ionicons name="images-outline" size={80} color="#555" />
             <Text style={styles.emptyText}>{t.noPosts}</Text>
@@ -492,7 +540,7 @@ const PetsgramScreen = ({ navigation, route }) => {
       ) : (
         <FlatList 
             ref={flatListRef} 
-            data={posts} 
+            data={displayPosts} 
             renderItem={({ item }) => <PostItem item={item} isVisible={visiblePostId === item.id} user={user} activeLang={activeLang} t={t} handlers={handlers} />}
             keyExtractor={item => item.id} 
             pagingEnabled 
@@ -586,7 +634,7 @@ const PetsgramScreen = ({ navigation, route }) => {
                     <TouchableOpacity onPress={() => setCommentModalVisible(false)}><Ionicons name="close" size={24} color="white" /></TouchableOpacity>
                 </View>
                 <FlatList 
-                    data={posts.find(p => p.id === activePostId)?.comments || []} 
+                    data={displayPosts.find(p => p.id === activePostId)?.comments || []} 
                     keyExtractor={item => item.id} 
                     contentContainerStyle={{paddingBottom: 20}}
                     renderItem={renderCommentItem}
