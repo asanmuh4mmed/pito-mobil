@@ -2,7 +2,7 @@
   "expo": {
     "name": "Pito",
     "slug": "pito-mobile",
-    "version": "1.0.7",
+    "version": "1.0.26",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -14,11 +14,12 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.oxpi.pito",
-      "buildNumber": "7",
+      "buildNumber": "33",
       "infoPlist": {
-        "NSCameraUsageDescription": "Pito, evcil hayvanınızın fotoğrafını veya videosunu çekmek ve ilan oluşturmak için kameranıza erişmek istiyor.",
-        "NSPhotoLibraryUsageDescription": "Pito, profil fotoğrafı, ilan ve Petsgram gönderileri oluşturmak için galerinize erişmek istiyor.",
-        "NSMicrophoneUsageDescription": "Pito, video kaydı sırasında sesinizi kaydetmek için mikrofona erişmek istiyor.",
+        "NSCameraUsageDescription": "Sahiplendirme ilanı oluştururken veya Petsgram akışında paylaşım yaparken evcil hayvanınızın anlık fotoğrafını çekebilmeniz için kameranıza erişim gereklidir.",
+        "NSPhotoLibraryUsageDescription": "Sahiplendirme ilanlarına, Petsgram gönderilerine veya profilinize evcil hayvanınızın mevcut fotoğraflarını yükleyebilmeniz için fotoğraf galerinize erişim gereklidir.",
+        "NSMicrophoneUsageDescription": "Petsgram akışında paylaşmak üzere çekeceğiniz evcil hayvan videolarında ses kaydı yapabilmeniz için mikrofona erişim gereklidir.",
+        "NSLocationWhenInUseUsageDescription": "Harita üzerinde size en yakın veteriner kliniklerini ve yuva arayan evcil hayvanları gösterebilmek için konum bilginize ihtiyaç duyulmaktadır.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -28,18 +29,24 @@
         "backgroundColor": "#000000"
       },
       "package": "com.oxpi.pito",
-      "versionCode": 7,
+      "versionCode": 39,
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.INTERNET",
         "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ],
-      "gradleProperties": {
-        "org.gradle.jvmargs": "-Xmx3072m -XX:MaxMetaspaceSize=512m"
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAtHpaBoLVOSALAwV1JCwkDQW527n4VlO0"
+        }
       },
+      
       "edgeToEdgeEnabled": true
     },
     "web": {
@@ -54,8 +61,22 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Galeriye erişim izni gerekiyor.",
-          "cameraPermission": "Kameraya erişim izni gerekiyor."
+          "photosPermission": "Sahiplendirme ilanlarına veya profilinize evcil hayvanınızın mevcut fotoğraflarını yükleyebilmeniz için fotoğraf galerinize erişim gereklidir.",
+          "cameraPermission": "Sahiplendirme ilanı oluştururken veya Petsgram akışında paylaşım yaparken evcil hayvanınızın anlık fotoğrafını çekebilmeniz için kameranıza erişim gereklidir."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Harita üzerinde size en yakın veteriner kliniklerini ve yuva arayan evcil hayvanları gösterebilmek için konum bilginize ihtiyaç duyulmaktadır."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableProguardInReleaseBuilds": true
+          }
         }
       ]
     ],

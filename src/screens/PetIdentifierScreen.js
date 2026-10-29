@@ -1,320 +1,302 @@
-import React, { useState, useContext, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator, Animated, Easing, ScrollView, Alert, Dimensions } from 'react-native';
+import React, { useState, useContext, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, useWindowDimensions, Alert, Animated, Easing, Modal, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
+import { requestAi, aiErrorText } from '../utils/requestAi';
 
-const { width } = Dimensions.get('window');
 
-// 🔒 GÜVENLİ TOKEN ÇEKİMİ (.env dosyasından geliyor - Yeni Pito Token'ı)
-const HF_TOKEN = process.env.EXPO_PUBLIC_HF_TOKEN; 
-
-// ✅ Hugging Face Router URL - En stabil görüntü sınıflandırma modeli
-const HF_MODEL_URL = "https://router.huggingface.co/hf-inference/models/google/vit-base-patch16-224";
+// --- PITO YENİ RENK PALETİ ---
+const PITO_COLORS = {
+    primary: '#C5A059', 
+    primaryDark: '#B08D4B', 
+    navyBg: '#0B131E', 
+    navySurface: '#1A2533', 
+    navyLight: '#243447',
+    cream: '#F5F5DC',
+    white: '#FFFFFF',
+    grayText: '#A0AAB5',
+    error: '#FF4757',
+    success: '#00B894'
+};
 
 const TRANSLATIONS = {
     TR: {
-        title: "Türü Nedir? (AI)",
-        subtitle: "Fotoğrafı gönder, yapay zeka türünü anında söylesin!",
-        camera: "Kamera",
-        gallery: "Galeri",
-        analyzing: "Yapay Zeka Analiz Ediyor...",
-        resultTitle: "Tahmin Edilen Tür",
-        error: "Analiz yapılamadı. Lütfen tekrar dene.",
-        loadingModel: "Yapay zeka motoru hazırlanıyor, lütfen bekleyin...",
-        serverError: "Sunucu meşgul, lütfen birkaç saniye sonra tekrar dene.",
-        lowConfidence: "Düşük Tahmin: Fotoğraf tam net olmayabilir, ancak buna benziyor.",
-        highConfidence: "Yüksek İhtimal: Büyük ihtimalle bu cins.",
-        certainConfidence: "Kesin Sonuç: Bundan hiç şüphemiz yok!"
+        title: 'Irk tahmini', back: 'Geri dön', tag: 'PİTO • YAPAY ZEKÂ',
+        headline: 'Bir fotoğraf,\nyeni bir ipucu.',
+        intro: 'Dostunun görünüşünden yola çıkarak olası ırkını birlikte keşfedelim.',
+        cat: 'Kediler', dog: 'Köpekler', visual: 'Görsel tahmin',
+        photoTitle: 'Dostunu kadraja al', photoSub: 'Net bir fotoğrafla başlayalım.',
+        placeholder: 'Bu alan onun için ayrıldı', placeholderSub: 'Kamera veya galeriden bir fotoğraf seç.',
+        gallery: 'Galeriden fotoğraf seç', camera: 'Fotoğraf çek', change: 'Başka bir fotoğraf dene',
+        analyzing: 'Fotoğrafın inceleniyor', analyzingSub: 'Görsel özellikler değerlendiriliyor. Biraz sürebilir.',
+        selected: 'SEÇİLEN FOTOĞRAF', expand: 'Fotoğrafı büyüt', close: 'Kapat',
+        resultTitle: 'OLASI IRK', resultHeading: 'Küçük dostundan bir ipucu',
+        estimate: 'Yapay zekâ tahmini', unclear: 'Daha net bir fotoğraf deneyebilirsin',
+        errorTitle: 'Bu kez analiz tamamlanamadı', error: 'Fotoğrafı yeniden seçerek tekrar deneyebilirsin.',
+        resultNote: 'Bu sonuç görünüşe dayalı bir tahmindir. Safkanlık veya soy bilgisi fotoğraftan doğrulanamaz.',
+        tipsTitle: 'Daha iyi bir fotoğraf için', tipsSub: 'Küçük detaylar, daha anlamlı bir tahmine yardımcı olur.',
+        tips: [
+            ['sunny-outline', 'Doğal ışık kullan', 'Karanlık, yoğun filtre veya bulanıklık olmayan bir fotoğraf seç.'],
+            ['paw-outline', 'Tek dost, tek kare', 'Karede yalnızca bir kedi veya köpek bulunsun.'],
+            ['scan-outline', 'Yüzü ve gövdesi görünsün', 'Kulakları ve tüy yapısı mümkün olduğunca net olsun.'],
+        ],
+        privacyTitle: 'Fotoğraf analizi hakkında',
+        privacy: 'Seçtiğin fotoğraf analiz için Google Gemini’ye gönderilir. Ücretsiz hizmet koşullarında içerik Google ürünlerini geliştirmek için kullanılabilir. Kişisel bilgi içeren fotoğraflar seçme.',
+        footer: 'Her dost, ırkından çok daha fazlası. 🐾',
     },
     AU: {
-        title: "What Breed? (AI)",
-        subtitle: "Upload photo, let AI find the breed instantly!",
-        camera: "Camera",
-        gallery: "Gallery",
-        analyzing: "AI is Analyzing...",
-        resultTitle: "Predicted Breed",
-        error: "Analysis failed. Please try again.",
-        loadingModel: "AI engine is warming up, please wait...",
-        serverError: "Server busy, please try again in a few seconds.",
-        lowConfidence: "Low Confidence: Photo might not be clear, but it looks like this.",
-        highConfidence: "High Confidence: Highly likely to be this breed.",
-        certainConfidence: "Certain: We have no doubt about this!"
-    }
+        title: 'Breed estimate', back: 'Go back', tag: 'PITO • ARTIFICIAL INTELLIGENCE',
+        headline: 'One photo.\nA new clue.',
+        intro: 'Explore a possible breed based on your companion’s appearance.',
+        cat: 'Cats', dog: 'Dogs', visual: 'Visual estimate',
+        photoTitle: 'Meet the star of the photo', photoSub: 'Start with a clear picture.',
+        placeholder: 'A little space just for them', placeholderSub: 'Choose a photo or take a new one.',
+        gallery: 'Choose from gallery', camera: 'Take a photo', change: 'Try another photo',
+        analyzing: 'Looking at your photo', analyzingSub: 'Visual features are being assessed. This may take a moment.',
+        selected: 'YOUR PHOTO', expand: 'Expand photo', close: 'Close',
+        resultTitle: 'POSSIBLE BREED', resultHeading: 'A clue about your companion',
+        estimate: 'AI estimate', unclear: 'Try a clearer photo',
+        errorTitle: 'The analysis could not finish', error: 'Choose your photo again to retry.',
+        resultNote: 'This is an estimate based on appearance. A photo cannot confirm pedigree or ancestry.',
+        tipsTitle: 'For a better photo', tipsSub: 'A few small details can help make the estimate more useful.',
+        tips: [
+            ['sunny-outline', 'Use natural light', 'Choose a sharp photo without heavy filters or dark shadows.'],
+            ['paw-outline', 'One companion at a time', 'Include only one cat or dog in the frame.'],
+            ['scan-outline', 'Show their face and body', 'Keep ears and coat features as clear as possible.'],
+        ],
+        privacyTitle: 'About photo analysis',
+        privacy: 'Your selected photo is sent to Google Gemini for analysis. Under the free service terms, content may be used to improve Google products. Avoid photos containing personal information.',
+        footer: 'Every companion is more than a breed. 🐾',
+    },
 };
 
 const PetIdentifierScreen = ({ navigation }) => {
-    const { country } = useContext(AuthContext);
+    const { user, language } = useContext(AuthContext);
     const { theme, isDarkMode } = useContext(ThemeContext);
-    const activeLang = country?.code === 'AU' ? 'AU' : 'TR';
+    const activeLang = language === 'EN' ? 'AU' : 'TR';
     const t = TRANSLATIONS[activeLang];
 
+    const { width } = useWindowDimensions();
+    const photoHeight = Math.min(Math.max(width - 80, 240), 420);
+    const [zoomVisible, setZoomVisible] = useState(false);
+    const palette = isDarkMode
+        ? { bg: '#0B131E', card: '#172332', text: '#F6F1E7', sub: '#B2BDCB', line: '#2C3A4A', tint: '#282B29', photo: '#111E2C' }
+        : { bg: '#F8F5EF', card: '#FFFFFF', text: '#172638', sub: '#6D7784', line: '#E7E1D7', tint: '#F3EAD7', photo: '#FAF8F3' };
     const [imageUri, setImageUri] = useState(null);
     const [loading, setLoading] = useState(false);
     const [resultData, setResultData] = useState({ text: "", score: 0, level: "" });
 
+    const lifecycle = useRef({ live: true, version: 0, busy: false, controller: null, animation: null });
+    const accountId = useRef(user?.id); accountId.current = user?.id;
+    useEffect(() => {
+        lifecycle.current.live = true;
+        return () => { lifecycle.current.live = false; lifecycle.current.version++; lifecycle.current.controller?.abort(); lifecycle.current.animation?.stop(); };
+    }, []);
+    useEffect(() => {
+        lifecycle.current.version++; lifecycle.current.controller?.abort(); lifecycle.current.animation?.stop(); lifecycle.current.busy = false;
+        setLoading(false); setResultData({ text: '', score: 0, level: '' }); setImageUri(null);
+    }, [user?.id]);
     const scanAnim = useRef(new Animated.Value(0)).current;
 
     const startScanAnimation = () => {
         scanAnim.setValue(0);
-        Animated.loop(
+        lifecycle.current.animation?.stop();
+        lifecycle.current.animation = Animated.loop(
             Animated.sequence([
                 Animated.timing(scanAnim, { toValue: 1, duration: 1800, useNativeDriver: true, easing: Easing.inOut(Easing.ease) }),
                 Animated.timing(scanAnim, { toValue: 0, duration: 1800, useNativeDriver: true, easing: Easing.inOut(Easing.ease) })
             ])
-        ).start();
+        );
+        lifecycle.current.animation.start();
     };
 
-    const stopScanAnimation = () => { scanAnim.stopAnimation(); };
+    const stopScanAnimation = () => { lifecycle.current.animation?.stop(); scanAnim.stopAnimation(); };
 
     const pickImage = async (useCamera) => {
-        const { granted } = useCamera 
-            ? await ImagePicker.requestCameraPermissionsAsync() 
-            : await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-        if (!granted) {
-            Alert.alert("Hata", "İzin verilmedi.");
-            return;
-        }
-
-        let result = await (useCamera ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync)({
-            mediaTypes: ['images'],
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.5, 
-            // base64: true kaldırıldı, sadece URI kullanılacak
-        });
-
-        if (!result.canceled) {
-            setImageUri(result.assets[0].uri);
-            analyzeImage(result.assets[0].uri); // API'ye URI gönderiliyor
-        }
-    };
-
-    const getConfidenceLevel = (score) => {
-        if (score < 50) return { text: t.lowConfidence, color: '#FF9F43', icon: 'warning' };
-        if (score < 90) return { text: t.highConfidence, color: '#0984E3', icon: 'checkmark-circle' };
-        return { text: t.certainConfidence, color: '#00B894', icon: 'shield-checkmark' };
-    };
-
-    const analyzeImage = async (uri, retryCount = 0) => {
-        setLoading(true);
-        if (retryCount === 0) {
-            setResultData({ text: "", score: 0, level: "" });
-            startScanAnimation();
-        }
-
-        const MAX_RETRIES = 3; 
-
+        if (lifecycle.current.busy) return;
+        if (!user?.id) { Alert.alert('Pito', aiErrorText({ code: 'auth' }, activeLang === 'AU')); return; }
+        lifecycle.current.busy = true;
+        const ownerId = user.id;
         try {
-            // Resmi Blob (Binary) formatına çevirme işlemi
-            const imgResponse = await fetch(uri);
-            const blob = await imgResponse.blob();
-
-            const response = await fetch(HF_MODEL_URL, {
-                method: "POST",
-                headers: { 
-                    "Authorization": `Bearer ${HF_TOKEN}`
-                    // Content-Type belirtilmedi, fetch Blob için otomatik ayarlar
-                },
-                body: blob,
+            const permission = await (useCamera ? ImagePicker.requestCameraPermissionsAsync() : ImagePicker.requestMediaLibraryPermissionsAsync());
+            if (!permission.granted) { Alert.alert('Pito', activeLang === 'AU' ? 'Photo permission is required.' : 'Fotoğraf izni gerekli.'); return; }
+            const result = await (useCamera ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync)({
+                mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.5, base64: true,
             });
-
-            const data = await response.json();
-            console.log("Hugging Face Yanıtı:", data);
-
-            if (data.error) {
-                if (data.error.includes("loading") && retryCount < MAX_RETRIES) {
-                    setResultData({ text: t.loadingModel, score: 0, level: 'loading' });
-                    setTimeout(() => analyzeImage(uri, retryCount + 1), 5000);
-                    return;
-                }
-                throw new Error(data.error);
-            }
-
-            if (Array.isArray(data) && data.length > 0) {
-                const topResult = data[0].label;
-                const scoreValue = parseFloat((data[0].score * 100).toFixed(1));
-                const cleanResult = topResult.split(',')[0].toUpperCase();
-                
-                setResultData({ 
-                    text: cleanResult, 
-                    score: scoreValue, 
-                    level: getConfidenceLevel(scoreValue) 
-                });
-            } else {
-                setResultData({ text: t.error, score: 0, level: 'error' });
-            }
-        } catch (err) {
-            setResultData({ text: t.error, score: 0, level: 'error' });
-            console.log("Fetch Error / API Hatası:", err.message || err);
+            if (result.canceled || !result.assets?.[0] || !lifecycle.current.live || accountId.current !== ownerId) return;
+            const asset = result.assets[0];
+            if (!asset.base64 || asset.base64.length > 5600000) throw Object.assign(new Error('image'), { code: 'image' });
+            setImageUri(asset.uri);
+            await analyzeImage(asset.base64, ownerId);
+        } catch (error) {
+            if (lifecycle.current.live && accountId.current === ownerId) Alert.alert('Pito', aiErrorText(error, activeLang === 'AU'));
         } finally {
-            if (retryCount >= MAX_RETRIES || !loading) {
-                setLoading(false);
-                stopScanAnimation();
-            }
+            if (accountId.current === ownerId) lifecycle.current.busy = false;
         }
     };
 
-    const translateY = scanAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [0, 260] 
-    });
+    const analyzeImage = async (imageBase64, ownerId) => {
+        const version = ++lifecycle.current.version;
+        lifecycle.current.controller?.abort();
+        const controller = new AbortController(); lifecycle.current.controller = controller;
+        const current = () => lifecycle.current.live && lifecycle.current.version === version && accountId.current === ownerId;
+        setLoading(true); setResultData({ text: '', score: 0, level: '' }); startScanAnimation();
+        try {
+            const data = await requestAi({ kind: 'classify', imageBase64, language: activeLang === 'AU' ? 'EN' : 'TR' }, controller.signal);
+            if (typeof data.label !== 'string' || !data.label.trim()) throw new Error('Invalid analysis response');
+            if (current()) setResultData({
+                text: data.label.trim(), score: null,
+                level: { text: data.note || t.resultNote, uncertain: data.uncertain === true },
+            });
+        } catch (error) {
+            if (current()) setResultData({ text: aiErrorText(error, activeLang === 'AU'), score: 0, level: 'error' });
+        } finally {
+            if (current()) { setLoading(false); stopScanAnimation(); lifecycle.current.controller = null; }
+        }
+    };
+
+    const translateY = scanAnim.interpolate({ inputRange: [0, 1], outputRange: [0, photoHeight - 4] });
+
+    const hasResult = !loading && Boolean(resultData.text) && resultData.level !== 'error';
+    const hasError = !loading && resultData.level === 'error';
+    const goBack = () => navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Home');
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: isDarkMode ? '#121212' : '#F8F9FA' }]}>
-            
-            {/* ŞIK HEADER */}
-            <View style={[styles.header, { backgroundColor: theme.cardBg }]}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, {backgroundColor: isDarkMode ? '#333' : '#F0F0F0'}]}>
-                    <Ionicons name="arrow-back" size={24} color={theme.text} />
+        <SafeAreaView style={[styles.container, { backgroundColor: palette.bg }]}>
+            <View style={styles.header}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={t.back} onPress={goBack} style={[styles.backButton, { backgroundColor: palette.card, borderColor: palette.line }]}>
+                    <Ionicons name="arrow-back" size={23} color={palette.text} />
                 </TouchableOpacity>
-                <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                    <Ionicons name="scan-outline" size={22} color="#6C5CE7" style={{marginRight: 8}} />
-                    <Text style={[styles.headerTitle, { color: theme.text }]}>{t.title}</Text>
-                </View>
-                <View style={{ width: 40 }} />
+                <Text accessibilityRole="header" style={[styles.headerTitle, { color: palette.text }]}>{t.title}</Text>
+                <View style={[styles.aiBadge, { backgroundColor: palette.tint }]}><Ionicons name="sparkles" size={15} color={PITO_COLORS.primaryDark} /><Text style={styles.aiBadgeText}>AI</Text></View>
             </View>
 
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                
-                {/* AÇIKLAMA METNİ */}
-                <View style={styles.titleContainer}>
-                    <Text style={[styles.subtitle, { color: theme.subText }]}>{t.subtitle}</Text>
-                </View>
-
-                {/* PREMIUM RESİM ALANI */}
-                <View style={[styles.imageWrapper, { backgroundColor: theme.cardBg, shadowColor: isDarkMode ? '#000' : '#6C5CE7' }]}>
-                    <View style={[styles.imageContainer, { borderColor: isDarkMode ? '#444' : '#E0E0E0' }]}>
-                        {imageUri ? (
-                            <>
-                                <Image source={{ uri: imageUri }} style={styles.image} />
-                                {loading && (
-                                    <View style={styles.radarOverlay}>
-                                        <Animated.View style={[styles.radarLine, { transform: [{ translateY }] }]} />
-                                    </View>
-                                )}
-                            </>
-                        ) : (
-                            <View style={styles.placeholder}>
-                                <View style={styles.iconCircle}>
-                                    <Ionicons name="image-outline" size={50} color="#6C5CE7" />
-                                </View>
-                                <Text style={{ color: theme.subText, marginTop: 15, fontWeight: '500' }}>Fotoğraf Bekleniyor...</Text>
-                                <Text style={{ color: theme.subText, fontSize: 11, marginTop: 5, opacity: 0.6 }}>Kamera veya galeriden seçiniz</Text>
-                            </View>
-                        )}
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+                <View style={styles.hero}>
+                    <View accessible={false} pointerEvents="none" style={styles.heroOrbit} />
+                    <View style={styles.heroTop}><Text style={styles.eyebrow}>{t.tag}</Text><Ionicons name="paw" size={25} color="#D9BC7E" /></View>
+                    <Text accessibilityRole="header" style={styles.headline}>{t.headline}</Text>
+                    <Text style={styles.heroIntro}>{t.intro}</Text>
+                    <View style={styles.pillRow}>
+                        {[t.cat, t.dog, t.visual].map((label, index) => <View key={label} style={styles.pill}><Ionicons name={index === 2 ? 'sparkles-outline' : 'paw-outline'} size={13} color="#D9BC7E" /><Text style={styles.pillText}>{label}</Text></View>)}
                     </View>
                 </View>
 
-                {/* MODERN BUTONLAR (TON SÜR TON) */}
-                <View style={styles.btnRow}>
-                    <TouchableOpacity 
-                        style={[styles.btn, { backgroundColor: '#5B4BC4' }]} 
-                        onPress={() => pickImage(true)} 
-                        disabled={loading}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="camera" size={22} color="white" />
-                        <Text style={styles.btnText}>{t.camera}</Text>
-                    </TouchableOpacity>
+                <View style={styles.sectionHeading}><View style={styles.flex}><Text accessibilityRole="header" style={[styles.sectionTitle, { color: palette.text }]}>{t.photoTitle}</Text><Text style={[styles.sectionSub, { color: palette.sub }]}>{t.photoSub}</Text></View><View style={[styles.sectionIcon, { backgroundColor: palette.tint }]}><Ionicons name="scan-outline" size={23} color={PITO_COLORS.primaryDark} /></View></View>
 
-                    <TouchableOpacity 
-                        style={[styles.btn, { backgroundColor: '#6C5CE7' }]} 
-                        onPress={() => pickImage(false)} 
-                        disabled={loading}
-                        activeOpacity={0.8}
-                    >
-                        <Ionicons name="images" size={22} color="white" />
-                        <Text style={styles.btnText}>{t.gallery}</Text>
-                    </TouchableOpacity>
+                <View style={[styles.photoCard, { backgroundColor: palette.card, borderColor: palette.line }]}>
+                    <View style={[styles.photoFrame, { height: photoHeight, backgroundColor: palette.photo, borderColor: imageUri ? 'transparent' : (isDarkMode ? '#4B4940' : '#D7C7A4'), borderStyle: imageUri ? 'solid' : 'dashed' }]}>
+                        {imageUri ? <>
+                            <Image source={{ uri: imageUri }} resizeMode="contain" style={styles.image} />
+                            <View style={styles.photoLabel}><View style={styles.goldDot} /><Text style={styles.photoLabelText}>{t.selected}</Text></View>
+                            {!loading && <TouchableOpacity accessibilityRole="button" accessibilityLabel={t.expand} onPress={() => setZoomVisible(true)} style={styles.expandButton}><Ionicons name="expand-outline" size={20} color="#FFFFFF" /></TouchableOpacity>}
+                            {loading && <View style={styles.radarOverlay}><Animated.View style={[styles.radarLine, { transform: [{ translateY }] }]} /><View style={styles.loadingChip}><ActivityIndicator size="small" color="#D9BC7E" /><Text style={styles.loadingChipText}>{t.analyzing}</Text></View></View>}
+                        </> : <View style={styles.placeholder}>
+                            <View style={[styles.placeholderRing, { borderColor: isDarkMode ? '#3E4039' : '#E9DDBF' }]}><View style={[styles.placeholderIcon, { backgroundColor: palette.tint }]}><Ionicons name="paw-outline" size={52} color={PITO_COLORS.primaryDark} /></View><View style={styles.plusMark}><Ionicons name="add" size={19} color="#152437" /></View></View>
+                            <Text style={[styles.placeholderTitle, { color: palette.text }]}>{t.placeholder}</Text>
+                            <Text style={[styles.placeholderSub, { color: palette.sub }]}>{t.placeholderSub}</Text>
+                        </View>}
+                    </View>
+                    <TouchableOpacity accessibilityRole="button" disabled={loading} activeOpacity={0.8} onPress={() => pickImage(false)} style={[styles.primaryButton, loading && styles.disabled]}><Ionicons name="images-outline" size={21} color="#142334" /><Text style={styles.primaryButtonText}>{imageUri ? t.change : t.gallery}</Text><Ionicons name="arrow-forward" size={19} color="#142334" /></TouchableOpacity>
+                    <TouchableOpacity accessibilityRole="button" disabled={loading} activeOpacity={0.7} onPress={() => pickImage(true)} style={[styles.secondaryButton, { borderColor: palette.line }, loading && styles.disabled]}><Ionicons name="camera-outline" size={21} color={palette.text} /><Text style={[styles.secondaryButtonText, { color: palette.text }]}>{t.camera}</Text></TouchableOpacity>
                 </View>
 
-                {/* PREMIUM SONUÇ KARTI */}
-                {(loading || resultData.text !== "") && (
-                    <View style={[styles.resultCard, { backgroundColor: isDarkMode ? '#1E1E2C' : '#FFFFFF' }]}>
-                        {loading && resultData.level === 'loading' ? (
-                             <View style={{ alignItems: 'center' }}>
-                                <ActivityIndicator size="large" color="#6C5CE7" />
-                                <Text style={{ marginTop: 12, color: '#6C5CE7', textAlign: 'center', fontWeight: '600' }}>{resultData.text}</Text>
-                             </View>
-                        ) : loading ? (
-                            <View style={{ alignItems: 'center' }}>
-                                <ActivityIndicator size="large" color="#6C5CE7" />
-                                <Text style={{ marginTop: 12, color: '#6C5CE7', fontWeight: 'bold', fontSize: 16, letterSpacing: 0.5 }}>{t.analyzing}</Text>
-                            </View>
-                        ) : resultData.level === 'error' ? (
-                            <View style={{ alignItems: 'center' }}>
-                                <Ionicons name="warning" size={32} color="#FF4D4D" style={{ marginBottom: 10 }} />
-                                <Text style={{ color: '#FF4D4D', fontWeight: 'bold', textAlign: 'center' }}>{resultData.text}</Text>
-                            </View>
-                        ) : (
-                            <View style={{ alignItems: 'center' }}>
-                                <View style={styles.sparkleContainer}>
-                                    <Ionicons name="sparkles" size={28} color="#FDCB6E" />
-                                </View>
-                                <Text style={[styles.resTitle, { color: theme.subText }]}>{t.resultTitle}</Text>
-                                
-                                <Text style={[styles.resText, { color: isDarkMode ? '#A55EEA' : '#5B4BC4' }]}>
-                                    {resultData.text} 
-                                </Text>
-                                
-                                <Text style={[styles.scoreText, { color: theme.text }]}>
-                                    (%{resultData.score} Emin)
-                                </Text>
+                {loading && <View accessibilityLiveRegion="polite" style={[styles.statusCard, { backgroundColor: palette.card, borderColor: palette.line }]}><ActivityIndicator color={PITO_COLORS.primaryDark} /><View style={styles.flex}><Text style={[styles.featureTitle, { color: palette.text }]}>{t.analyzing}</Text><Text style={[styles.bodySmall, { color: palette.sub }]}>{t.analyzingSub}</Text></View></View>}
 
-                                {/* YÜZDEYE GÖRE DİNAMİK BİLGİ KUTUSU */}
-                                {resultData.level && (
-                                    <View style={[styles.confidenceBox, { backgroundColor: resultData.level.color + '15', borderColor: resultData.level.color }]}>
-                                        <Ionicons name={resultData.level.icon} size={18} color={resultData.level.color} style={{marginRight: 6}} />
-                                        <Text style={[styles.confidenceText, { color: resultData.level.color }]}>
-                                            {resultData.level.text}
-                                        </Text>
-                                    </View>
-                                )}
-                            </View>
-                        )}
-                    </View>
-                )}
+                {hasError && <View accessibilityLiveRegion="polite" style={[styles.errorCard, { backgroundColor: palette.card }]}><Ionicons name="alert-circle-outline" size={29} color="#CC6557" /><Text style={[styles.resultHeading, { color: palette.text }]}>{t.errorTitle}</Text><Text style={[styles.body, { color: palette.sub }]}>{resultData.text}</Text><TouchableOpacity accessibilityRole="button" onPress={() => pickImage(false)} style={[styles.retryButton, { backgroundColor: palette.tint }]}><Ionicons name="images-outline" size={18} color={PITO_COLORS.primaryDark}/><Text style={styles.retryText}>{t.change}</Text></TouchableOpacity></View>}
+
+                {hasResult && <View accessibilityLiveRegion="polite" style={[styles.resultCard, { backgroundColor: palette.card, borderColor: '#C5A059' }]}>
+                    <View style={styles.resultTop}><View style={[styles.resultIcon, { backgroundColor: palette.tint }]}><Ionicons name={resultData.level?.uncertain ? 'help-circle-outline' : 'sparkles-outline'} size={25} color={PITO_COLORS.primaryDark} /></View><View style={styles.flex}><Text style={styles.resultEyebrow}>{t.resultTitle}</Text><Text style={[styles.bodySmall, { color: palette.sub }]}>{t.resultHeading}</Text></View></View>
+                    <Text selectable style={[styles.resultName, { color: palette.text }]}>{resultData.text}</Text>
+                    <View style={[styles.estimatePill, { backgroundColor: palette.tint }]}><Ionicons name="information-circle-outline" size={15} color={PITO_COLORS.primaryDark} /><Text style={styles.estimateText}>{resultData.level?.uncertain ? t.unclear : t.estimate}</Text></View>
+                    <Text selectable style={[styles.body, { color: palette.sub }]}>{resultData.level?.text || t.resultNote}</Text>
+                    <View style={[styles.resultFooter, { borderColor: palette.line }]}><Ionicons name="paw-outline" size={20} color={PITO_COLORS.primaryDark}/><Text style={[styles.resultDisclaimer, { color: palette.sub }]}>{t.resultNote}</Text></View>
+                </View>}
+
+                <View style={[styles.tipsCard, { backgroundColor: palette.card, borderColor: palette.line }]}>
+                    <Text accessibilityRole="header" style={[styles.sectionTitle, { color: palette.text }]}>{t.tipsTitle}</Text><Text style={[styles.sectionSub, { color: palette.sub }]}>{t.tipsSub}</Text>
+                    {t.tips.map(([icon, title, description], index) => <View key={title} style={[styles.tipRow, index > 0 && { borderTopWidth: 1, borderTopColor: palette.line }]}><View style={[styles.tipIcon, { backgroundColor: palette.tint }]}><Ionicons name={icon} size={22} color={PITO_COLORS.primaryDark} /></View><View style={styles.flex}><Text style={[styles.featureTitle, { color: palette.text }]}>{title}</Text><Text style={[styles.bodySmall, { color: palette.sub }]}>{description}</Text></View></View>)}
+                </View>
+
+                <View style={styles.privacy}><Ionicons name="information-circle-outline" size={21} color={palette.sub}/><View style={styles.flex}><Text style={[styles.privacyTitle, { color: palette.text }]}>{t.privacyTitle}</Text><Text style={[styles.privacyBody, { color: palette.sub }]}>{t.privacy}</Text></View></View>
+                <Text style={[styles.footerText, { color: palette.sub }]}>{t.footer}</Text>
             </ScrollView>
+
+            <Modal visible={zoomVisible && Boolean(imageUri)} transparent animationType="fade" onRequestClose={() => setZoomVisible(false)}>
+                <SafeAreaView style={styles.zoomBackground}><View style={styles.zoomHeader}><Text style={styles.zoomTitle}>{t.selected}</Text><TouchableOpacity accessibilityRole="button" accessibilityLabel={t.close} onPress={() => setZoomVisible(false)} style={styles.zoomClose}><Ionicons name="close" size={27} color="#FFFFFF" /></TouchableOpacity></View>{imageUri && <Image source={{ uri: imageUri }} resizeMode="contain" style={styles.zoomImage} />}</SafeAreaView>
+            </Modal>
         </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1 },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 18, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, borderBottomLeftRadius: 25, borderBottomRightRadius: 25 },
-    backButton: { padding: 8, borderRadius: 14 },
-    headerTitle: { fontSize: 19, fontWeight: '800' },
-    
-    scrollContent: { padding: 20, alignItems: 'center', paddingBottom: 50 },
-    
-    titleContainer: { marginBottom: 25, marginTop: 10, paddingHorizontal: 10 },
-    subtitle: { textAlign: 'center', fontSize: 15, fontWeight: '500', lineHeight: 22 },
-    
-    imageWrapper: { width: width * 0.88, borderRadius: 32, padding: 10, elevation: 8, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 15, marginBottom: 30 },
-    imageContainer: { width: '100%', height: 260, borderRadius: 24, borderWidth: 2, borderStyle: 'dashed', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(108, 92, 231, 0.03)' },
+    container: { flex: 1 }, flex: { flex: 1 },
+    header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 12, gap: 12 },
+    backButton: { width: 46, height: 46, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+    headerTitle: { flex: 1, fontSize: 19, fontWeight: '800' },
+    aiBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 9, borderRadius: 13 },
+    aiBadgeText: { color: '#A07A34', fontWeight: '800', fontSize: 12 },
+    scrollContent: { padding: 20, paddingTop: 8, paddingBottom: 32, width: '100%', maxWidth: 640, alignSelf: 'center' },
+    hero: { borderRadius: 28, backgroundColor: '#142334', padding: 24, overflow: 'hidden' },
+    heroOrbit: { position: 'absolute', width: 230, height: 230, borderRadius: 120, borderWidth: 35, borderColor: '#203247', right: -110, top: -60 },
+    heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+    eyebrow: { color: '#D9BC7E', fontSize: 10, fontWeight: '800', letterSpacing: 1.5, flexShrink: 1 },
+    headline: { color: '#FCF8F0', fontWeight: '800', fontSize: 32, lineHeight: 40, letterSpacing: -0.8, marginTop: 19 },
+    heroIntro: { color: '#C5CED9', fontSize: 14, lineHeight: 23, marginTop: 12 },
+    pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 21 },
+    pill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: '#253448' },
+    pillText: { color: '#EEE7D9', fontSize: 10, fontWeight: '600' },
+    sectionHeading: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 28, marginBottom: 15 },
+    sectionTitle: { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
+    sectionSub: { fontSize: 13, lineHeight: 21, marginTop: 5 },
+    sectionIcon: { width: 44, height: 44, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+    photoCard: { borderWidth: 1, borderRadius: 27, padding: 12 },
+    photoFrame: { borderWidth: 1.5, borderRadius: 20, overflow: 'hidden', justifyContent: 'center' },
     image: { width: '100%', height: '100%' },
-    placeholder: { alignItems: 'center', justifyContent: 'center' },
-    iconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(108, 92, 231, 0.1)', justifyContent: 'center', alignItems: 'center' },
-    
-    radarOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.2)' },
-    radarLine: { width: '100%', height: 3, backgroundColor: '#00E5FF', shadowColor: '#00E5FF', shadowOpacity: 1, shadowRadius: 15, elevation: 10 }, 
-    
-    btnRow: { flexDirection: 'row', justifyContent: 'space-between', width: width * 0.88, marginBottom: 30 },
-    btn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 20, marginHorizontal: 6, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.2, shadowRadius: 8 },
-    btnText: { color: 'white', fontWeight: 'bold', fontSize: 16, marginLeft: 10 },
-    
-    resultCard: { width: width * 0.88, padding: 25, borderRadius: 28, elevation: 10, shadowColor: '#6C5CE7', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.15, shadowRadius: 20, borderWidth: 1, borderColor: 'rgba(108, 92, 231, 0.1)' },
-    sparkleContainer: { backgroundColor: 'rgba(253, 203, 110, 0.15)', padding: 12, borderRadius: 20, marginBottom: 10 },
-    resTitle: { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 5 },
-    resText: { fontSize: 24, fontWeight: '900', textAlign: 'center', lineHeight: 32 },
-    scoreText: { fontSize: 16, fontWeight: '600', marginTop: 5, opacity: 0.8 },
-    
-    confidenceBox: { flexDirection: 'row', alignItems: 'center', marginTop: 15, paddingVertical: 10, paddingHorizontal: 15, borderRadius: 12, borderWidth: 1 },
-    confidenceText: { fontSize: 12, fontWeight: '700', flex: 1, flexWrap: 'wrap' }
+    placeholder: { padding: 20, alignItems: 'center', justifyContent: 'center' },
+    placeholderRing: { width: 120, height: 120, borderRadius: 65, borderWidth: 1, padding: 10, marginBottom: 23 },
+    placeholderIcon: { flex: 1, borderRadius: 55, alignItems: 'center', justifyContent: 'center' },
+    plusMark: { position: 'absolute', right: 1, bottom: 8, width: 29, height: 29, borderRadius: 15, backgroundColor: '#D9BC7E', alignItems: 'center', justifyContent: 'center' },
+    placeholderTitle: { fontSize: 17, fontWeight: '700', textAlign: 'center' },
+    placeholderSub: { fontSize: 12, lineHeight: 20, marginTop: 8, textAlign: 'center' },
+    photoLabel: { position: 'absolute', top: 12, left: 12, borderRadius: 12, padding: 9, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(16,29,43,0.8)' },
+    goldDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#D9BC7E' },
+    photoLabelText: { color: '#FFFFFF', fontSize: 8, fontWeight: '800', letterSpacing: 1 },
+    expandButton: { position: 'absolute', right: 12, bottom: 12, padding: 11, borderRadius: 14, backgroundColor: 'rgba(16,29,43,0.8)' },
+    radarOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(11,19,30,0.35)' },
+    radarLine: { height: 3, backgroundColor: '#D9BC7E', width: '100%' },
+    loadingChip: { position: 'absolute', bottom: 16, left: 14, right: 14, borderRadius: 16, padding: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 9, backgroundColor: 'rgba(16,29,43,0.9)' },
+    loadingChipText: { color: '#FFFFFF', fontSize: 12, flexShrink: 1 },
+    primaryButton: { backgroundColor: '#D1B06B', borderRadius: 17, paddingHorizontal: 16, paddingVertical: 17, marginTop: 13, flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 55 },
+    primaryButtonText: { flex: 1, color: '#142334', fontSize: 14, fontWeight: '800' },
+    secondaryButton: { borderRadius: 17, padding: 15, minHeight: 51, marginTop: 9, borderWidth: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 9 },
+    secondaryButtonText: { fontSize: 14, fontWeight: '700' }, disabled: { opacity: 0.5 },
+    statusCard: { marginTop: 18, borderRadius: 22, padding: 20, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 14 },
+    featureTitle: { fontSize: 14, fontWeight: '700', marginBottom: 5 },
+    bodySmall: { fontSize: 12, lineHeight: 20 }, body: { fontSize: 14, lineHeight: 24 },
+    resultCard: { marginTop: 20, borderRadius: 27, padding: 23, borderWidth: 1 },
+    resultTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    resultIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+    resultEyebrow: { color: '#A07A34', fontSize: 10, fontWeight: '800', letterSpacing: 1.6, marginBottom: 3 },
+    resultName: { fontSize: 27, lineHeight: 35, fontWeight: '800', letterSpacing: -0.6, marginTop: 21, marginBottom: 13 },
+    estimatePill: { alignSelf: 'flex-start', paddingHorizontal: 11, paddingVertical: 8, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16, maxWidth: '100%' },
+    estimateText: { color: '#A07A34', fontSize: 11, fontWeight: '700', flexShrink: 1 },
+    resultFooter: { borderTopWidth: 1, marginTop: 19, paddingTop: 17, flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    resultDisclaimer: { flex: 1, fontSize: 11, lineHeight: 18 },
+    errorCard: { marginTop: 20, borderWidth: 1, borderColor: '#CC6557', borderRadius: 25, padding: 22, gap: 12 },
+    resultHeading: { fontSize: 19, lineHeight: 27, fontWeight: '800' },
+    retryButton: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8, padding: 13, borderRadius: 14, marginTop: 3 }, retryText: { color: '#A07A34', fontWeight: '700', fontSize: 12, flexShrink: 1 },
+    tipsCard: { borderRadius: 25, padding: 21, borderWidth: 1, marginTop: 23 },
+    tipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 13, paddingVertical: 17 },
+    tipIcon: { width: 41, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+    privacy: { flexDirection: 'row', gap: 11, marginTop: 24, paddingHorizontal: 3 },
+    privacyTitle: { fontSize: 12, fontWeight: '700', marginBottom: 5 },
+    privacyBody: { fontSize: 11, lineHeight: 19 }, footerText: { fontSize: 12, textAlign: 'center', lineHeight: 20, marginTop: 27 },
+    zoomBackground: { flex: 1, backgroundColor: '#080F18' }, zoomHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18, gap: 12 },
+    zoomTitle: { color: '#E6DDCA', fontSize: 11, letterSpacing: 1.5, fontWeight: '700', flex: 1 }, zoomClose: { padding: 10, backgroundColor: '#1B2939', borderRadius: 15 }, zoomImage: { flex: 1, width: '100%' },
 });
 
 export default PetIdentifierScreen;

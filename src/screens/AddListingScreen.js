@@ -1,5 +1,5 @@
-import React, { useState, useContext, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, Modal, FlatList, ActivityIndicator, KeyboardAvoidingView, Platform, Animated, Easing } from 'react-native';
+import React, { useState, useContext, useEffect, useRef, memo } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, Alert, Modal, FlatList, ActivityIndicator, KeyboardAvoidingView, Platform, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -10,15 +10,28 @@ import { CITY_DATA } from '../constants/cities';
 import { ThemeContext } from '../context/ThemeContext';
 import { supabase } from '../lib/supabase';
 
-// ✅ DÜZELTME: ModernInput ana fonksiyonun DIŞINA alındı. 
-// theme prop olarak dışarıdan alınıyor, böylece her harf yazışta klavye kapanmayacak.
-const ModernInput = ({ icon, placeholder, value, onChangeText, keyboardType = 'default', multiline = false, theme }) => (
-    <View style={[styles.inputContainer, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
-        {icon && <Ionicons name={icon} size={20} color="#6C5CE7" style={styles.inputIcon} />}
+// --- PITO YENİ RENK PALETİ ---
+const PITO_COLORS = {
+    primary: '#C5A059', 
+    primaryDark: '#B08D4B', 
+    navyBg: '#0B131E', 
+    navySurface: '#1A2533', 
+    navyLight: '#243447',
+    cream: '#F5F5DC',
+    white: '#FFFFFF',
+    grayText: '#A0AAB5',
+    error: '#FF4D4D'
+};
+
+// ✅ OPTİMİZASYON: Klavye kapanma sorununu kökten çözen, tamamen izole edilmiş Input bileşeni.
+// theme objesi yerine sadece primitif renk stringleri alarak gereksiz render'ı durdurur.
+const ModernInput = memo(({ icon, placeholder, value, onChangeText, keyboardType = 'default', multiline = false, bgColor, borderColor, textColor, placeholderColor }) => (
+    <View style={[styles.inputContainer, { backgroundColor: bgColor, borderColor: borderColor }]}>
+        {icon && <Ionicons name={icon} size={20} color={PITO_COLORS.primary} style={styles.inputIcon} />}
         <TextInput
-            style={[styles.input, { color: theme.text, height: multiline ? 100 : 50 }]}
+            style={[styles.input, { color: textColor, height: multiline ? 100 : 50 }]}
             placeholder={placeholder}
-            placeholderTextColor={theme.subText}
+            placeholderTextColor={placeholderColor}
             value={value}
             onChangeText={onChangeText}
             keyboardType={keyboardType}
@@ -26,15 +39,32 @@ const ModernInput = ({ icon, placeholder, value, onChangeText, keyboardType = 'd
             textAlignVertical={multiline ? 'top' : 'center'}
         />
     </View>
-);
+));
 
 const AddListingScreen = ({ route, navigation }) => {
-  const { category } = route.params; 
-  const { fetchListings } = useContext(ListingContext);
+  const { category = '' } = route.params || {}; 
+  const { addListing } = useContext(ListingContext);
   const { user, country } = useContext(AuthContext);
   const { theme, isDarkMode } = useContext(ThemeContext);
 
   const activeLang = country?.code || 'TR';
+
+  const submitLock = useRef(false);
+  const pickerLock = useRef(false);
+  const completed = useRef(false);
+  const uploadedImages = useRef(new Map());
+  const lifecycle = useRef({ live: true, userId: user?.id, country: activeLang });
+  lifecycle.current.userId = user?.id;
+  lifecycle.current.country = activeLang;
+
+  useEffect(() => {
+      lifecycle.current.live = true;
+      return () => { lifecycle.current.live = false; };
+  }, []);
+
+  useEffect(() => navigation.addListener('beforeRemove', event => {
+      if (submitLock.current) event.preventDefault();
+  }), [navigation]);
 
   // --- ANİMASYON DEĞERLERİ ---
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -75,24 +105,20 @@ const AddListingScreen = ({ route, navigation }) => {
   const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false); 
   
-  // Hayvan Bilgileri (Pet Name kaldırıldı)
   const [age, setAge] = useState('');
   const [breed, setBreed] = useState('');
   const [gender, setGender] = useState('Erkek');
   const [petType, setPetType] = useState(null); 
 
-  // İşletme Bilgileri
   const [shopName, setShopName] = useState(''); 
   const [ownerName, setOwnerName] = useState(''); 
   const [phone, setPhone] = useState(''); 
   const [address, setAddress] = useState(''); 
   const [price, setPrice] = useState(''); 
 
-  // Bakıcı Bilgileri
   const [sitterName, setSitterName] = useState(user?.user_metadata?.full_name || ''); 
   const [experience, setExperience] = useState(''); 
 
-  // Modal State
   const [modalVisible, setModalVisible] = useState(false);
   const [selectionType, setSelectionType] = useState(null); 
 
@@ -108,17 +134,16 @@ const AddListingScreen = ({ route, navigation }) => {
 
   const displayCategory = getLocalizedCategory(category);
 
-  // Veritabanı için sabit kalacak etiketler
+  // Hayvan tipleri (Gelişmiş Grid ikonları)
   const ANIMAL_TYPES = [
-      { label: 'Kedi', icon: 'paw' },
+      { label: 'Kedi', icon: 'logo-octocat' }, // Kediye en yakın standart ikon
       { label: 'Köpek', icon: 'paw' },
-      { label: 'Kuş', icon: 'airplane' }, 
+      { label: 'Kuş', icon: 'leaf' }, 
       { label: 'Balık', icon: 'water' },
-      { label: 'Kemirgen', icon: 'leaf' },
-      { label: 'Diğer', icon: 'ellipsis-horizontal' }
+      { label: 'Kemirgen', icon: 'egg' },
+      { label: 'Diğer', icon: 'apps' }
   ];
 
-  // Ekranda Görünen Tür İsimleri (Çeviri)
   const typeLabels = {
       'Kedi': activeLang === 'AU' ? 'Cat' : 'Kedi',
       'Köpek': activeLang === 'AU' ? 'Dog' : 'Köpek',
@@ -138,7 +163,7 @@ const AddListingScreen = ({ route, navigation }) => {
           cityLabel: "İl",
           distLabel: "İlçe",
           select: "Seçiniz",
-          addBtn: "Ekle", // 🆕 Çeviri Eklendi
+          addBtn: "Ekle", 
           btnPost: "İlanı Yayınla",
           breed: "Tür / Cins",
           age: "Yaş",
@@ -173,7 +198,7 @@ const AddListingScreen = ({ route, navigation }) => {
           cityLabel: "State",
           distLabel: "Suburb",
           select: "Select",
-          addBtn: "Add", // 🆕 Çeviri Eklendi
+          addBtn: "Add", 
           btnPost: "Post Listing",
           breed: "Breed",
           age: "Age",
@@ -201,180 +226,187 @@ const AddListingScreen = ({ route, navigation }) => {
       }
   };
 
-  const t = TEXTS[activeLang];
+  const t = TEXTS[activeLang] || TEXTS.TR;
+
+  // Renk hesaplamaları (Memoize edilmiş inputlar için primitif değerler)
+  const inputBgColor = isDarkMode ? PITO_COLORS.navySurface : theme.cardBg;
+  const inputBorderColor = isDarkMode ? PITO_COLORS.navyLight : theme.border;
+  const inputTextColor = theme.text;
+  const inputPlaceholderColor = isDarkMode ? PITO_COLORS.grayText : theme.subText;
 
   const pickMedia = async () => {
-    if (mediaList.length >= 3) { Alert.alert(t.limitTitle, t.limitMsg); return; }
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.5,
-      base64: true 
-    });
-    if (!result.canceled) {
-      setMediaList([...mediaList, result.assets[0]]);
-    }
-  };
-
-  const removeMedia = (index) => {
-      const newList = [...mediaList];
-      newList.splice(index, 1);
-      setMediaList(newList);
-  };
-
-  const decode = (base64) => {
-    const binaryString = atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes.buffer;
-  };
-
-  const uploadImageToSupabase = async (base64) => {
+      if (submitLock.current || completed.current || pickerLock.current) return;
+      if (mediaList.length >= 3) { Alert.alert(t.limitTitle, t.limitMsg); return; }
+      pickerLock.current = true;
+      const account = user?.id;
       try {
-          const filename = `${user.id}/${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-          const arrayBuffer = decode(base64);
-
-          const { error } = await supabase.storage
-              .from('listings') 
-              .upload(filename, arrayBuffer, { contentType: 'image/jpeg', upsert: true });
-
-          if (error) {
-             const { error: err2 } = await supabase.storage.from('posts').upload(filename, arrayBuffer, { contentType: 'image/jpeg', upsert: true });
-             if(err2) throw err2;
-             const { data } = supabase.storage.from('posts').getPublicUrl(filename);
-             return data.publicUrl;
+          const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsEditing: true,
+              aspect: [4, 3],
+              quality: 0.5,
+              base64: true,
+          });
+          if (!lifecycle.current.live || lifecycle.current.userId !== account) return;
+          if (!result.canceled && result.assets?.[0]) {
+              const asset = result.assets[0];
+              if (!asset.base64) throw new Error('Fotoğraf okunamadı. Lütfen tekrar seçin.');
+              setMediaList(previous => previous.length < 3 ? [...previous, asset] : previous);
           }
-
-          const { data } = supabase.storage.from('listings').getPublicUrl(filename);
-          return data.publicUrl;
-      } catch (error) {
-          console.log("Resim yükleme hatası:", error);
-          return null;
-      }
+      } catch {
+          if (lifecycle.current.live) Alert.alert(activeLang === 'TR' ? 'Fotoğraf seçilemedi' : 'Photo unavailable', activeLang === 'TR' ? 'Galeri iznini kontrol edip tekrar deneyin.' : 'Check photo access and try again.');
+      } finally { pickerLock.current = false; }
   };
 
-  // --- KAYDETME ---
+  const removeMedia = index => {
+      if (submitLock.current || completed.current) return;
+      setMediaList(previous => previous.filter((_, itemIndex) => itemIndex !== index));
+  };
+
+  const uploadImageToSupabase = async (media, ownerId) => {
+      const cacheKey = `${ownerId}:${media.uri}`;
+      if (uploadedImages.current.has(cacheKey)) return uploadedImages.current.get(cacheKey);
+      if (typeof media.base64 !== 'string' || media.base64.length > 11200000) {
+          throw new Error('Fotoğraf okunamadı veya çok büyük. Daha küçük bir fotoğraf seçin.');
+      }
+      const binary = atob(media.base64);
+      const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+      if (bytes.length < 12 || bytes.length > 8 * 1024 * 1024) throw new Error('Fotoğraf en fazla 8 MB olabilir.');
+      const jpeg = bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
+      const png = bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71;
+      const webp = String.fromCharCode(...bytes.slice(0, 4)) === 'RIFF' && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP';
+      if (!jpeg && !png && !webp) throw new Error('JPEG, PNG veya WebP fotoğraf seçin.');
+      const ext = png ? 'png' : webp ? 'webp' : 'jpg';
+      const contentType = png ? 'image/png' : webp ? 'image/webp' : 'image/jpeg';
+      const filename = `${ownerId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+      let bucket = 'listings';
+      let { error } = await supabase.storage.from(bucket).upload(filename, bytes.buffer, { contentType, upsert: false });
+      // Eski kurulumlarda yalnızca listings bucket'ı yoksa mevcut posts yolunu koru.
+      if (error && /bucket.*not found/i.test(error.message || '')) {
+          bucket = 'posts';
+          ({ error } = await supabase.storage.from(bucket).upload(filename, bytes.buffer, { contentType, upsert: false }));
+      }
+      if (error) throw error;
+      const { data } = supabase.storage.from(bucket).getPublicUrl(filename);
+      if (!data?.publicUrl) throw new Error('Fotoğraf bağlantısı alınamadı.');
+      uploadedImages.current.set(cacheKey, data.publicUrl);
+      return data.publicUrl;
+  };
+
   const handleSubmit = async () => {
+      if (submitLock.current || completed.current || pickerLock.current) return;
       animateButton();
-      
-      // Validasyonlar
-      if (mediaList.length === 0 || !city || !district || !description) {
+      if (mediaList.length === 0 || !city || !district || !description.trim()) {
           Alert.alert(t.alertTitle, t.alertMsg);
           return;
       }
-
-      // Hayvan Türü Kontrolü (Hizmet ilanı VEYA Bakıcı ilanı değilse sorulacak)
       if (!isServiceListing && !isSitter && !petType) {
           Alert.alert(t.alertTitle, t.typeAlert);
           return;
       }
-
-      if (!user) {
-          Alert.alert("Hata", "Giriş yapmalısınız.");
+      if (!user?.id) {
+          Alert.alert('Pito', activeLang === 'TR' ? 'Giriş yapmalısınız.' : 'Please sign in.');
           return;
       }
-
+      if (!category) {
+          Alert.alert('Pito', activeLang === 'TR' ? 'İlan kategorisi bulunamadı. Geri dönüp tekrar seçin.' : 'Go back and select a listing category.');
+          return;
+      }
+      const numericPrice = price.trim() ? Number(price.trim().replace(',', '.')) : 0;
+      const ageInput = isSitter ? experience : age;
+      const numericAge = ageInput.trim() ? Number(ageInput.trim().replace(',', '.')) : 0;
+      if (!Number.isFinite(numericPrice) || numericPrice < 0 || !Number.isFinite(numericAge) || numericAge < 0) {
+          Alert.alert(t.alertTitle, activeLang === 'TR' ? 'Yaş, deneyim ve ücret alanlarına geçerli, negatif olmayan sayılar girin.' : 'Enter valid, nonnegative age, experience and price values.');
+          return;
+      }
+      submitLock.current = true;
       setIsLoading(true);
-
+      setModalVisible(false);
+      const ownerId = user.id;
+      const code = activeLang;
+      const stillCurrent = () => lifecycle.current.live && lifecycle.current.userId === ownerId && lifecycle.current.country === code;
+      let saved = false;
       try {
-          // 1. Resimleri Yükle
           const uploadedUrls = [];
           for (const media of mediaList) {
-              if (media.base64) {
-                  const publicUrl = await uploadImageToSupabase(media.base64);
-                  if (publicUrl) uploadedUrls.push(publicUrl);
-              }
+              if (!stillCurrent()) throw new Error('Oturum değişti. Lütfen tekrar giriş yapın.');
+              const url = await uploadImageToSupabase(media, ownerId);
+              if (!url) throw new Error('Fotoğraf yüklenemedi.');
+              uploadedUrls.push(url);
           }
-
-          // İlan İsmi Belirleme (Bakıcıysa sitterName, Hizmetse shopName, Hayvansa cinsi(breed) başlık olur)
+          if (!stillCurrent()) throw new Error('Oturum değişti. Lütfen tekrar giriş yapın.');
           const finalName = isServiceListing ? shopName : (isSitter ? sitterName : breed);
-          
-          const numericPrice = price && price.trim() !== '' ? parseFloat(price) : 0;
-          
-          // Bakıcı ise deneyimi, hayvan ise yaşı alır. Veritabanında hata vermemesi için age kolonunda tutulur.
-          const numericAge = isSitter 
-              ? (experience && experience.trim() !== '' ? parseFloat(experience) : 0)
-              : (age && age.trim() !== '' ? parseFloat(age) : 0);
-
-          // 3. DOĞRUDAN SUPABASE INSERT
-          const { error } = await supabase
-              .from('listings')
-              .insert({
-                  owner_id: user.id, 
-                  name: finalName || t.unnamed, 
-                  category: category,
-                  description: description,
-                  city: city,
-                  district: district,
-                  price: numericPrice, 
-                  phone: phone,
-                  address: address,
-                  breed: breed,
-                  age: numericAge, 
-                  gender: gender,
-                  pet_type: petType, 
-                  img: uploadedUrls.length > 0 ? uploadedUrls[0] : null, 
-                  images: uploadedUrls, 
-                  is_found: false,
-                  country_code: activeLang, // ✨ İLANIN ÜLKESİ BURADA KAYDEDİLİYOR
-                  created_at: new Date()
-              });
-
-          if (error) throw error;
-
-          if (fetchListings) await fetchListings();
-          
+          const result = await addListing(category, {
+              name: finalName.trim() || t.unnamed,
+              description: description.trim(), city, district,
+              price: numericPrice, phone, address, breed,
+              age: numericAge, gender, pet_type: petType,
+              images: uploadedUrls,
+          });
+          if (!result?.success) throw new Error(result?.msg || 'İlan kaydı doğrulanamadı.');
+          saved = true;
+          completed.current = true;
+          if (!stillCurrent()) return;
+          submitLock.current = false;
           setIsLoading(false);
-          
           Alert.alert(t.successTitle, t.successMsg, [
-              { text: "OK", onPress: () => navigation.navigate('Home') }
+              { text: 'OK', onPress: () => { if (stillCurrent()) navigation.navigate('Home'); } },
           ]);
-
       } catch (error) {
-          setIsLoading(false);
-          console.log("İlan yükleme hatası:", error);
-          Alert.alert("Hata", "İlan yüklenirken bir sorun oluştu: " + (error.message || JSON.stringify(error)));
+          if (!saved && stillCurrent()) {
+              console.log('[Listings] Yayınlama tamamlanamadı', { code: error?.code || 'request' });
+              Alert.alert(activeLang === 'TR' ? 'İlan yayınlanamadı' : 'Listing not published', activeLang === 'TR'
+                  ? 'Fotoğraflar veya ilan kaydı tamamlanamadı. Bilgilerin bu ekranda duruyor. Bağlantını kontrol et; tekrar denemeden önce profilinde ilanın oluşup oluşmadığını kontrol et.'
+                  : 'The photo upload or listing save could not be confirmed. Your form is preserved. Check your connection and profile before retrying.');
+          }
+      } finally {
+          submitLock.current = false;
+          if (lifecycle.current.live) setIsLoading(false);
       }
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isDarkMode ? '#121212' : '#F8F9FA' }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: isDarkMode ? PITO_COLORS.navyBg : theme.background }]}>
       
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.cardBg }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backButton, {backgroundColor: isDarkMode ? '#333' : '#F0F0F0'}]}>
-          <Ionicons name="arrow-back" size={24} color={theme.text} />
+      <View style={styles.header}>
+        <TouchableOpacity disabled={isLoading} onPress={() => navigation.goBack()} style={[styles.backButton, { backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.cardBg }]} accessibilityRole="button" accessibilityLabel={activeLang === 'TR' ? 'Geri' : 'Back'}>
+          <Ionicons name="arrow-back" size={22} color={theme.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>{t.headerTitle}</Text>
-        <View style={{ width: 40 }} />
+        <View style={styles.brandRow}><Text style={[styles.brandText, { color: theme.text }]}>Pito</Text><Ionicons name="paw" size={20} color={PITO_COLORS.primary} /></View>
+        <View style={styles.headerBadge}><Ionicons name="create-outline" size={19} color={PITO_COLORS.primary} /></View>
       </View>
 
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView pointerEvents={isLoading ? "none" : "auto"} behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             
             <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
                 
+                <View style={styles.introBlock}>
+                    <View style={styles.categoryPill}><Ionicons name="paw-outline" size={13} color={PITO_COLORS.primary} /><Text style={styles.categoryPillText}>{displayCategory}</Text></View>
+                    <Text style={[styles.pageTitle, { color: theme.text }]}>{t.headerTitle}</Text>
+                    <Text style={[styles.pageSubtitle, { color: theme.subText }]}>{activeLang === 'TR' ? 'Fotoğrafları ve bilgileri ekleyerek ilanını hazırla.' : 'Prepare your listing with photos and details.'}</Text>
+                </View>
+
                 {/* Medya Yükleme Alanı */}
-                <View style={[styles.sectionContainer, {backgroundColor: theme.cardBg, shadowColor: isDarkMode ? '#000' : '#6C5CE7'}]}>
+                <View style={[styles.sectionContainer, {backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.cardBg, borderColor: isDarkMode ? PITO_COLORS.navyLight : theme.border, borderWidth: 1}]}>
                     <View style={styles.sectionHeader}>
-                        <Ionicons name="images-outline" size={20} color="#6C5CE7" />
-                        <Text style={[styles.label, { color: theme.text, marginLeft: 8 }]}>{t.photoLabel} <Text style={styles.subLabel}>{t.photoSubLabel}</Text></Text>
+                        <Ionicons name="images-outline" size={20} color={PITO_COLORS.primary} />
+                        <View style={{ flex: 1, marginLeft: 9 }}><Text style={[styles.label, { color: theme.text }]}>{t.photoLabel}</Text><Text style={[styles.subLabel, { color: theme.subText }]}>{t.photoSubLabel}</Text></View>
+                        <View style={styles.photoCount}><Text style={styles.photoCountText}>{mediaList.length}/3</Text></View>
                     </View>
                     
                     <View style={styles.mediaRow}>
-                        <TouchableOpacity style={[styles.addMediaBtn, { borderColor: '#6C5CE7', backgroundColor: isDarkMode ? 'rgba(108, 92, 231, 0.1)' : 'rgba(108, 92, 231, 0.05)' }]} onPress={pickMedia}>
-                            <Ionicons name="add" size={32} color="#6C5CE7" />
-                            <Text style={[styles.addMediaText, {color: '#6C5CE7'}]}>{t.addBtn}</Text>
+                        <TouchableOpacity style={[styles.addMediaBtn, { borderColor: PITO_COLORS.primary, backgroundColor: isDarkMode ? 'rgba(197, 160, 89, 0.1)' : 'rgba(197, 160, 89, 0.05)' }]} onPress={pickMedia}>
+                            <Ionicons name="add" size={32} color={PITO_COLORS.primary} />
+                            <Text style={[styles.addMediaText, {color: PITO_COLORS.primary}]}>{t.addBtn}</Text>
                         </TouchableOpacity>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{alignItems: 'center'}}>
                             {mediaList.map((item, index) => (
                                 <View key={index} style={styles.mediaItem}>
                                     <Image source={{ uri: item.uri }} style={styles.mediaImage} />
-                                    <TouchableOpacity style={styles.removeMedia} onPress={() => removeMedia(index)}>
-                                        <Ionicons name="close-circle" size={22} color="#FF4D4D" />
+                                    {index === 0 && <View style={styles.coverTag}><Text style={styles.coverTagText}>{activeLang === 'TR' ? 'Kapak' : 'Cover'}</Text></View>}
+                                    <TouchableOpacity style={styles.removeMedia} onPress={() => removeMedia(index)} accessibilityRole="button" accessibilityLabel={activeLang === 'TR' ? 'Fotoğrafı kaldır' : 'Remove photo'}>
+                                        <Ionicons name="close-circle" size={22} color={PITO_COLORS.error} />
                                     </TouchableOpacity>
                                 </View>
                             ))}
@@ -382,90 +414,92 @@ const AddListingScreen = ({ route, navigation }) => {
                     </View>
                 </View>
 
-                {/* HAYVAN TÜRÜ SEÇİMİ (Hizmet VEYA Bakıcı ilanı DEĞİLSE sorulacak) */}
+                {/* YENİ HAYVAN TÜRÜ SEÇİMİ (GRID SİSTEMİ) */}
                 {!isServiceListing && !isSitter && (
-                    <View style={[styles.sectionContainer, {backgroundColor: theme.cardBg, paddingVertical: 15, shadowColor: isDarkMode ? '#000' : '#6C5CE7'}]}>
+                    <View style={[styles.sectionContainer, {backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.cardBg, paddingVertical: 15, borderColor: isDarkMode ? PITO_COLORS.navyLight : theme.border, borderWidth: 1}]}>
                         <View style={styles.sectionHeader}>
-                            <Ionicons name="paw-outline" size={20} color="#6C5CE7" />
+                            <Ionicons name="paw-outline" size={20} color={PITO_COLORS.primary} />
                             <Text style={[styles.label, { color: theme.text, marginLeft: 8 }]}>{t.typeLabel}</Text>
                         </View>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        
+                        <View style={styles.typeGridContainer}>
                             {ANIMAL_TYPES.map((type, index) => (
                                 <TouchableOpacity 
                                     key={index} 
                                     style={[
-                                        styles.typeChip, 
-                                        petType === type.label && { backgroundColor: '#6C5CE7', borderColor: '#6C5CE7' },
-                                        { borderColor: theme.border }
+                                        styles.typeGridItem, 
+                                        { backgroundColor: isDarkMode ? PITO_COLORS.navyLight : theme.background, borderColor: isDarkMode ? 'transparent' : theme.border },
+                                        petType === type.label && { backgroundColor: PITO_COLORS.primary, borderColor: PITO_COLORS.primary }
                                     ]}
                                     onPress={() => setPetType(type.label)}
                                     activeOpacity={0.8}
                                 >
-                                    <Ionicons name={type.icon} size={16} color={petType === type.label ? 'white' : theme.subText} style={{marginRight: 5}} />
+                                    <Ionicons name={type.icon} size={22} color={petType === type.label ? PITO_COLORS.navyBg : PITO_COLORS.primary} style={{marginBottom: 4}} />
                                     <Text style={[
-                                        styles.typeChipText, 
-                                        { color: petType === type.label ? 'white' : theme.subText }
+                                        styles.typeGridText, 
+                                        { color: petType === type.label ? PITO_COLORS.navyBg : theme.text }
                                     ]}>
                                         {typeLabels[type.label]}
                                     </Text>
-                                    {petType === type.label && <Ionicons name="checkmark-circle" size={16} color="white" style={{marginLeft: 5}} />}
+                                    {petType === type.label && <Ionicons name="checkmark-circle" size={14} color={PITO_COLORS.navyBg} style={styles.typeCheckIcon} />}
                                 </TouchableOpacity>
                             ))}
-                        </ScrollView>
+                        </View>
                     </View>
                 )}
 
+                <View style={styles.formHeading}><View style={styles.headingIcon}><Ionicons name="document-text-outline" size={18} color={PITO_COLORS.primary} /></View><Text style={[styles.formHeadingText, { color: theme.text }]}>{activeLang === 'TR' ? 'İlan bilgileri' : 'Listing details'}</Text></View>
                 {/* Form Alanları */}
-                <View style={[styles.sectionContainer, {backgroundColor: theme.cardBg, paddingBottom: 10, shadowColor: isDarkMode ? '#000' : '#6C5CE7'}]}>
+                <View style={[styles.sectionContainer, {backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.cardBg, paddingBottom: 10, borderColor: isDarkMode ? PITO_COLORS.navyLight : theme.border, borderWidth: 1}]}>
                     
                     {isServiceListing ? (
                         <>
                             <Text style={[styles.fieldLabel, {color: theme.subText}]}>{t.shopName}</Text>
-                            <ModernInput theme={theme} icon="business-outline" placeholder={t.shopName} value={shopName} onChangeText={setShopName} />
+                            <ModernInput bgColor={inputBgColor} borderColor={inputBorderColor} textColor={inputTextColor} placeholderColor={inputPlaceholderColor} icon="business-outline" placeholder={t.shopName} value={shopName} onChangeText={setShopName} />
                             
                             <Text style={[styles.fieldLabel, {color: theme.subText}]}>{t.ownerName}</Text>
-                            <ModernInput theme={theme} icon="person-outline" placeholder={t.ownerName} value={ownerName} onChangeText={setOwnerName} />
+                            <ModernInput bgColor={inputBgColor} borderColor={inputBorderColor} textColor={inputTextColor} placeholderColor={inputPlaceholderColor} icon="person-outline" placeholder={t.ownerName} value={ownerName} onChangeText={setOwnerName} />
                             
                             <Text style={[styles.fieldLabel, {color: theme.subText}]}>{t.phone}</Text>
-                            <ModernInput theme={theme} icon="call-outline" placeholder={t.phonePlace} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
+                            <ModernInput bgColor={inputBgColor} borderColor={inputBorderColor} textColor={inputTextColor} placeholderColor={inputPlaceholderColor} icon="call-outline" placeholder={t.phonePlace} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
                             
                             <Text style={[styles.fieldLabel, {color: theme.subText}]}>{t.address}</Text>
-                            <ModernInput theme={theme} icon="location-outline" placeholder={t.address} value={address} onChangeText={setAddress} />
+                            <ModernInput bgColor={inputBgColor} borderColor={inputBorderColor} textColor={inputTextColor} placeholderColor={inputPlaceholderColor} icon="location-outline" placeholder={t.address} value={address} onChangeText={setAddress} />
                         </>
                     ) : isSitter ? (
                         <>
                             <Text style={[styles.fieldLabel, {color: theme.subText}]}>{t.sitterName}</Text>
-                            <ModernInput theme={theme} icon="person-outline" placeholder={t.sitterName} value={sitterName} onChangeText={setSitterName} />
+                            <ModernInput bgColor={inputBgColor} borderColor={inputBorderColor} textColor={inputTextColor} placeholderColor={inputPlaceholderColor} icon="person-outline" placeholder={t.sitterName} value={sitterName} onChangeText={setSitterName} />
                             
                             <Text style={[styles.fieldLabel, {color: theme.subText}]}>{t.experience}</Text>
-                            <ModernInput theme={theme} icon="time-outline" placeholder="Örn: 3" keyboardType="numeric" value={experience} onChangeText={setExperience} />
+                            <ModernInput bgColor={inputBgColor} borderColor={inputBorderColor} textColor={inputTextColor} placeholderColor={inputPlaceholderColor} icon="time-outline" placeholder="Örn: 3" keyboardType="numeric" value={experience} onChangeText={setExperience} />
 
                             <Text style={[styles.fieldLabel, {color: theme.subText}]}>{t.price}</Text>
-                            <ModernInput theme={theme} icon="wallet-outline" placeholder="0" keyboardType="numeric" value={price} onChangeText={setPrice} />
+                            <ModernInput bgColor={inputBgColor} borderColor={inputBorderColor} textColor={inputTextColor} placeholderColor={inputPlaceholderColor} icon="wallet-outline" placeholder="0" keyboardType="numeric" value={price} onChangeText={setPrice} />
                             
                             <Text style={[styles.fieldLabel, {color: theme.subText}]}>{t.phone}</Text>
-                            <ModernInput theme={theme} icon="call-outline" placeholder={t.phonePlace} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
+                            <ModernInput bgColor={inputBgColor} borderColor={inputBorderColor} textColor={inputTextColor} placeholderColor={inputPlaceholderColor} icon="call-outline" placeholder={t.phonePlace} keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
                         </>
                     ) : (
                         <>
                             <View style={styles.row}>
                                 <View style={{ flex: 1, marginRight: 10 }}>
                                     <Text style={[styles.fieldLabel, {color: theme.subText}]}>{t.breed}</Text>
-                                    <ModernInput theme={theme} icon="dna-outline" placeholder={t.breed} value={breed} onChangeText={setBreed} />
+                                    <ModernInput bgColor={inputBgColor} borderColor={inputBorderColor} textColor={inputTextColor} placeholderColor={inputPlaceholderColor} icon="paw-outline" placeholder={t.breed} value={breed} onChangeText={setBreed} />
                                 </View>
                                 <View style={{ flex: 0.6 }}>
                                     <Text style={[styles.fieldLabel, {color: theme.subText}]}>{t.age}</Text>
-                                    <ModernInput theme={theme} icon="calendar-outline" placeholder="0" keyboardType="numeric" value={age} onChangeText={setAge} />
+                                    <ModernInput bgColor={inputBgColor} borderColor={inputBorderColor} textColor={inputTextColor} placeholderColor={inputPlaceholderColor} icon="calendar-outline" placeholder="0" keyboardType="numeric" value={age} onChangeText={setAge} />
                                 </View>
                             </View>
 
                             <Text style={[styles.fieldLabel, {color: theme.subText}]}>{t.gender}</Text>
                             <View style={styles.genderContainer}>
-                                <TouchableOpacity style={[styles.genderBtn, gender === 'Erkek' && { backgroundColor: 'rgba(91, 75, 196, 0.1)', borderColor: '#5B4BC4' }, { borderColor: theme.border }]} onPress={() => setGender('Erkek')} activeOpacity={0.8}>
+                                <TouchableOpacity style={[styles.genderBtn, gender === 'Erkek' && { backgroundColor: 'rgba(91, 75, 196, 0.1)', borderColor: '#5B4BC4' }, { borderColor: isDarkMode ? PITO_COLORS.navyLight : theme.border }]} onPress={() => setGender('Erkek')} activeOpacity={0.8}>
                                     <Ionicons name="male" size={20} color={gender === 'Erkek' ? '#5B4BC4' : theme.subText} />
                                     <Text style={[styles.genderText, { color: gender === 'Erkek' ? '#5B4BC4' : theme.subText }]}>{t.male}</Text>
                                 </TouchableOpacity>
-                                <TouchableOpacity style={[styles.genderBtn, gender === 'Dişi' && { backgroundColor: 'rgba(253, 121, 168, 0.1)', borderColor: '#FD79A8' }, { borderColor: theme.border }]} onPress={() => setGender('Dişi')} activeOpacity={0.8}>
+                                <TouchableOpacity style={[styles.genderBtn, gender === 'Dişi' && { backgroundColor: 'rgba(253, 121, 168, 0.1)', borderColor: '#FD79A8' }, { borderColor: isDarkMode ? PITO_COLORS.navyLight : theme.border }]} onPress={() => setGender('Dişi')} activeOpacity={0.8}>
                                     <Ionicons name="female" size={20} color={gender === 'Dişi' ? '#FD79A8' : theme.subText} />
                                     <Text style={[styles.genderText, { color: gender === 'Dişi' ? '#FD79A8' : theme.subText }]}>{t.female}</Text>
                                 </TouchableOpacity>
@@ -473,29 +507,31 @@ const AddListingScreen = ({ route, navigation }) => {
                         </>
                     )}
 
+                    <View style={[styles.formDivider, { backgroundColor: theme.border }]} />
+                    <View style={styles.locationHeading}><Ionicons name="location-outline" size={17} color={PITO_COLORS.primary} /><Text style={[styles.locationHeadingText, { color: theme.text }]}>{activeLang === 'TR' ? 'Konum ve açıklama' : 'Location and description'}</Text></View>
                     {/* Şehir ve İlçe Seçimi */}
                     <View style={styles.row}>
                         <View style={{ flex: 1, marginRight: 10 }}>
                             <Text style={[styles.fieldLabel, {color: theme.subText}]}>{t.cityLabel}</Text>
-                            <TouchableOpacity style={[styles.selectorBtn, { backgroundColor: theme.background, borderColor: theme.border }]} onPress={() => { setSelectionType('city'); setModalVisible(true); }} activeOpacity={0.8}>
+                            <TouchableOpacity style={[styles.selectorBtn, { backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.background, borderColor: isDarkMode ? PITO_COLORS.navyLight : theme.border }]} onPress={() => { setSelectionType('city'); setModalVisible(true); }} activeOpacity={0.8}>
                                 <Text style={{ color: city ? theme.text : theme.subText, flex: 1 }}>{city || t.select}</Text>
-                                <Ionicons name="chevron-down" size={18} color={theme.subText} />
+                                <Ionicons name="chevron-down" size={18} color={PITO_COLORS.primary} />
                             </TouchableOpacity>
                         </View>
                         <View style={{ flex: 1 }}>
                             <Text style={[styles.fieldLabel, {color: theme.subText}]}>{t.distLabel}</Text>
-                            <TouchableOpacity style={[styles.selectorBtn, { backgroundColor: theme.background, borderColor: theme.border }]} onPress={() => { 
+                            <TouchableOpacity style={[styles.selectorBtn, { backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.background, borderColor: isDarkMode ? PITO_COLORS.navyLight : theme.border }]} onPress={() => { 
                                 if (!city) Alert.alert("Warning", t.cityWarning); 
                                 else { setSelectionType('district'); setModalVisible(true); }
                             }} activeOpacity={0.8}>
                                 <Text style={{ color: district ? theme.text : theme.subText, flex: 1 }}>{district || t.select}</Text>
-                                <Ionicons name="chevron-down" size={18} color={theme.subText} />
+                                <Ionicons name="chevron-down" size={18} color={PITO_COLORS.primary} />
                             </TouchableOpacity>
                         </View>
                     </View>
 
                     <Text style={[styles.fieldLabel, {color: theme.subText}]}>{t.descLabel}</Text>
-                    <ModernInput theme={theme} icon="document-text-outline" placeholder="..." value={description} onChangeText={setDescription} multiline={true} />
+                    <ModernInput bgColor={inputBgColor} borderColor={inputBorderColor} textColor={inputTextColor} placeholderColor={inputPlaceholderColor} icon="document-text-outline" placeholder="..." value={description} onChangeText={setDescription} multiline={true} />
 
                 </View>
 
@@ -503,11 +539,11 @@ const AddListingScreen = ({ route, navigation }) => {
                 <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
                     <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={isLoading} activeOpacity={0.8}>
                         {isLoading ? (
-                            <ActivityIndicator color="white" />
+                            <ActivityIndicator color={PITO_COLORS.navyBg} />
                         ) : (
                             <>
-                                <Ionicons name="checkmark-circle" size={24} color="white" style={{marginRight: 8}} />
-                                <Text style={styles.submitBtnText}>{t.btnPost}</Text>
+                                <Ionicons name="checkmark-circle" size={24} color={PITO_COLORS.navyBg} style={{marginRight: 8}} />
+                                <Text style={styles.submitBtnText}>{t.btnPost}</Text><Ionicons name="arrow-forward" size={18} color={PITO_COLORS.navyBg} style={{ marginLeft: 10 }} />
                             </>
                         )}
                     </TouchableOpacity>
@@ -519,30 +555,32 @@ const AddListingScreen = ({ route, navigation }) => {
       </KeyboardAvoidingView>
 
       {/* Seçim Modalı */}
-      <Modal visible={modalVisible} transparent={true} animationType="slide">
+      <Modal visible={modalVisible} transparent={true} animationType="slide" onRequestClose={() => setModalVisible(false)}>
         <View style={styles.modalOverlay}>
-            <View style={[styles.modalContent, { backgroundColor: theme.cardBg }]}>
+            <View style={[styles.modalContent, { backgroundColor: isDarkMode ? PITO_COLORS.navyBg : theme.cardBg }]}>
+                <View style={styles.sheetHandle} />
                 <View style={styles.modalHeader}>
                     <Text style={[styles.modalTitle, { color: theme.text }]}>{selectionType === 'city' ? t.cityLabel : t.distLabel}</Text>
                     <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.closeModalBtn}>
-                        <Ionicons name="close" size={24} color={theme.text} />
+                        <Ionicons name="close" size={24} color={PITO_COLORS.primary} />
                     </TouchableOpacity>
                 </View>
                 <FlatList 
                     data={
                         selectionType === 'city' 
-                        ? Object.keys(CITY_DATA[activeLang] || {}).sort() 
-                        : (CITY_DATA[activeLang]?.[city]?.sort() || [])
+                        ? Object.keys(CITY_DATA[activeLang] || {}).sort((a, b) => a.localeCompare(b, 'tr')) 
+                        : (CITY_DATA[activeLang]?.[city] || []).sort((a, b) => a.localeCompare(b, 'tr'))
                     }
                     keyExtractor={(item) => item}
                     showsVerticalScrollIndicator={false}
+                    initialNumToRender={15}
                     renderItem={({ item }) => (
-                        <TouchableOpacity style={[styles.modalItem, { borderBottomColor: theme.border }]} onPress={() => {
+                        <TouchableOpacity style={[styles.modalItem, { borderBottomColor: isDarkMode ? PITO_COLORS.navyLight : theme.border }]} onPress={() => {
                             if (selectionType === 'city') { setCity(item); setDistrict(''); } else { setDistrict(item); }
                             setModalVisible(false);
                         }}>
                             <Text style={[styles.modalItemText, { color: theme.text }]}>{item}</Text>
-                            <Ionicons name="chevron-forward" size={18} color={theme.subText} />
+                            <Ionicons name="chevron-forward" size={18} color={PITO_COLORS.primary} />
                         </TouchableOpacity>
                     )}
                 />
@@ -556,56 +594,60 @@ const AddListingScreen = ({ route, navigation }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 18, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 10, borderBottomLeftRadius: 25, borderBottomRightRadius: 25, zIndex: 10 },
-  headerTitle: { fontSize: 19, fontWeight: '800' },
-  backButton: { padding: 8, borderRadius: 14 },
-  scrollContent: { padding: 20, paddingBottom: 100 },
-  
-  // Section Styles
-  sectionContainer: { borderRadius: 24, padding: 20, marginBottom: 20, shadowOffset:{width:0, height:4}, shadowOpacity:0.05, shadowRadius:8, elevation: 3 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
-  label: { fontSize: 16, fontWeight: '800' },
-  subLabel: { fontSize: 11, fontWeight: '500', color: '#999' },
-  fieldLabel: { fontSize: 13, marginBottom: 6, fontWeight: '700', marginLeft: 4, letterSpacing: 0.5 },
-
-  // Media Styles
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 10 },
+  backButton: { width: 42, height: 42, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  brandText: { fontSize: 24, fontWeight: '900', letterSpacing: -1 },
+  headerBadge: { width: 42, height: 42, borderRadius: 14, backgroundColor: 'rgba(197,160,89,0.1)', alignItems: 'center', justifyContent: 'center' },
+  scrollContent: { paddingHorizontal: 20, paddingBottom: 38 },
+  introBlock: { paddingTop: 14, paddingBottom: 25 },
+  categoryPill: { flexDirection: 'row', alignSelf: 'flex-start', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: 'rgba(197,160,89,0.1)', borderRadius: 10, marginBottom: 13 },
+  categoryPillText: { color: PITO_COLORS.primary, fontSize: 10, fontWeight: '700' },
+  pageTitle: { fontSize: 29, lineHeight: 36, fontWeight: '800', letterSpacing: -0.8 },
+  pageSubtitle: { fontSize: 12, lineHeight: 19, marginTop: 9 },
+  sectionContainer: { borderRadius: 22, padding: 16, marginBottom: 18 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 17 },
+  label: { fontSize: 14, fontWeight: '700', flexShrink: 1 },
+  subLabel: { fontSize: 10, lineHeight: 15, marginTop: 4 },
+  photoCount: { backgroundColor: 'rgba(197,160,89,0.13)', paddingHorizontal: 9, paddingVertical: 6, borderRadius: 9, marginLeft: 4 },
+  photoCountText: { color: PITO_COLORS.primary, fontSize: 11, fontWeight: '700' },
+  fieldLabel: { fontSize: 12, marginBottom: 8, fontWeight: '600', marginLeft: 2 },
   mediaRow: { flexDirection: 'row', alignItems: 'center' },
-  addMediaBtn: { width: 80, height: 80, borderRadius: 18, borderWidth: 2, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', marginRight: 15 },
-  addMediaText: { fontSize: 12, fontWeight: 'bold', marginTop: 4 },
-  mediaItem: { position: 'relative', marginRight: 12 },
-  mediaImage: { width: 80, height: 80, borderRadius: 18 },
-  removeMedia: { position: 'absolute', top: -8, right: -8, backgroundColor: 'white', borderRadius: 12, padding: 1 },
-
-  // Type Chip Styles
-  typeChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 25, borderWidth: 1, marginRight: 10, backgroundColor: 'transparent' },
-  typeChipText: { fontSize: 14, fontWeight: '600' },
-
-  // Input Styles
-  inputContainer: { flexDirection: 'row', alignItems: 'center', borderRadius: 16, borderWidth: 1, paddingHorizontal: 15, marginBottom: 18 },
-  inputIcon: { marginRight: 10 },
-  input: { flex: 1, fontSize: 15, paddingVertical: 15 },
+  addMediaBtn: { width: 82, height: 94, borderRadius: 16, borderWidth: 1, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  addMediaText: { fontSize: 11, fontWeight: '600', marginTop: 5 },
+  mediaItem: { position: 'relative', marginRight: 12, paddingTop: 7, paddingRight: 7, paddingBottom: 7 },
+  mediaImage: { width: 82, height: 94, borderRadius: 15 },
+  removeMedia: { position: 'absolute', top: 0, right: 0, backgroundColor: PITO_COLORS.navyBg, borderRadius: 13, padding: 3 },
+  coverTag: { position: 'absolute', bottom: 13, left: 6, backgroundColor: 'rgba(11,19,30,0.82)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3 },
+  coverTagText: { color: PITO_COLORS.cream, fontSize: 8, fontWeight: '700' },
+  typeGridContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  typeGridItem: { width: '31%', minHeight: 79, borderRadius: 14, borderWidth: 1, justifyContent: 'center', alignItems: 'center', marginBottom: 10, position: 'relative', paddingVertical: 10 },
+  typeGridText: { fontSize: 11, fontWeight: '600', textAlign: 'center' },
+  typeCheckIcon: { position: 'absolute', top: 5, right: 5 },
+  formHeading: { flexDirection: 'row', alignItems: 'center', gap: 9, marginBottom: 13, marginTop: 5 },
+  headingIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: 'rgba(197,160,89,0.12)', alignItems: 'center', justifyContent: 'center' },
+  formHeadingText: { fontSize: 17, fontWeight: '800', letterSpacing: -0.3 },
+  inputContainer: { flexDirection: 'row', alignItems: 'center', borderRadius: 13, borderWidth: 1, paddingHorizontal: 11, marginBottom: 18 },
+  inputIcon: { marginRight: 7 },
+  input: { flex: 1, minWidth: 0, fontSize: 13, paddingVertical: 13 },
   row: { flexDirection: 'row', justifyContent: 'space-between' },
-  
-  // Selectors
-  selectorBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 15, paddingVertical: 16, borderRadius: 16, borderWidth: 1, marginBottom: 18 },
-  
-  // Gender Styles
+  selectorBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 51, paddingHorizontal: 11, paddingVertical: 14, borderRadius: 13, borderWidth: 1, marginBottom: 18 },
   genderContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 18 },
-  genderBtn: { flex: 0.48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 16, borderWidth: 1, backgroundColor: 'transparent' },
-  genderText: { marginLeft: 8, fontWeight: 'bold', fontSize: 15 },
-
-  // Submit Button
-  submitBtn: { flexDirection: 'row', backgroundColor: '#6C5CE7', paddingVertical: 20, borderRadius: 20, alignItems: 'center', justifyContent: 'center', marginTop: 10, shadowColor: '#6C5CE7', shadowOffset: {width:0, height:5}, shadowOpacity:0.3, shadowRadius: 10, elevation: 6 },
-  submitBtnText: { color: 'white', fontSize: 18, fontWeight: '800', letterSpacing: 0.5 },
-
-  // Modal Styles
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { height: '65%', borderTopLeftRadius: 35, borderTopRightRadius: 35, padding: 25, shadowColor: '#000', shadowOffset: {width: 0, height: -5}, shadowOpacity: 0.1, shadowRadius: 10, elevation: 20 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold' },
-  closeModalBtn: { padding: 6, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 20 },
+  genderBtn: { flex: 0.48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 13, borderWidth: 1, backgroundColor: 'transparent' },
+  genderText: { marginLeft: 7, fontWeight: '600', fontSize: 13 },
+  formDivider: { height: 1, opacity: 0.65, marginTop: 2, marginBottom: 20 },
+  locationHeading: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 17 },
+  locationHeadingText: { fontSize: 14, fontWeight: '700' },
+  submitBtn: { flexDirection: 'row', backgroundColor: PITO_COLORS.primary, minHeight: 56, paddingHorizontal: 15, paddingVertical: 16, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 3 },
+  submitBtnText: { color: PITO_COLORS.navyBg, fontSize: 15, fontWeight: '800' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(5,10,18,0.7)', justifyContent: 'flex-end' },
+  modalContent: { height: '72%', borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 22, paddingTop: 10, paddingBottom: 32 },
+  sheetHandle: { alignSelf: 'center', width: 36, height: 4, borderRadius: 3, backgroundColor: PITO_COLORS.grayText, opacity: 0.4, marginBottom: 22 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 },
+  modalTitle: { fontSize: 22, fontWeight: '800', letterSpacing: -0.4 },
+  closeModalBtn: { width: 36, height: 36, backgroundColor: 'rgba(197,160,89,0.1)', borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   modalItem: { paddingVertical: 18, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  modalItemText: { fontSize: 16, fontWeight: '600' }
+  modalItemText: { fontSize: 14, fontWeight: '500' }
 });
 
 export default AddListingScreen;

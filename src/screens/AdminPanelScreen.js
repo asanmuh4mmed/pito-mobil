@@ -1,5 +1,5 @@
-import React, { useContext, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image, Dimensions } from 'react-native';
+import React, { useState, useEffect, useContext, memo } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image, TextInput, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/colors';
@@ -7,28 +7,194 @@ import { ThemeContext } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 
-const { width } = Dimensions.get('window');
+// --- BİLDİRİM PANELİ (KLAVYE KAPANMA SORUNUNU ÇÖZMEK İÇİN İZOLE EDİLDİ) ---
+const NotificationPanel = memo(({ theme, t }) => {
+    const [notifTitle, setNotifTitle] = useState('');
+    const [notifBody, setNotifBody] = useState('');
+    const [isSendingNotif, setIsSendingNotif] = useState(false);
 
-// 👑 KURUCU (FOUNDER) E-POSTA ADRESLERİ 👑
-const KURUCU_EMAILLER = [
-  "asanmuh4mmed@gmail.com",
-  "izahbngyn@gmail.com",
-  "petspito@gmail.com"
-];
+    const sendGlobalNotification = async () => {
+        if (!notifTitle.trim() || !notifBody.trim()) {
+            Alert.alert(t.error, t.fillFields);
+            return;
+        }
 
-const AdminPanelScreen = ({ navigation }) => {
+        setIsSendingNotif(true);
+
+        try {
+            const { data, error } = await supabase
+                .from('users')
+                .select('expo_push_token')
+                .not('expo_push_token', 'is', null);
+
+            if (error) throw error;
+
+            if (!data || data.length === 0) {
+                Alert.alert(t.warning, t.noUsers);
+                setIsSendingNotif(false);
+                return;
+            }
+
+            const validTokens = data
+                .map(u => u.expo_push_token)
+                .filter(token => token && (token.startsWith('ExponentPushToken') || token.startsWith('ExpoPushToken')));
+
+            if (validTokens.length === 0) {
+                Alert.alert(t.warning, t.noValidTokens);
+                setIsSendingNotif(false);
+                return;
+            }
+
+            const messages = validTokens.map(token => ({
+                to: token,
+                sound: 'default',
+                title: notifTitle,
+                body: notifBody,
+                data: { type: 'global_announcement' },
+            }));
+
+            let successCount = 0;
+            for (let i = 0; i < messages.length; i += 100) {
+                const chunk = messages.slice(i, i + 100);
+                const response = await fetch('https://exp.host/--/api/v2/push/send', {
+                    method: 'POST',
+                    headers: {
+                        Accept: 'application/json',
+                        'Accept-encoding': 'gzip, deflate',
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(chunk),
+                });
+
+                if (!response.ok) {
+                    throw new Error("Expo API'ye ulaşılamadı.");
+                }
+                successCount += chunk.length;
+            }
+
+            Alert.alert(t.success, `${successCount} ${t.notifSent}`);
+            setNotifTitle('');
+            setNotifBody('');
+
+        } catch (error) {
+            console.log("Global Bildirim Hatası:", error);
+            Alert.alert(t.error, t.notifError);
+        } finally {
+            setIsSendingNotif(false);
+        }
+    };
+
+    return (
+        <View style={[styles.notifPanel, { backgroundColor: theme.cardBg, borderColor: theme.border }]}>
+            <View style={styles.notifHeader}>
+                <Ionicons name="megaphone-outline" size={22} color={COLORS.primary} />
+                <Text style={[styles.notifHeaderTitle, { color: theme.text }]}>{t.sendGlobal}</Text>
+            </View>
+
+            <TextInput
+                style={[styles.input, { backgroundColor: theme.type === 'dark' ? '#1A2533' : '#F8F9FA', color: theme.text }]}
+                placeholder={t.notifTitle}
+                placeholderTextColor={theme.subText}
+                value={notifTitle}
+                onChangeText={setNotifTitle}
+                maxLength={50}
+            />
+            
+            <TextInput
+                style={[styles.input, styles.textArea, { backgroundColor: theme.type === 'dark' ? '#1A2533' : '#F8F9FA', color: theme.text }]}
+                placeholder={t.notifBody}
+                placeholderTextColor={theme.subText}
+                value={notifBody}
+                onChangeText={setNotifBody}
+                multiline
+                numberOfLines={4}
+            />
+
+            <TouchableOpacity 
+                style={[styles.sendButton, isSendingNotif && { opacity: 0.7 }]} 
+                onPress={sendGlobalNotification}
+                disabled={isSendingNotif}
+            >
+                {isSendingNotif ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                    <Text style={styles.sendButtonText}>{t.send}</Text>
+                )}
+            </TouchableOpacity>
+        </View>
+    );
+});
+
+// --- LİSTE BAŞLIĞI (BİLDİRİMLER VE AKORDEONLAR BURADA YER ALIR) ---
+const ListHeader = memo(({ activeSection, toggleSection, search, handleSearch, theme, t, usersCount, listingsCount }) => {
+    return (
+        <View style={{ paddingBottom: 15 }}>
+            <NotificationPanel theme={theme} t={t} />
+
+            <View style={{ marginTop: 10 }}>
+                <TouchableOpacity 
+                    style={[styles.accordionBtn, { backgroundColor: activeSection === 'users' ? COLORS.primary : theme.cardBg, borderColor: theme.border }]} 
+                    onPress={() => toggleSection('users')}
+                    activeOpacity={0.8}
+                >
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Ionicons name="people-outline" size={20} color={activeSection === 'users' ? '#FFF' : theme.text} />
+                        <Text style={[styles.accordionText, { color: activeSection === 'users' ? '#FFF' : theme.text }]}>{t.usersTab}</Text>
+                    </View>
+                    <Ionicons name={activeSection === 'users' ? "chevron-up" : "chevron-down"} size={20} color={activeSection === 'users' ? '#FFF' : theme.subText} />
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                    style={[styles.accordionBtn, { backgroundColor: activeSection === 'listings' ? COLORS.primary : theme.cardBg, borderColor: theme.border }]} 
+                    onPress={() => toggleSection('listings')}
+                    activeOpacity={0.8}
+                >
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Ionicons name="list-outline" size={20} color={activeSection === 'listings' ? '#FFF' : theme.text} />
+                        <Text style={[styles.accordionText, { color: activeSection === 'listings' ? '#FFF' : theme.text }]}>{t.listingsTab}</Text>
+                    </View>
+                    <Ionicons name={activeSection === 'listings' ? "chevron-up" : "chevron-down"} size={20} color={activeSection === 'listings' ? '#FFF' : theme.subText} />
+                </TouchableOpacity>
+            </View>
+
+            {activeSection && (
+                <View style={{ marginTop: 20 }}>
+                    <View style={[styles.searchContainer, { backgroundColor: theme.type === 'dark' ? '#1A2533' : '#F8F9FA', borderColor: theme.border }]}>
+                        <Ionicons name="search-outline" size={20} color={theme.subText} style={{ marginRight: 10 }} />
+                        <TextInput
+                            style={[styles.searchInput, { color: theme.text }]}
+                            placeholder={activeSection === 'users' ? t.searchUsers : t.searchListings}
+                            placeholderTextColor={theme.subText}
+                            value={search}
+                            onChangeText={handleSearch}
+                        />
+                        {search.length > 0 && (
+                            <TouchableOpacity onPress={() => handleSearch('')} style={{ padding: 5 }}>
+                                <Ionicons name="close-circle" size={18} color={theme.subText} />
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                    <Text style={{ color: theme.subText, fontSize: 13, marginTop: 10, marginLeft: 5 }}>
+                        {activeSection === 'users' ? t.totalUsers : t.totalListings}: <Text style={{fontWeight: 'bold', color: theme.text}}>{activeSection === 'users' ? usersCount : listingsCount}</Text>
+                    </Text>
+                </View>
+            )}
+        </View>
+    );
+});
+
+// --- ANA EKRAN BİLEŞENİ ---
+const AdminUsersScreen = ({ navigation }) => {
     const { theme } = useContext(ThemeContext);
-    const { user, country } = useContext(AuthContext);
+    const { country } = useContext(AuthContext);
     
-    const [stats, setStats] = useState({ 
-        userCount: 0, 
-        listingCount: 0, 
-        totalRevenue: 0, 
-        totalSoldItems: 0,
-        totalDonations: 0 // YENİ: Toplam Bağış
-    });
-    const [bestSeller, setBestSeller] = useState(null);
-    const [recentDonations, setRecentDonations] = useState([]); // YENİ: Son Bağışlar Listesi
+    const [users, setUsers] = useState([]);
+    const [filteredUsers, setFilteredUsers] = useState([]);
+    const [listings, setListings] = useState([]);
+    const [filteredListings, setFilteredListings] = useState([]);
+    
+    const [activeSection, setActiveSection] = useState(null); 
+    const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
 
     const activeLang = country?.code === 'AU' ? 'AU' : 'TR';
@@ -36,364 +202,267 @@ const AdminPanelScreen = ({ navigation }) => {
     const TEXTS = {
         TR: {
             title: "Yönetici Paneli",
-            welcome: "Hoş geldin, Patron",
-            financials: "Finansal Durum",
-            revenue: "Toplam Ciro",
-            sold: "Satılan Ürün",
-            donations: "Toplam Bağış", // YENİ
-            recentDonations: "Son Bağışlar", // YENİ
-            database: "Veritabanı (Detaylar için tıkla)",
-            users: "Kullanıcı",
-            listings: "İlan",
-            bestSeller: "Günün Yıldızı 🏆",
-            bestSellerSub: "En çok tercih edilen ürün",
-            soldCount: "Adet Satıldı",
-            share: "Pazar Payı",
-            shopManager: "Mağaza Yönetimi",
-            shopDesc: "Siparişleri ve ürünleri yönet",
-            accessDenied: "Erişim Reddedildi",
-            accessMsg: "Yetkiniz yok.",
-            currency: "TL",
-            noDonations: "Henüz bir bağış yapılmadı."
+            usersTab: "Kullanıcıları Göster",
+            listingsTab: "İlanları Göster",
+            searchUsers: "İsim veya e-posta ara...",
+            searchListings: "İlan adı veya türü ara...",
+            totalUsers: "Toplam Kullanıcı",
+            totalListings: "Toplam İlan",
+            noUser: "Kullanıcı bulunamadı.",
+            noListing: "İlan bulunamadı.",
+            admin: "Yönetici",
+            error: "Hata",
+            fillFields: "Lütfen başlık ve mesaj içeriğini doldurun.",
+            warning: "Uyarı",
+            noUsers: "Bildirim gönderilecek hiçbir kullanıcı bulunamadı.",
+            noValidTokens: "Geçerli bildirim izni (token) olan kullanıcı bulunamadı.",
+            success: "Başarılı",
+            notifSent: "kullanıcıya bildirim gönderildi!",
+            notifError: "Bildirim gönderilirken bir sorun oluştu.",
+            sendGlobal: "Herkese Bildirim Gönder",
+            notifTitle: "Bildirim Başlığı (Örn: Yeni Özellik!)",
+            notifBody: "Bildirim İçeriği (Örn: Pito'ya beklenen güncelleme geldi...)",
+            send: "Gönder"
         },
         AU: {
-            title: "Admin Dashboard",
-            welcome: "Welcome, Boss",
-            financials: "Financial Overview",
-            revenue: "Total Revenue",
-            sold: "Items Sold",
-            donations: "Total Donations", // YENİ
-            recentDonations: "Recent Donations", // YENİ
-            database: "Database (Click for details)",
-            users: "Users",
-            listings: "Listings",
-            bestSeller: "Top Performer 🏆",
-            bestSellerSub: "Most popular product",
-            soldCount: "Sold",
-            share: "Sales Share",
-            shopManager: "Shop Manager",
-            shopDesc: "Manage orders & products",
-            accessDenied: "Access Denied",
-            accessMsg: "Unauthorized access.",
-            currency: "AUD",
-            noDonations: "No donations made yet."
+            title: "Admin Panel",
+            usersTab: "Show Users",
+            listingsTab: "Show Listings",
+            searchUsers: "Search name or email...",
+            searchListings: "Search ad name or type...",
+            totalUsers: "Total Users",
+            totalListings: "Total Listings",
+            noUser: "No user found.",
+            noListing: "No listing found.",
+            admin: "Admin",
+            error: "Error",
+            fillFields: "Please fill in the title and message content.",
+            warning: "Warning",
+            noUsers: "No users found to send notifications.",
+            noValidTokens: "No users found with a valid push token.",
+            success: "Success",
+            notifSent: "users were notified!",
+            notifError: "A problem occurred while sending the notification.",
+            sendGlobal: "Send Global Notification",
+            notifTitle: "Notification Title (e.g., New Feature!)",
+            notifBody: "Notification Content (e.g., The expected update is here...)",
+            send: "Send"
         }
     };
-
     const t = TEXTS[activeLang];
 
     useEffect(() => {
-        // ✅ GÜNCELLENEN KISIM: Yetki Kontrolü
-        const hasAccess = user && (user.is_admin || user.is_founder || KURUCU_EMAILLER.includes(user.email));
-        
-        if (!hasAccess) {
-            Alert.alert(t.accessDenied, t.accessMsg);
-            navigation.goBack();
-            return;
-        }
-        fetchDashboardData();
+        fetchAllData();
     }, []);
 
-    const fetchDashboardData = async () => {
+    const fetchAllData = async () => {
         try {
             setLoading(true);
-
-            // 1. Basit Sayımlar
-            const { count: uCount } = await supabase.from('users').select('*', { count: 'exact', head: true });
-            const { count: lCount } = await supabase.from('listings').select('*', { count: 'exact', head: true });
-
-            // 2. Finansal Hesaplama (Siparişler)
-            const { data: ordersData } = await supabase.from('orders').select('*'); 
-
-            let revenue = 0;
-            let soldItems = 0;
-            let productMap = {}; 
-
-            if (ordersData) {
-                ordersData.forEach(order => {
-                    revenue += parseFloat(order.total_price || 0);
-                    if (order.items && Array.isArray(order.items)) {
-                        order.items.forEach(item => {
-                            soldItems += item.quantity || 1;
-                            if (productMap[item.name]) {
-                                productMap[item.name].qty += (item.quantity || 1);
-                            } else {
-                                productMap[item.name] = {
-                                    name: item.name,
-                                    qty: (item.quantity || 1),
-                                    img: item.img,
-                                    price: item.price
-                                };
-                            }
-                        });
-                    }
-                });
-            }
-
-            // En çok satanı belirle
-            let topProduct = null;
-            let maxQty = 0;
-            Object.values(productMap).forEach(prod => {
-                if (prod.qty > maxQty) {
-                    maxQty = prod.qty;
-                    topProduct = prod;
-                }
-            });
-
-            // 3. BAĞIŞ VERİLERİNİ ÇEK (YENİ EKLENDİ)
-            // Bağış tablosundan verileri alırken aynı zamanda kullanıcılar tablosundan bağış yapanın adını ve profil fotosunu birleştiriyoruz.
-            const { data: donationsData, error: donationError } = await supabase
-                .from('donations')
-                .select(`
-                    *,
-                    users (fullname, profile_image)
-                `)
-                .eq('status', 'success')
+            
+            const { data: usersData, error: usersError } = await supabase
+                .from('users')
+                .select('*')
                 .order('created_at', { ascending: false });
 
-            let totalDonationAmount = 0;
-            let formattedDonations = [];
+            if (usersError) throw usersError;
+            setUsers(usersData || []);
+            setFilteredUsers(usersData || []);
 
-            if (!donationError && donationsData) {
-                donationsData.forEach(donation => {
-                    totalDonationAmount += parseFloat(donation.amount || 0);
-                });
-                
-                // En son yapılan 10 bağışı listele
-                formattedDonations = donationsData.slice(0, 10);
-            }
+            const { data: listingsData, error: listingsError } = await supabase
+                .from('listings')
+                .select('*')
+                .order('created_at', { ascending: false });
 
-            // 4. Tüm Statları Güncelle
-            setBestSeller(topProduct);
-            setRecentDonations(formattedDonations);
-            setStats({
-                userCount: uCount || 0,
-                listingCount: lCount || 0,
-                totalRevenue: revenue.toFixed(2),
-                totalSoldItems: soldItems,
-                totalDonations: totalDonationAmount.toFixed(2) // Toplam bağış miktarını kaydet
-            });
+            if (listingsError) throw listingsError;
+            setListings(listingsData || []);
+            setFilteredListings(listingsData || []);
 
         } catch (error) {
-            console.log("Dashboard Error:", error);
+            console.log("Data fetch error:", error);
         } finally {
             setLoading(false);
         }
     };
 
-    // Kullanıcı Detayına Git (Bağış listesindeki kişiye tıklanırsa)
-    const handleDonatorClick = (userId) => {
-        if(userId) {
-            navigation.navigate('UserProfile', { userId: userId });
+    const handleSearch = (text) => {
+        setSearch(text);
+        if (!text) {
+            setFilteredUsers(users);
+            setFilteredListings(listings);
+            return;
+        }
+
+        const textData = text.toUpperCase();
+
+        if (activeSection === 'users') {
+            const newData = users.filter(item => {
+                const name = item.fullname ? item.fullname.toUpperCase() : '';
+                const email = item.email ? item.email.toUpperCase() : '';
+                return name.indexOf(textData) > -1 || email.indexOf(textData) > -1;
+            });
+            setFilteredUsers(newData);
+        } else if (activeSection === 'listings') {
+            const newData = listings.filter(item => {
+                const name = item.name ? item.name.toUpperCase() : (item.title ? item.title.toUpperCase() : '');
+                const category = item.category ? item.category.toUpperCase() : '';
+                return name.indexOf(textData) > -1 || category.indexOf(textData) > -1;
+            });
+            setFilteredListings(newData);
         }
     };
 
-    if (loading) {
-        return (
-            <View style={[styles.container, {backgroundColor: theme.background, justifyContent:'center', alignItems:'center'}]}>
-                <ActivityIndicator size="large" color={COLORS.primary} />
+    const toggleSection = (section) => {
+        if (activeSection === section) {
+            setActiveSection(null);
+            setSearch('');
+            setFilteredUsers(users);
+            setFilteredListings(listings);
+        } else {
+            setActiveSection(section);
+            setSearch('');
+            setFilteredUsers(users);
+            setFilteredListings(listings);
+        }
+    };
+
+    const renderUserItem = ({ item }) => (
+        <TouchableOpacity 
+            style={[styles.rowItem, { backgroundColor: theme.cardBg, borderBottomColor: theme.border }]} 
+            onPress={() => navigation.navigate('UserProfile', { userId: item.id, userName: item.fullname, userAvatar: item.avatar })}
+            activeOpacity={0.7}
+        >
+            <View style={styles.rowInfo}>
+                {item.avatar ? (
+                    <Image source={{ uri: item.avatar }} style={styles.avatar} />
+                ) : (
+                    <View style={[styles.avatarPlaceholder, { backgroundColor: '#E2E8F0' }]}>
+                        <Text style={[styles.avatarText, { color: '#64748B' }]}>{item.fullname?.charAt(0).toUpperCase()}</Text>
+                    </View>
+                )}
+                
+                <View style={{ marginLeft: 15, flex: 1 }}>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                        <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{item.fullname}</Text>
+                        {item.is_admin && (
+                            <View style={styles.adminBadge}>
+                                <Text style={styles.adminText}>{t.admin}</Text>
+                            </View>
+                        )}
+                    </View>
+                    <Text style={[styles.subText, { color: theme.subText }]} numberOfLines={1}>{item.email}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={theme.subText} />
             </View>
+        </TouchableOpacity>
+    );
+
+    const renderListingItem = ({ item }) => {
+        const imageSource = item.img || (item.images && item.images[0]);
+        return (
+            <TouchableOpacity 
+                style={[styles.rowItem, { backgroundColor: theme.cardBg, borderBottomColor: theme.border }]} 
+                onPress={() => navigation.navigate('ListingDetail', { item })}
+                activeOpacity={0.7}
+            >
+                <View style={styles.rowInfo}>
+                    {imageSource ? (
+                        <Image source={{ uri: imageSource }} style={styles.listingImage} />
+                    ) : (
+                        <View style={[styles.listingImage, { backgroundColor: theme.type === 'dark' ? '#1A2533' : '#F1F5F9', justifyContent: 'center', alignItems: 'center' }]}>
+                            <Ionicons name="paw" size={20} color={theme.subText} />
+                        </View>
+                    )}
+                    
+                    <View style={{ marginLeft: 15, flex: 1 }}>
+                        <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>{item.name || item.title}</Text>
+                        <Text style={[styles.subText, { color: theme.subText }]} numberOfLines={1}>{item.category}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={theme.subText} />
+                </View>
+            </TouchableOpacity>
         );
-    }
+    };
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                    <Ionicons name="arrow-back" size={24} color={theme.text} />
+            <View style={[styles.header, { borderBottomColor: theme.border }]}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.7}>
+                    <Ionicons name="arrow-back" size={22} color={theme.text} />
                 </TouchableOpacity>
-                <Text style={[styles.title, { color: theme.text }]}>{t.title}</Text>
-                <View style={{width:40}}/>
+                <Text style={[styles.headerTitle, { color: theme.text }]}>{t.title}</Text>
+                <View style={{ width: 40 }} />
             </View>
 
-            <ScrollView contentContainerStyle={{padding: 20, paddingBottom: 50}} showsVerticalScrollIndicator={false}>
-                
-                <Text style={{color: theme.subText, marginBottom: 15, fontSize: 16}}>{t.welcome} 👋</Text>
-
-                {/* --- FİNANSAL KARTLAR (YATAY SCROLL İLE 3 KART) --- */}
-                <Text style={[styles.sectionTitle, {color: theme.text}]}>{t.financials}</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 20}}>
-                    
-                    {/* Ciro Kartı */}
-                    <View style={[styles.bigCard, { backgroundColor: '#E8F5E9', marginRight: 15, width: width * 0.42 }]}>
-                        <View style={[styles.iconCircle, { backgroundColor: '#C8E6C9' }]}>
-                            <Text style={{fontSize: 22}}>💰</Text>
-                        </View>
-                        <Text style={styles.bigCardValue}>{stats.totalRevenue} <Text style={{fontSize:14}}>{t.currency}</Text></Text>
-                        <Text style={styles.bigCardLabel}>{t.revenue}</Text>
-                    </View>
-
-                    {/* Satış Kartı */}
-                    <View style={[styles.bigCard, { backgroundColor: '#E3F2FD', marginRight: 15, width: width * 0.42 }]}>
-                        <View style={[styles.iconCircle, { backgroundColor: '#BBDEFB' }]}>
-                            <Text style={{fontSize: 22}}>📦</Text>
-                        </View>
-                        <Text style={styles.bigCardValue}>{stats.totalSoldItems}</Text>
-                        <Text style={styles.bigCardLabel}>{t.sold}</Text>
-                    </View>
-
-                    {/* YENİ: Toplam Bağış Kartı */}
-                    <View style={[styles.bigCard, { backgroundColor: '#FFF3E0', marginRight: 15, width: width * 0.42 }]}>
-                        <View style={[styles.iconCircle, { backgroundColor: '#FFE0B2' }]}>
-                            <Text style={{fontSize: 22}}>❤️</Text>
-                        </View>
-                        <Text style={styles.bigCardValue}>{stats.totalDonations} <Text style={{fontSize:14}}>{t.currency}</Text></Text>
-                        <Text style={styles.bigCardLabel}>{t.donations}</Text>
-                    </View>
-
-                </ScrollView>
-
-                {/* --- SON BAĞIŞ YAPANLAR LİSTESİ (YENİ EKLENDİ) --- */}
-                <Text style={[styles.sectionTitle, {color: theme.text, marginTop: 10}]}>{t.recentDonations}</Text>
-                <View style={[styles.donationsCard, { backgroundColor: theme.cardBg }]}>
-                    {recentDonations.length === 0 ? (
-                        <Text style={{color: theme.subText, textAlign: 'center', padding: 15}}>{t.noDonations}</Text>
-                    ) : (
-                        recentDonations.map((donation, index) => (
-                            <TouchableOpacity 
-                                key={donation.id || index} 
-                                style={[styles.donationItem, index !== recentDonations.length - 1 && { borderBottomWidth: 1, borderBottomColor: theme.border }]}
-                                onPress={() => handleDonatorClick(donation.user_id)}
-                            >
-                                <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                                    {donation.users?.profile_image ? (
-                                        <Image source={{uri: donation.users.profile_image}} style={styles.donatorImg} />
-                                    ) : (
-                                        <View style={[styles.donatorImg, {backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center'}]}>
-                                            <Ionicons name="person" color="white" size={20} />
-                                        </View>
-                                    )}
-                                    <View style={{marginLeft: 12}}>
-                                        <Text style={[styles.donatorName, {color: theme.text}]}>{donation.users?.fullname || 'Gizli Kahraman'}</Text>
-                                        <Text style={{fontSize: 12, color: theme.subText}}>
-                                            {new Date(donation.created_at).toLocaleDateString()}
-                                        </Text>
-                                    </View>
-                                </View>
-                                <View style={styles.donationAmountBadge}>
-                                    <Text style={styles.donationAmountText}>{donation.amount} {donation.currency}</Text>
-                                </View>
-                            </TouchableOpacity>
-                        ))
-                    )}
+            {loading ? (
+                <View style={styles.centerContainer}>
+                    <ActivityIndicator size="large" color={COLORS.primary} />
                 </View>
-{/* --- EN ÇOK SATAN (BEST SELLER) --- */}
-                {bestSeller && (
-                    <>
-                        <Text style={[styles.sectionTitle, {color: theme.text, marginTop: 25}]}>{t.bestSeller}</Text>
-                        <View style={[styles.bestSellerCard, { backgroundColor: theme.cardBg, borderColor: COLORS.primary }]}>
-                            <View style={styles.bestSellerContent}>
-                                <Image source={{ uri: bestSeller.img }} style={styles.bestSellerImg} />
-                                <View style={{flex:1, paddingLeft: 15}}>
-                                    <Text style={[styles.bsName, {color:theme.text}]} numberOfLines={2}>{bestSeller.name}</Text>
-                                    <View style={styles.bsStatsRow}>
-                                        <View style={styles.bsStatItem}>
-                                            <Text style={styles.bsStatVal}>{bestSeller.qty}</Text>
-                                            <Text style={styles.bsStatLbl}>{t.soldCount}</Text>
-                                        </View>
-                                        <View style={styles.bsStatItem}>
-                                            <Text style={styles.bsStatVal}>%{((bestSeller.qty / stats.totalSoldItems) * 100).toFixed(1)}</Text>
-                                            <Text style={styles.bsStatLbl}>{t.share}</Text>
-                                        </View>
-                                    </View>
-                                    <View style={styles.progressBarBg}>
-                                        <View style={[styles.progressBarFill, { width: `${(bestSeller.qty / stats.totalSoldItems) * 100}%` }]} />
-                                    </View>
-                                </View>
+            ) : (
+                <FlatList
+                    data={activeSection === 'users' ? filteredUsers : (activeSection === 'listings' ? filteredListings : [])}
+                    keyExtractor={(item) => String(item.id)}
+                    renderItem={activeSection === 'users' ? renderUserItem : renderListingItem}
+                    keyboardShouldPersistTaps="handled"
+                    ListHeaderComponent={
+                        <ListHeader 
+                            activeSection={activeSection}
+                            toggleSection={toggleSection}
+                            search={search}
+                            handleSearch={handleSearch}
+                            theme={theme}
+                            t={t}
+                            usersCount={filteredUsers.length}
+                            listingsCount={filteredListings.length}
+                        />
+                    }
+                    contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 40, paddingTop: 15 }}
+                    showsVerticalScrollIndicator={false}
+                    ListEmptyComponent={
+                        activeSection ? (
+                            <View style={styles.centerContainer}>
+                                <Ionicons name="document-text-outline" size={40} color={theme.border} />
+                                <Text style={{ color: theme.subText, marginTop: 10 }}>{activeSection === 'users' ? t.noUser : t.noListing}</Text>
                             </View>
-                        </View>
-                    </> 
-                )}
-
-                {/* --- MAĞAZA YÖNETİMİ BUTONU --- */}
-                <TouchableOpacity 
-                    style={styles.shopAdminBtn}
-                    onPress={() => navigation.navigate('ShopAdmin')} 
-                >
-                    <View style={styles.shopAdminIcon}>
-                        <Ionicons name="storefront" size={28} color="white" />
-                    </View>
-                    <View style={{flex:1}}>
-                        <Text style={styles.shopAdminTitle}>{t.shopManager}</Text>
-                        <Text style={styles.shopAdminDesc}>{t.shopDesc}</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={24} color="white" />
-                </TouchableOpacity>
-
-                {/* --- VERİTABANI İSTATİSTİKLERİ --- */}
-                <Text style={[styles.sectionTitle, {color: theme.text, marginTop: 25}]}>{t.database}</Text>
-                <View style={styles.statsRow}>
-                    <TouchableOpacity 
-                        style={[styles.smallCard, { backgroundColor: theme.cardBg, borderColor: '#9C27B0', borderWidth: 1 }]} 
-                        onPress={() => navigation.navigate('AdminUsers')}
-                    >
-                        <View style={{flexDirection:'row', alignItems:'center', justifyContent:'space-between', width:'100%'}}>
-                            <Ionicons name="people" size={24} color="#9C27B0" />
-                            <Ionicons name="arrow-forward-circle" size={20} color="#9C27B0" />
-                        </View>
-                        <Text style={[styles.smallCardValue, {color: theme.text}]}>{stats.userCount}</Text>
-                        <Text style={styles.smallCardLabel}>{t.users}</Text>
-                    </TouchableOpacity>
-
-                    <View style={[styles.smallCard, { backgroundColor: theme.cardBg }]}>
-                        <Ionicons name="layers" size={24} color="#FF9800" />
-                        <Text style={[styles.smallCardValue, {color: theme.text}]}>{stats.listingCount}</Text>
-                        <Text style={styles.smallCardLabel}>{t.listings}</Text>
-                    </View>
-                </View>
-
-            </ScrollView>
+                        ) : null
+                    }
+                />
+            )}
         </SafeAreaView>
     );
 };
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 15 },
-    backBtn: { padding: 8, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.05)' },
-    title: { fontSize: 22, fontWeight: 'bold' },
+    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 15, borderBottomWidth: 1 },
+    backBtn: { padding: 8, borderRadius: 10 },
+    headerTitle: { fontSize: 18, fontWeight: '600' },
+    centerContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 40 },
     
-    sectionTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12, marginTop: 5 },
+    notifPanel: { padding: 20, borderRadius: 16, borderWidth: 1, elevation: 0 },
+    notifHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 15 },
+    notifHeaderTitle: { fontSize: 15, fontWeight: '600', marginLeft: 8 },
+    input: { borderRadius: 10, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 12, fontSize: 14 },
+    textArea: { height: 100, textAlignVertical: 'top', paddingTop: 14 },
+    sendButton: { backgroundColor: COLORS.primary, alignItems: 'center', paddingVertical: 14, borderRadius: 10, marginTop: 5 },
+    sendButtonText: { color: '#FFFFFF', fontWeight: '600', fontSize: 14 },
+
+    accordionBtn: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderRadius: 12, borderWidth: 1, marginBottom: 10 },
+    accordionText: { fontSize: 15, fontWeight: '600', marginLeft: 10 },
     
-    statsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15 },
+    searchContainer: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15, paddingVertical: 10, borderRadius: 10, borderWidth: 1 },
+    searchInput: { flex: 1, fontSize: 14, paddingVertical: 4 },
+
+    rowItem: { paddingVertical: 16, borderBottomWidth: 1 },
+    rowInfo: { flexDirection: 'row', alignItems: 'center' },
+    avatar: { width: 44, height: 44, borderRadius: 22 },
+    avatarPlaceholder: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+    avatarText: { fontSize: 18, fontWeight: '600' },
+    listingImage: { width: 48, height: 48, borderRadius: 8 },
+    name: { fontSize: 15, fontWeight: '600', flex: 1 },
+    subText: { fontSize: 13, marginTop: 3 },
     
-    // Büyük Finansal Kartlar
-    bigCard: { padding: 15, borderRadius: 20, alignItems: 'flex-start', elevation: 2, shadowColor:'#000', shadowOpacity:0.1, shadowOffset:{width:0, height:2} },
-    iconCircle: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center', marginBottom: 15 },
-    bigCardValue: { fontSize: 22, fontWeight: 'bold', color: '#333' },
-    bigCardLabel: { fontSize: 13, color: '#666', marginTop: 4, fontWeight: '500' },
-
-    // YENİ: Bağış Listesi Tasarımı
-    donationsCard: { borderRadius: 20, paddingHorizontal: 15, marginBottom: 20, elevation: 1, shadowColor:'#000', shadowOpacity:0.05 },
-    donationItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 15 },
-    donatorImg: { width: 40, height: 40, borderRadius: 20 },
-    donatorName: { fontSize: 15, fontWeight: 'bold', marginBottom: 2 },
-    donationAmountBadge: { backgroundColor: '#FFF3E0', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 15 },
-    donationAmountText: { color: '#EF6C00', fontWeight: 'bold', fontSize: 14 },
-
-    // Best Seller Kartı
-    bestSellerCard: { padding: 15, borderRadius: 20, borderWidth: 1, marginBottom: 20, borderLeftWidth: 5 },
-    bestSellerContent: { flexDirection: 'row', alignItems: 'center' },
-    bestSellerImg: { width: 70, height: 70, borderRadius: 10, backgroundColor: '#eee' },
-    bsName: { fontWeight: 'bold', fontSize: 15, marginBottom: 5 },
-    bsStatsRow: { flexDirection: 'row', gap: 15, marginBottom: 8 },
-    bsStatItem: { alignItems: 'flex-start' },
-    bsStatVal: { fontWeight: 'bold', fontSize: 14, color: COLORS.primary },
-    bsStatLbl: { fontSize: 10, color: '#888' },
-    progressBarBg: { height: 6, backgroundColor: '#eee', borderRadius: 3, width: '100%' },
-    progressBarFill: { height: '100%', backgroundColor: COLORS.primary, borderRadius: 3 },
-
-    // Shop Admin Butonu
-    shopAdminBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FF9800', padding: 15, borderRadius: 15, marginBottom: 10, elevation: 4 },
-    shopAdminIcon: { width: 50, height: 50, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
-    shopAdminTitle: { color: 'white', fontWeight: 'bold', fontSize: 18 },
-    shopAdminDesc: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
-
-    // Küçük İstatistik Kartları
-    smallCard: { width: '48%', padding: 15, borderRadius: 15, elevation: 1, height: 110, justifyContent: 'space-between' },
-    smallCardValue: { fontSize: 24, fontWeight: 'bold' },
-    smallCardLabel: { fontSize: 12, color: '#999' },
+    adminBadge: { marginLeft: 8, backgroundColor: 'rgba(197, 160, 89, 0.1)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+    adminText: { fontSize: 10, color: COLORS.primary, fontWeight: '600' }
 });
 
-export default AdminPanelScreen;
+export default AdminUsersScreen;

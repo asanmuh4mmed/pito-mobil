@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext, useEffect, useRef } from 'react';
 import { 
     View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, 
     Alert, Image, Switch, KeyboardAvoidingView, Platform, ActivityIndicator 
@@ -8,77 +8,50 @@ import { Ionicons } from '@expo/vector-icons';
 import { ShopContext } from '../context/ShopContext';
 import { ThemeContext } from '../context/ThemeContext';
 import { AuthContext } from '../context/AuthContext';
-import { COLORS } from '../constants/colors';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '../lib/supabase'; // ✅ Storage için gerekli
+import { supabase } from '../lib/supabase'; 
 
 const AddEditProductScreen = ({ navigation, route }) => {
-    // ✅ Context'ten DB fonksiyonlarını al
     const { addProduct, updateProduct } = useContext(ShopContext);
-    const { theme } = useContext(ThemeContext);
-    const { country } = useContext(AuthContext);
+    const { theme: appTheme, isDarkMode } = useContext(ThemeContext);
+    const { user, country } = useContext(AuthContext);
+    const theme = isDarkMode ? appTheme : { ...appTheme, background: '#F8F5EF', cardBg: '#FFFFFF', text: '#142239', subText: '#727989', border: '#EAE4D8' };
+    const saveLock = useRef(false);
+    const pickerLock = useRef(false);
+    const uploadCache = useRef(new Map());
+    const editLanguage = country?.code === 'AU' ? 'AU' : 'TR';
+    const textValue = value => value && typeof value === 'object' ? String(value[editLanguage] || value.TR || value.AU || '') : String(value ?? '');
     const editProduct = route.params?.product;
 
-    const activeLang = country?.code === 'AU' ? 'AU' : 'TR';
-    const [uploading, setUploading] = useState(false); // Yükleme durumu
+    const [uploading, setUploading] = useState(false); 
 
     const OPTIONS = {
-        TR: {
-            colors: ["Siyah", "Beyaz", "Kırmızı", "Mavi", "Yeşil", "Sarı", "Turuncu", "Mor", "Pembe", "Kahverengi", "Gri", "Lacivert", "Bej", "Bordo", "Çok Renkli"],
-            sizes: ["XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "Standart"]
-        },
-        AU: {
-            colors: ["Black", "White", "Red", "Blue", "Green", "Yellow", "Orange", "Purple", "Pink", "Brown", "Grey", "Navy", "Beige", "Maroon", "Multi"],
-            sizes: ["XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "One Size"]
-        }
+        colors: ["Siyah", "Beyaz", "Kırmızı", "Mavi", "Yeşil", "Sarı", "Turuncu", "Mor", "Pembe", "Kahverengi", "Gri", "Lacivert", "Bej", "Bordo", "Çok Renkli"],
+        sizes: ["XXS", "XS", "S", "M", "L", "XL", "XXL", "3XL", "4XL", "Standart"]
     };
 
     const t = {
-        TR: { 
-            header: editProduct ? "Ürünü Düzenle" : "Yeni Ürün", 
-            media: "Medya (Max 5 Foto, 1 Video)",
-            name: "Ürün Adı", price: "Fiyat", disc: "İndirimli Fiyat",
-            color: "Renk Seçimi (Çoklu)", size: "Beden Seçimi (Çoklu)", desc: "Açıklama",
-            catLabel: "Kategori",
-            categories: [
-                "Kedi Maması", "Köpek Maması", "Kuş Yemi", "Oyuncak", 
-                "Aksesuar", "Giyim", "Bakım & Sağlık", 
-                "Yatak & Taşıma", "Teknoloji", "QR Kodlu Tasma"
-            ],
-            feat: "★ Öne Çıkan", 
-            best: "🔥 Çok Satan", 
-            new: "🆕 Yeni Sezon",
-            discount: "🏷️ İndirimli",
-            limited: "⚠️ Sınırlı Stok",
-            eco: "🌱 Ekolojik",
-            save: "Kaydet", addMedia: "Ekle", video: "Video",
-            alert: "Lütfen en az 1 fotoğraf, isim, fiyat ve kategori giriniz.",
-            region: "Hedef Bölge", global: "Herkes (Global)", tr: "Sadece Türkiye", au: "Sadece Avustralya"
-        },
-        AU: { 
-            header: editProduct ? "Edit Product" : "New Product", 
-            media: "Media (Max 5 Photos, 1 Video)",
-            name: "Name", price: "Price", disc: "Discount Price",
-            color: "Select Colors (Multi)", size: "Select Sizes (Multi)", desc: "Description",
-            catLabel: "Category",
-            categories: [
-                "Cat Food", "Dog Food", "Bird Food", "Toys", 
-                "Accessories", "Clothing", "Care & Health", 
-                "Beds & Carriers", "Technology", "QR Coded Collar"
-            ],
-            feat: "★ Featured", 
-            best: "🔥 Best Seller", 
-            new: "🆕 New Arrival",
-            discount: "🏷️ On Sale",
-            limited: "⚠️ Limited Stock",
-            eco: "🌱 Eco-Friendly",
-            save: "Save", addMedia: "Add", video: "Video",
-            alert: "Please enter at least 1 photo, name, price and category.",
-            region: "Target Region", global: "Global (All)", tr: "Turkey Only", au: "Australia Only"
-        }
-    }[activeLang];
+        header: editProduct ? "Ürünü Düzenle" : "Yeni Ürün", 
+        media: "Ürün fotoğrafları · En fazla 5",
+        name: "Ürün Adı", price: "Fiyat", disc: "İndirimli Fiyat",
+        color: "Renk Seçimi (Çoklu)", size: "Beden Seçimi (Çoklu)", desc: "Açıklama",
+        catLabel: "Kategori",
+        categories: [
+            "Kedi Maması", "Köpek Maması", "Kuş Yemi", "Oyuncak", 
+            "Aksesuar", "Giyim", "Bakım & Sağlık", 
+            "Yatak & Taşıma", "Teknoloji", "QR Kodlu Tasma"
+        ],
+        feat: "★ Öne Çıkan", 
+        best: "🔥 Çok Satan", 
+        new: "🆕 Yeni Sezon",
+        discount: "🏷️ İndirimli",
+        limited: "⚠️ Sınırlı Stok",
+        eco: "🌱 Ekolojik",
+        save: "Kaydet", addMedia: "Ekle", video: "Video",
+        alert: "Lütfen en az 1 fotoğraf, isim, fiyat ve kategori giriniz."
+    };
 
-    // State
     const [name, setName] = useState('');
     const [price, setPrice] = useState('');
     const [discountPrice, setDiscountPrice] = useState('');
@@ -88,7 +61,6 @@ const AddEditProductScreen = ({ navigation, route }) => {
     const [selectedSizes, setSelectedSizes] = useState([]);
     const [category, setCategory] = useState(''); 
     
-    // Etiketler
     const [isFeatured, setIsFeatured] = useState(false);
     const [isBestSeller, setIsBestSeller] = useState(false);
     const [isNewArrival, setIsNewArrival] = useState(false);
@@ -97,14 +69,14 @@ const AddEditProductScreen = ({ navigation, route }) => {
     const [isEco, setIsEco] = useState(false);
 
     const [mediaList, setMediaList] = useState([]);
-    const [targetRegion, setTargetRegion] = useState('GLOBAL'); 
+    const [targetRegion, setTargetRegion] = useState(editProduct?.targetRegion || editProduct?.target_region || 'TR'); 
 
     useEffect(() => {
         if (editProduct) {
-            setName(editProduct.name);
+            setName(textValue(editProduct.rawName ?? editProduct.name));
             setPrice(editProduct.price ? editProduct.price.toString() : '');
-            setDiscountPrice(editProduct.discountPrice ? editProduct.discountPrice.toString() : '');
-            setDescription(editProduct.description);
+            setDiscountPrice((editProduct.discountPrice ?? editProduct.discount_price)?.toString() || '');
+            setDescription(textValue(editProduct.rawDescription ?? editProduct.description));
             
             setSelectedColors(Array.isArray(editProduct.colors) ? editProduct.colors : []);
             setSelectedSizes(Array.isArray(editProduct.sizes) ? editProduct.sizes : []);
@@ -118,9 +90,6 @@ const AddEditProductScreen = ({ navigation, route }) => {
             setIsLimited(editProduct.isLimited || false);
             setIsEco(editProduct.isEco || false);
 
-            setTargetRegion(editProduct.targetRegion || 'GLOBAL'); 
-            
-            // Medya listesini oluştur (Veritabanından gelen URL'leri UI formatına çevir)
             if (editProduct.media && editProduct.media.length > 0) {
                 setMediaList(editProduct.media);
             } else if (editProduct.image_urls && editProduct.image_urls.length > 0) {
@@ -141,79 +110,58 @@ const AddEditProductScreen = ({ navigation, route }) => {
         }
     };
 
-    // 📸 GALERİDEN MEDYA SEÇME
     const pickMedia = async () => {
         const currentImages = mediaList.filter(m => m.type === 'image').length;
         if (currentImages >= 5) { Alert.alert("Limit", "Maksimum fotoğraf sayısına ulaştınız."); return; }
 
         Alert.alert("Medya Ekle", "Ne eklemek istersiniz?", [
             { text: "Fotoğraf", onPress: () => launchPicker('image') },
-            // Video özelliği şimdilik kapalı kalabilir veya açılabilir
-            // { text: "Video", onPress: () => launchPicker('video') }, 
             { text: "İptal", style: "cancel" }
         ]);
     };
 
     const launchPicker = async (type) => {
-        let result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: type === 'image' ? ImagePicker.MediaTypeOptions.Images : ImagePicker.MediaTypeOptions.Videos,
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.5,
-            base64: true 
-        });
-
-        if (!result.canceled) {
-            setMediaList([...mediaList, { type: type, uri: result.assets[0].uri, base64: result.assets[0].base64 }]);
-        }
-    };
-
-    // ☁️ RESİM YÜKLEME (SUPABASE STORAGE)
-    const uploadImage = async (uri, base64) => {
+        if (saveLock.current || pickerLock.current) return;
+        pickerLock.current = true;
         try {
-            // Eğer zaten http ile başlıyorsa (önceden yüklenmişse) tekrar yükleme
-            if (uri.startsWith('http')) return uri;
-
-            const filename = `product_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
-            
-            // Base64'ten Buffer'a çevirme (React Native için ArrayBuffer decode gerekir)
-            // Ancak Expo'da FormData ile göndermek daha kolaydır:
-            const formData = new FormData();
-            formData.append('files', {
-                uri: uri,
-                name: filename,
-                type: 'image/jpeg',
+            const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!permission.granted) { Alert.alert('Fotoğraf izni gerekli', 'Fotoğraf eklemek için galeri erişimine izin verin.'); return; }
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true, aspect: [1, 1], quality: 0.8, base64: true
             });
-
-            // Veya Supabase'in JS client'ı arrayBuffer ister.
-            // En basiti: base64'ü decode edip yüklemek
-            const { data, error } = await supabase.storage
-                .from('product-images') // Bucket adı (Supabase panelinden oluşturulmalı)
-                .upload(filename, decode(base64), {
-                    contentType: 'image/jpeg'
-                });
-
-            if (error) {
-                // Eğer bucket yoksa hata verebilir, bucket oluşturulmalı
-                console.log("Upload Error:", error);
-                throw error;
+            if (!result.canceled && result.assets?.[0]) {
+                const asset = result.assets[0];
+                setMediaList(previous => previous.filter(m => m.type === 'image').length >= 5 ? previous : [...previous, { type: 'image', uri: asset.uri, base64: asset.base64 }]);
             }
-
-            // Public URL al
-            const { data: { publicUrl } } = supabase.storage
-                .from('product-images')
-                .getPublicUrl(filename);
-
-            return publicUrl;
-
-        } catch (e) {
-            console.log("Resim yükleme hatası (Storage):", e);
-            // Hata durumunda URI'yi geri dön (Yerel çalışmaya devam etsin diye)
-            return uri; 
-        }
+        } catch (error) { Alert.alert('Fotoğraf seçilemedi', error.message || 'Tekrar deneyin.'); }
+        finally { pickerLock.current = false; }
     };
 
-    // Base64 decode yardımcısı (Supabase upload için)
+    const uploadImage = async (uri, base64) => {
+        if (/^https?:\/\//i.test(uri)) return uri;
+        if (uploadCache.current.has(uri)) return uploadCache.current.get(uri);
+        const encoded = base64 || await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+        if (!encoded) throw new Error('Fotoğraf okunamadı. Lütfen yeniden seçin.');
+        const buffer = decode(encoded);
+        const bytes = new Uint8Array(buffer);
+        // Match the real file format instead of labelling every upload as JPEG.
+        let ext, contentType;
+        if (bytes[0] === 255 && bytes[1] === 216) { ext = 'jpg'; contentType = 'image/jpeg'; }
+        else if (bytes[0] === 137 && bytes[1] === 80) { ext = 'png'; contentType = 'image/png'; }
+        else if (bytes[0] === 71 && bytes[1] === 73) { ext = 'gif'; contentType = 'image/gif'; }
+        else if (String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP') { ext = 'webp'; contentType = 'image/webp'; }
+        else throw new Error('Desteklenmeyen fotoğraf biçimi. JPEG veya PNG bir fotoğraf seçin.');
+        const filename = `product_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+        const bucket = supabase.storage.from('product-images');
+        const { error } = await bucket.upload(filename, buffer, { contentType, upsert: false });
+        if (error) throw error;
+        const { data } = bucket.getPublicUrl(filename);
+        if (!data?.publicUrl) throw new Error('Fotoğraf bağlantısı alınamadı.');
+        uploadCache.current.set(uri, data.publicUrl);
+        return data.publicUrl;
+    };
+
     const decode = (base64) => {
         const binaryString = atob(base64);
         const bytes = new Uint8Array(binaryString.length);
@@ -229,84 +177,102 @@ const AddEditProductScreen = ({ navigation, route }) => {
         setMediaList(newList);
     };
 
-    // 💾 KAYDETME İŞLEMİ (DATABASE)
+    // ✅ DÜZELTİLEN KAYDETME İŞLEMİ
     const handleSave = async () => {
-        if (!name || !price || !category || mediaList.length === 0) { 
+        if (saveLock.current) return;
+        if (user?.is_admin !== true) return Alert.alert('Yetki gerekli', 'Ürünleri yalnızca yönetici hesapları kaydedebilir.');
+        const validMoney = value => /^\d+(\.\d{1,2})?$/.test(value.trim().replace(',', '.')) && Number(value.trim().replace(',', '.')) > 0 && Number.isFinite(Number(value.trim().replace(',', '.')));
+        if (!validMoney(price) || (discountPrice.trim() && (!validMoney(discountPrice) || Number(discountPrice.replace(',', '.')) >= Number(price.replace(',', '.'))))) {
+            Alert.alert('Fiyatı kontrol edin', 'Geçerli bir fiyat girin. İndirimli fiyat normal fiyattan düşük olmalı.');
+            return;
+        }
+        if (!name.trim() || !price || !category || !mediaList.some(m => m.type === 'image')) { 
             Alert.alert("Hata", t.alert);
             return;
         }
 
+        saveLock.current = true;
         setUploading(true);
 
         try {
-            // 1. Resimleri Yükle
-            // const uploadedMedia = await Promise.all(mediaList.map(m => uploadImage(m.uri, m.base64)));
-            // Not: Supabase Storage kurulumu karmaşıksa şimdilik URI kullanıyoruz.
-            // Gerçek storage aktif olduğunda üstteki satır açılır.
-            const uploadedMedia = mediaList; // Şimdilik yerel URI veya mevcut URL
+            // 🚨 EKSİK OLAN KISIM EKLENDİ: Önce resimleri tek tek Supabase'e yüklüyoruz
+            const uploadedMedia = await Promise.all(
+                mediaList.map(async (media) => {
+                    if (media.uri.startsWith('http')) {
+                        return media; // Zaten yüklüyse veya linkse aynen bırak
+                    }
+                    const publicUrl = await uploadImage(media.uri, media.base64);
+                    return { ...media, uri: publicUrl }; // Yerel URI'yi public URL ile değiştir
+                })
+            );
+
+            // Virgül ile girilen fiyatları noktaya çevirip sayıya dönüştürüyoruz
+            const finalPrice = parseFloat(price.replace(',', '.'));
+            const finalDiscountPrice = discountPrice.trim() ? parseFloat(discountPrice.replace(',', '.')) : null;
 
             const productData = {
-                name, 
-                price: parseFloat(price),
-                discountPrice: discountPrice ? parseFloat(discountPrice) : null,
-                description,
+                name: editProduct?.rawName && typeof editProduct.rawName === 'object' ? { ...editProduct.rawName, [editLanguage]: name.trim() } : name.trim(), 
+                price: finalPrice,
+                discountPrice: finalDiscountPrice,
+                description: editProduct?.rawDescription && typeof editProduct.rawDescription === 'object' ? { ...editProduct.rawDescription, [editLanguage]: description.trim() } : description.trim(),
                 category, 
-                media: uploadedMedia, // Obje listesi
-                img: uploadedMedia.length > 0 ? uploadedMedia[0].uri : null, // Ana resim
+                media: uploadedMedia,
+                img: uploadedMedia.length > 0 ? uploadedMedia[0].uri : null,
                 
-                // Etiketler
                 isFeatured, isBestSeller, isNewArrival,
                 isDiscount, isLimited, isEco,
                 
                 colors: selectedColors,
                 sizes: selectedSizes,
-                targetRegion: targetRegion,
+                targetRegion: targetRegion, 
                 
-                // Eski değerleri koru
                 rating: editProduct ? editProduct.rating : 0,
                 reviewCount: editProduct ? editProduct.reviewCount : 0,
                 soldCount: editProduct ? editProduct.soldCount : 0,
             };
 
-            // 2. Veritabanına Yaz
-            if (editProduct) {
-                await updateProduct(editProduct.id, productData);
-            } else {
-                await addProduct(productData);
-            }
+            const saved = editProduct
+                ? await updateProduct(editProduct.id, productData)
+                : await addProduct(productData);
+            if (!saved?.id) throw new Error('Kayıt doğrulanamadı. ShopContext dosyasının güncel olduğundan emin olun.');
             
+            saveLock.current = false;
             navigation.goBack();
 
         } catch (error) {
             console.log("Kaydetme hatası:", error);
-            Alert.alert("Hata", "Ürün kaydedilemedi.");
+            Alert.alert("Ürün kaydedilemedi", error.message || "Lütfen tekrar deneyin.");
         } finally {
+            saveLock.current = false;
             setUploading(false);
         }
     };
+
+    useEffect(() => navigation.addListener('beforeRemove', event => {
+        if (saveLock.current) event.preventDefault();
+    }), [navigation]);
 
     const renderOption = (item, isSelected, type) => (
         <TouchableOpacity
             key={item}
             style={[
-                styles.optionBtn,
-                isSelected && { backgroundColor: COLORS.primary, borderColor: COLORS.primary }
+                styles.optionBtn, { backgroundColor: theme.cardBg, borderColor: theme.border },
+                isSelected && { backgroundColor: '#B18A46', borderColor: '#B18A46' }
             ]}
             onPress={() => toggleSelection(item, type)}
         >
-            <Text style={[styles.optionText, isSelected && { color: 'white' }]}>{item}</Text>
+            <Text style={[styles.optionText, { color: theme.text }, isSelected && { color: 'white' }]}>{item}</Text>
         </TouchableOpacity>
     );
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-            {/* ÜST BAŞLIK */}
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()}><Ionicons name="close" size={28} color={theme.text} /></TouchableOpacity>
                 <Text style={[styles.headerTitle, { color: theme.text }]}>{t.header}</Text>
                 
                 {uploading ? (
-                    <ActivityIndicator color={COLORS.primary} />
+                    <ActivityIndicator color="#B18A46" />
                 ) : (
                     <TouchableOpacity onPress={handleSave}><Text style={styles.saveText}>{t.save}</Text></TouchableOpacity>
                 )}
@@ -317,9 +283,10 @@ const AddEditProductScreen = ({ navigation, route }) => {
                 style={{ flex: 1 }}
                 keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
             >
-                <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
+                <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 20, paddingBottom: 30 }}>
+                    <View pointerEvents={uploading ? 'none' : 'auto'} style={{ opacity: uploading ? 0.6 : 1 }}>
+                    <View style={styles.hero}><Text style={styles.heroEyebrow}>PİTO SHOP · ÜRÜN STÜDYOSU</Text><Text style={styles.heroTitle}>{editProduct ? 'Ürününe yeni bir dokunuş.' : 'Yeni bir ürün, yeni bir keşif.'}</Text><Text style={styles.heroBody}>Fotoğrafları, fiyatı ve ürün seçeneklerini tek yerden düzenle.</Text></View>
                     
-                    {/* MEDYA ALANI */}
                     <Text style={[styles.label, {color:theme.text}]}>{t.media}</Text>
                     <View style={styles.mediaRow}>
                         <TouchableOpacity style={styles.addBtn} onPress={pickMedia}>
@@ -334,7 +301,7 @@ const AddEditProductScreen = ({ navigation, route }) => {
                                             <Ionicons name="videocam" size={20} color="white" />
                                         </View>
                                     ) : (
-                                        <Image source={{ uri: item.uri }} style={styles.mediaThumb} />
+                                        <TouchableOpacity accessibilityLabel="Kapak fotoğrafı yap" onPress={() => setMediaList(previous => [previous[index], ...previous.filter((_, i) => i !== index)])}><Image source={{ uri: item.uri }} style={styles.mediaThumb} />{index === 0 && <View style={styles.coverBadge}><Text style={styles.coverText}>KAPAK</Text></View>}</TouchableOpacity>
                                     )}
                                     <TouchableOpacity style={styles.removeBtn} onPress={() => removeMedia(index)}>
                                         <Ionicons name="close-circle" size={20} color="red" />
@@ -344,88 +311,74 @@ const AddEditProductScreen = ({ navigation, route }) => {
                         </ScrollView>
                     </View>
 
-                    {/* İSİM VE FİYATLAR */}
+                    <Text style={[styles.helper, { color: theme.subText }]}>İlk fotoğraf mağazada kapak olarak görünür. Fotoğrafa dokunarak kapağı değiştirebilirsin.</Text>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>Ürün bilgileri</Text>
                     <Text style={[styles.label, {color:theme.text}]}>{t.name}</Text>
-                    <TextInput style={[styles.input, {color:theme.text, borderColor:theme.border}]} value={name} onChangeText={setName} />
+                    <TextInput style={[styles.input, {color:theme.text, borderColor:theme.border, backgroundColor:theme.cardBg}]} value={name} onChangeText={setName} />
 
                     <View style={{flexDirection:'row', justifyContent:'space-between'}}>
                         <View style={{width:'48%'}}>
                             <Text style={[styles.label, {color:theme.text}]}>{t.price}</Text>
-                            <TextInput style={[styles.input, {color:theme.text, borderColor:theme.border}]} value={price} onChangeText={setPrice} keyboardType="numeric" />
+                            <TextInput style={[styles.input, {color:theme.text, borderColor:theme.border, backgroundColor:theme.cardBg}]} value={price} onChangeText={setPrice} keyboardType="numeric" />
                         </View>
                         <View style={{width:'48%'}}>
                             <Text style={[styles.label, {color:theme.text}]}>{t.disc}</Text>
-                            <TextInput style={[styles.input, {color:theme.text, borderColor:theme.border}]} value={discountPrice} onChangeText={setDiscountPrice} keyboardType="numeric" />
+                            <TextInput style={[styles.input, {color:theme.text, borderColor:theme.border, backgroundColor:theme.cardBg}]} value={discountPrice} onChangeText={setDiscountPrice} keyboardType="numeric" />
                         </View>
                     </View>
 
-                    {/* KATEGORİ SEÇİMİ */}
+                    <Text style={[styles.label, {color:theme.text}]}>Satış bölgesi</Text>
+                    <View style={styles.optionsContainer}>{[['TR', 'Türkiye · TL'], ['AU', 'Avustralya · AUD'], ['GLOBAL', 'Tüm bölgeler']].map(([value, title]) => <TouchableOpacity key={value} onPress={() => setTargetRegion(value)} style={[styles.optionBtn, { backgroundColor: theme.cardBg, borderColor: theme.border }, { backgroundColor: theme.cardBg, borderColor: theme.border }, targetRegion === value && { backgroundColor: '#142239' }]}><Text style={{ color: targetRegion === value ? '#FFFFFF' : theme.text, fontSize: 12 }}>{title}</Text></TouchableOpacity>)}</View>
                     <Text style={[styles.label, {color:theme.text}]}>{t.catLabel}:</Text>
                     <View style={styles.optionsContainer}>
-                        {t.categories.map((cat) => (
+                        {[...new Set([...t.categories, ...(category ? [category] : [])])].map((cat) => (
                             <TouchableOpacity
                                 key={cat}
                                 style={[
-                                    styles.optionBtn,
-                                    category === cat && { backgroundColor: COLORS.primary, borderColor: COLORS.primary }
+                                    styles.optionBtn, { backgroundColor: theme.cardBg, borderColor: theme.border },
+                                    category === cat && { backgroundColor: '#B18A46', borderColor: '#B18A46' }
                                 ]}
                                 onPress={() => setCategory(cat)}
                             >
-                                <Text style={[styles.optionText, category === cat && { color: 'white' }]}>{cat}</Text>
+                                <Text style={[styles.optionText, { color: theme.text }, category === cat && { color: 'white' }]}>{cat}</Text>
                             </TouchableOpacity>
                         ))}
                     </View>
 
-                    {/* RENK SEÇİMİ */}
                     <Text style={[styles.label, {color:theme.text, marginTop:20}]}>{t.color}:</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                         <View style={{flexDirection:'row', paddingBottom:5}}>
-                            {OPTIONS[activeLang].colors.map(color => renderOption(color, selectedColors.includes(color), 'color'))}
+                            {OPTIONS.colors.map(color => renderOption(color, selectedColors.includes(color), 'color'))}
                         </View>
                     </ScrollView>
 
-                    {/* BEDEN SEÇİMİ */}
                     <Text style={[styles.label, {color:theme.text, marginTop:20}]}>{t.size}:</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                         <View style={{flexDirection:'row', paddingBottom:5}}>
-                            {OPTIONS[activeLang].sizes.map(size => renderOption(size, selectedSizes.includes(size), 'size'))}
+                            {OPTIONS.sizes.map(size => renderOption(size, selectedSizes.includes(size), 'size'))}
                         </View>
                     </ScrollView>
 
-                    {/* BÖLGE SEÇİMİ */}
-                    <Text style={[styles.label, {color:theme.text, marginTop:20}]}>{t.region}:</Text>
-                    <View style={styles.regionRow}>
-                        <TouchableOpacity style={[styles.regionBtn, targetRegion === 'GLOBAL' && styles.regionBtnActive]} onPress={() => setTargetRegion('GLOBAL')}>
-                            <Text style={[styles.regionText, targetRegion === 'GLOBAL' && styles.regionTextActive]}>🌍 {t.global}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.regionBtn, targetRegion === 'TR' && styles.regionBtnActive]} onPress={() => setTargetRegion('TR')}>
-                            <Text style={[styles.regionText, targetRegion === 'TR' && styles.regionTextActive]}>🇹🇷 {t.tr}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.regionBtn, targetRegion === 'AU' && styles.regionBtnActive]} onPress={() => setTargetRegion('AU')}>
-                            <Text style={[styles.regionText, targetRegion === 'AU' && styles.regionTextActive]}>🇦🇺 {t.au}</Text>
-                        </TouchableOpacity>
-                    </View>
-
-                    {/* ETİKET YÖNETİMİ */}
                     <View style={styles.switchContainer}>
                         <Text style={{fontWeight:'bold', marginBottom:10, color:theme.text}}>Ürün Etiketleri</Text>
                         <View style={styles.switchRow}><Text style={{color:theme.text}}>{t.feat}</Text><Switch value={isFeatured} onValueChange={setIsFeatured} trackColor={{false:"#767577", true: "#FFD700"}} /></View>
                         <View style={styles.switchRow}><Text style={{color:theme.text}}>{t.best}</Text><Switch value={isBestSeller} onValueChange={setIsBestSeller} trackColor={{false:"#767577", true: "orange"}} /></View>
-                        <View style={styles.switchRow}><Text style={{color:theme.text}}>{t.new}</Text><Switch value={isNewArrival} onValueChange={setIsNewArrival} trackColor={{false:"#767577", true: "blue"}} /></View>
+                        <View style={styles.switchRow}><Text style={{color:theme.text}}>{t.new}</Text><Switch value={isNewArrival} onValueChange={setIsNewArrival} trackColor={{false:"#767577", true: "#B18A46"}} /></View>
                         <View style={styles.switchRow}><Text style={{color:theme.text}}>{t.discount}</Text><Switch value={isDiscount} onValueChange={setIsDiscount} trackColor={{false:"#767577", true: "#E91E63"}} /></View>
                         <View style={styles.switchRow}><Text style={{color:theme.text}}>{t.limited}</Text><Switch value={isLimited} onValueChange={setIsLimited} trackColor={{false:"#767577", true: "#FF5252"}} /></View>
                         <View style={styles.switchRow}><Text style={{color:theme.text}}>{t.eco}</Text><Switch value={isEco} onValueChange={setIsEco} trackColor={{false:"#767577", true: "#4CAF50"}} /></View>
                     </View>
 
-                    {/* AÇIKLAMA */}
                     <Text style={[styles.label, {color:theme.text}]}>{t.desc}</Text>
                     <TextInput 
-                        style={[styles.input, {height:120, textAlignVertical:'top', color:theme.text, borderColor:theme.border}]} 
+                        style={[styles.input, {height:120, textAlignVertical:'top', color:theme.text, borderColor:theme.border, backgroundColor:theme.cardBg}]} 
                         value={description} 
                         onChangeText={setDescription} 
                         multiline 
                     />
 
+                    <TouchableOpacity style={styles.bottomSave} onPress={handleSave}><Ionicons name="checkmark-circle-outline" size={22} color="#FFFFFF" /><Text style={styles.bottomSaveText}>{editProduct ? 'Değişiklikleri kaydet' : 'Ürünü kaydet'}</Text></TouchableOpacity>
+                    </View>
                 </ScrollView>
             </KeyboardAvoidingView>
         </SafeAreaView>
@@ -434,25 +387,29 @@ const AddEditProductScreen = ({ navigation, route }) => {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: '#eee' },
+    hero: { backgroundColor: '#142239', borderRadius: 24, padding: 22, marginBottom: 14 },
+    heroEyebrow: { color: '#D9BC82', fontSize: 9, letterSpacing: 1.5, fontWeight: '800' },
+    heroTitle: { color: '#FFFFFF', fontSize: 25, fontWeight: '800', marginTop: 12, lineHeight: 32 },
+    heroBody: { color: '#BBC5D2', fontSize: 12, lineHeight: 20, marginTop: 10 },
+    helper: { fontSize: 11, lineHeight: 18, marginTop: 6 },
+    sectionTitle: { fontSize: 21, fontWeight: '800', marginTop: 26 },
+    coverBadge: { position: 'absolute', left: 7, bottom: 7, backgroundColor: '#142239', borderRadius: 6, padding: 5 },
+    coverText: { color: '#E4C990', fontSize: 8, fontWeight: '800' },
+    bottomSave: { backgroundColor: '#142239', borderRadius: 18, padding: 18, marginTop: 25, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 9 },
+    bottomSaveText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: 'rgba(177,138,70,0.15)' },
     headerTitle: { fontSize: 18, fontWeight: 'bold' },
-    saveText: { color: COLORS.primary, fontWeight: 'bold', fontSize: 16 },
-    label: { fontWeight: 'bold', marginBottom: 5, marginTop: 10 },
-    input: { borderWidth: 1, borderRadius: 8, padding: 10, fontSize: 16 },
+    saveText: { color: '#B18A46', fontWeight: 'bold', fontSize: 16 },
+    label: { fontWeight: '700', fontSize: 12, marginBottom: 9, marginTop: 18 },
+    input: { borderWidth: 1, borderRadius: 16, padding: 15, fontSize: 15 },
     mediaRow: { flexDirection: 'row', marginBottom: 10 },
-    addBtn: { width: 70, height: 70, backgroundColor: '#f0f0f0', borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
+    addBtn: { width: 100, height: 110, backgroundColor: '#f0f0f0', borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
     mediaItem: { position: 'relative', marginRight: 10 },
-    mediaThumb: { width: 70, height: 70, borderRadius: 10 },
-    removeBtn: { position: 'absolute', top: -5, right: -5, backgroundColor: 'white', borderRadius: 10 },
+    mediaThumb: { width: 100, height: 110, borderRadius: 16 },
+    removeBtn: { position: 'absolute', top: -5, right: -5, backgroundColor: 'white', borderRadius: 16 },
     
-    switchContainer: { marginTop: 20, backgroundColor: 'rgba(0,0,0,0.05)', padding: 15, borderRadius: 10 },
+    switchContainer: { marginTop: 20, backgroundColor: 'rgba(0,0,0,0.05)', padding: 15, borderRadius: 16 },
     switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-    
-    regionRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
-    regionBtn: { flex: 1, paddingVertical: 10, borderWidth: 1, borderColor: '#ddd', borderRadius: 8, alignItems: 'center', marginHorizontal: 3, backgroundColor: 'white' },
-    regionBtnActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-    regionText: { fontSize: 12, color: '#333', fontWeight: '600' },
-    regionTextActive: { color: 'white' },
 
     optionsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 5 },
     optionBtn: { paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: '#ccc', borderRadius: 20, marginRight: 8, marginBottom: 8, backgroundColor: 'white' },

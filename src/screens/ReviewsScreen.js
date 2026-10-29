@@ -71,7 +71,7 @@ const ReviewsScreen = ({ navigation, route }) => {
               .from('reviews')
               .select(`
                   *,
-                  users ( fullname, avatar )
+                  users:pito_public_profiles ( fullname, avatar )
               `)
               .eq(idColumn, targetId)
               .order('created_at', { ascending: false });

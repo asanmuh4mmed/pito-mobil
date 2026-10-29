@@ -1,5 +1,6 @@
-import React, { useContext, useState, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList, Image, Modal, Dimensions, Alert, Animated } from 'react-native';
+import EditListingModal from '../components/EditListingModal';
+import React, { useContext, useState, useRef, useCallback, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList, Image, Modal, Dimensions, Alert, Animated, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native'; 
@@ -16,13 +17,19 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 
 const { width } = Dimensions.get('window');
 
-// 👑 KURUCU (FOUNDER) E-POSTA ADRESLERİ 👑
-// Supabase veritabanı (is_founder) ile entegre çalışır.
-const KURUCU_EMAILLER = [
-  "asanmuh4mmed@gmail.com",
-  "izahbngyn@gmail.com",
-  "petspito@gmail.com"
-];
+// --- PITO YENİ RENK PALETİ ---
+const PITO_COLORS = {
+    primary: '#C5A059', 
+    primaryDark: '#B08D4B', 
+    navyBg: '#0B131E', 
+    navySurface: '#1A2533', 
+    navyLight: '#243447',
+    cream: '#F5F5DC',
+    white: '#FFFFFF',
+    grayText: '#A0AAB5',
+    error: '#FF4757',
+    success: '#00B894'
+};
 
 // --- DİL PAKETİ ---
 const TRANSLATIONS = {
@@ -38,20 +45,19 @@ const TRANSLATIONS = {
         removeFollowerMsg: "Bu kişiyi çıkarmak istiyor musun?", deleteAdTitle: "İlanı Sil", deleteAdMsg: "Bu ilanı silmek istediğinize emin misiniz?",
         statusTitle: "Durum Güncelleme", statusMsg: "İlan durumunu değiştirmek istiyor musun?", yes: "Evet, Değiştir",
         swipeUserHint: "(Kişiyi çıkarmak için sola kaydır veya basılı tut)", 
-        tabListings: "İlanlarım", tabPetsgram: "Petsgram", tabShop: "Mağaza",
-        myOrders: "Siparişlerim", myFavs: "Favorilerim", goToShop: "Mağazaya Git",
+        tabListings: "İlanlarım", tabShop: "Mağaza İşlemleri",
+        myOrders: "Siparişlerim", myFavs: "Favori Ürünlerim", goToShop: "Mağazaya Git",
         noOrders: "Henüz sipariş vermediniz.", noFavs: "Henüz favori ürününüz yok.",
         orderNo: "Sipariş No:", status: "Durum:", total: "Toplam:", items: "Ürünler",
         modalAdTitle: "Ne İlanı Ekleyeceksin?", adMate: "Eş Arayanlar", adAdopt: "Sahiplendirme", adVet: "Veteriner Klinikleri", adSitter: "Bakıcı",
         addFirst: "İlk İlanını Ekle", addNew: "+ Yeni Ekle",
         orderDetail: "Sipariş Detayı", trackCargo: "Kargo Takip", close: "Kapat",
-        donationPoints: "Bağış ve Rozetler", totalPoints: "Yapılan Bağış:", points: "Kez",
         deliveryInfo: "Teslimat Bilgileri", recipient: "Alıcı:", phone: "Telefon:", address: "Adres:", cargoLinkText: "🚚 Kargo Takip Linki (Tıkla)",
         order_confirmed: "Sipariş Onaylandı", order_preparing: "Sipariş Hazırlanıyor", order_shipped: "Sipariş Kargoya Verildi", order_delivered: "Sipariş Teslim Edildi", order_cancelled: "Sipariş İptal Edildi",
         saved: "Kaydedilenler", noSavedPosts: "Henüz kaydedilen gönderi yok.",
         adminPanel: "Yönetici Paneli", adminDesc: "Sistem ve kullanıcı yönetimi",
         estDelivery: "Tahmini Teslimat:", notSet: "Belirtilmemiş",
-        badgeBronze: "Bronz Pati", badgeSilver: "Gümüş Pati", badgeGold: "Altın Pati", badgeDiamond: "Elmas Pati", nextBadge: "Sonraki Rozet", maxBadge: "En yüksek rozettesin!"
+        vaccineCard: "Aşı Karnesi", vaccineDesc: "Evcil hayvanınızın sağlık takvimi"
     },
     AU: {
         myProfile: "My Profile", editProfile: "Edit Profile", listings: "Listings", followers: "Followers", following: "Following",
@@ -65,77 +71,50 @@ const TRANSLATIONS = {
         removeFollowerMsg: "Do you want to remove this person?", deleteAdTitle: "Delete Ad", deleteAdMsg: "Are you sure you want to delete this ad?",
         statusTitle: "Update Status", statusMsg: "Do you want to update this ad status?", yes: "Yes, Change",
         swipeUserHint: "(Swipe left or long press to remove user)", 
-        tabListings: "Listings", tabPetsgram: "Petsgram", tabShop: "Shop",
-        myOrders: "My Orders", myFavs: "My Favorites", goToShop: "Go to Shop",
+        tabListings: "Listings", tabShop: "Shop Actions",
+        myOrders: "My Orders", myFavs: "Favorite Products", goToShop: "Go to Shop",
         noOrders: "No orders yet.", noFavs: "No favorites yet.",
         orderNo: "Order #", status: "Status:", total: "Total:", items: "Items",
         modalAdTitle: "What will you post?", adMate: "Find Mate", adAdopt: "Adopt", adVet: "Vet Clinics", adSitter: "Pet Sitter",
         addFirst: "Add Your First Ad", addNew: "+ Add New",
         orderDetail: "Order Detail", trackCargo: "Track Cargo", close: "Close",
-        donationPoints: "Donation & Badges", totalPoints: "Donations Made:", points: "Times", 
         deliveryInfo: "Delivery Information", recipient: "Recipient:", phone: "Phone:", address: "Address:", cargoLinkText: "🚚 Cargo Tracking Link (Click)",
         order_confirmed: "Order Confirmed", order_preparing: "Order Preparing", order_shipped: "Order Shipped", order_delivered: "Order Delivered", order_cancelled: "Order Cancelled",
         saved: "Saved", noSavedPosts: "No saved posts yet.",
         adminPanel: "Admin Panel", adminDesc: "System & User Management",
         estDelivery: "Est. Delivery:", notSet: "Not set",
-        badgeBronze: "Bronze Paw", badgeSilver: "Silver Paw", badgeGold: "Gold Paw", badgeDiamond: "Diamond Paw", nextBadge: "Next Badge", maxBadge: "Max badge reached!"
+        vaccineCard: "Vaccine Card", vaccineDesc: "Your pet's health schedule"
     }
 };
 
-// ✅ Izgara Görünümü İçin Tekil Öğe (Yorum Sayısı Eklendi)
-const GridItem = ({ post, navigation, onPress }) => {
-    const player = useVideoPlayer(post.type === 'video' ? post.image : null, player => {
-        player.muted = true; 
-        player.loop = true;
-    });
-
-    return (
-        <TouchableOpacity 
-            style={styles.gridItem} 
-            onPress={onPress ? onPress : () => navigation.navigate('Petsgram', { initialPostId: post.id })}
-        >
-            {post.type === 'video' ? (
-                <View style={{flex: 1, backgroundColor: 'black', justifyContent:'center', alignItems:'center'}}>
-                    <VideoView 
-                        player={player} 
-                        style={{width: '100%', height: '100%', opacity: 0.8}} 
-                        contentFit="cover"
-                        nativeControls={false}
-                    />
-                    <View style={[StyleSheet.absoluteFill, {justifyContent:'center', alignItems:'center'}]}>
-                        <Ionicons name="play-circle" size={30} color="rgba(255,255,255,0.8)" />
-                    </View>
-                </View>
-            ) : (
-                <Image source={{ uri: post.image }} style={styles.gridImage} resizeMode="cover" />
-            )}
-
-            <View style={styles.gridOverlay}>
-                <View style={{flexDirection:'row', alignItems:'center', marginRight:8}}>
-                    <Ionicons name="heart" size={10} color="white" />
-                    <Text style={{color:'white', fontSize:9, marginLeft:2, fontWeight:'bold'}}>{post.likes || 0}</Text>
-                </View>
-                <View style={{flexDirection:'row', alignItems:'center'}}>
-                    <Ionicons name="chatbubble" size={10} color="white" />
-                    <Text style={{color:'white', fontSize:9, marginLeft:2, fontWeight:'bold'}}>{post.comments?.length || 0}</Text>
-                </View>
-            </View>
-        </TouchableOpacity>
-    );
-};
-
 const ProfileScreen = ({ navigation, route }) => {
-    const { user, logout, allUsers, removeFollower, deleteNotification, updateUser, country } = useContext(AuthContext); 
-    const { urgentList, mateList, vetList, sitterList, deleteListing, updateListing, fetchListings } = useContext(ListingContext);
-    const { getUnreadCount } = useContext(ChatContext);
-    const { theme, isDarkMode } = useContext(ThemeContext);
+    const { user, logout, allUsers, removeFollower, deleteNotification, updateUser, language } = useContext(AuthContext); 
+    const { urgentList, mateList, vetList, sitterList, deleteListing, updateListing, fetchListings, error: listingError, loading: listingsLoading } = useContext(ListingContext);
+    const { theme: appTheme, isDarkMode } = useContext(ThemeContext);
+    // Local visual palette only; the saved application theme is unchanged.
+    const theme = isDarkMode ? appTheme : {
+        ...appTheme, background: '#F8F5EF', cardBg: '#FFFFFF',
+        text: '#142239', subText: '#727989', border: '#EAE4D8'
+    };
     const { posts, savedPostIds } = useContext(SocialContext);
     const { orders, products, favorites } = useContext(ShopContext);
 
+    const [editingListing, setEditingListing] = useState(null);
+    const [pendingListings, setPendingListings] = useState({});
+    const listingLocks = useRef(new Set());
+    const profileRuntime = useRef({ live: true, userId: user?.id });
+    profileRuntime.current.userId = user?.id;
+    useEffect(() => {
+        profileRuntime.current.live = true;
+        return () => { profileRuntime.current.live = false; };
+    }, []);
+    useEffect(() => {
+        setEditingListing(null);
+        setPendingListings({});
+    }, [user?.id]);
     const [modalVisible, setModalVisible] = useState(false);
     const [userListModalVisible, setUserListModalVisible] = useState(false);
     const [notificationsVisible, setNotificationsVisible] = useState(false);
-    const [savedModalVisible, setSavedModalVisible] = useState(false);
     const [accountMenuVisible, setAccountMenuVisible] = useState(false);
     const [orderDetailVisible, setOrderDetailVisible] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
@@ -145,8 +124,8 @@ const ProfileScreen = ({ navigation, route }) => {
     const [userListData, setUserListData] = useState([]);
 
     const scaleAnim = useRef(new Animated.Value(1)).current;
-    const activeLang = country?.code || 'TR';
-    const t = TRANSLATIONS[activeLang];
+    
+    const t = TRANSLATIONS[language] || TRANSLATIONS['TR'];
 
     const onPressIn = () => { Animated.spring(scaleAnim, { toValue: 0.95, useNativeDriver: true }).start(); };
     const onPressOut = () => { Animated.spring(scaleAnim, { toValue: 1, useNativeDriver: true }).start(); };
@@ -160,51 +139,25 @@ const ProfileScreen = ({ navigation, route }) => {
             if (fetchListings) {
                 fetchListings();
             }
-        }, [])
+        }, [fetchListings])
     );
 
     if (!viewUser) return null;
 
-    // ✅ DİNAMİK ROZET HESAPLAYICI (donation_count üzerinden hesaplar)
-    const calculateDynamicBadge = (points) => {
-        const p = points || 0;
-        if (p >= 50) return { name: t.badgeDiamond, icon: 'diamond', color: '#00E5FF' }; // Siyan Mavi
-        if (p >= 15) return { name: t.badgeGold, icon: 'star', color: '#FDCB6E' }; // Sıcak Sarı
-        if (p >= 5) return { name: t.badgeSilver, icon: 'medal', color: '#A55EEA' }; // Mor/Gümüş
-        if (p >= 1) return { name: t.badgeBronze, icon: 'paw', color: '#FD79A8' }; // Pembe
-        return null; 
-    };
-
-    const getBadgeProgress = (points) => {
-        const p = points || 0;
-        if (p < 1) return { next: 1, current: p, name: t.badgeBronze };
-        if (p < 5) return { next: 5, current: p, name: t.badgeSilver };
-        if (p < 15) return { next: 15, current: p, name: t.badgeGold };
-        if (p < 50) return { next: 50, current: p, name: t.badgeDiamond };
-        return { next: p, current: p, name: t.badgeDiamond, max: true }; 
-    };
-
-    // ✅ donation_points yerine donation_count kullanıldı
-    const displayBadge = viewUser.activeBadge || calculateDynamicBadge(viewUser.donation_count);
-    const badgeProgressInfo = getBadgeProgress(user?.donation_count || 0);
-    const badgeProgressPercent = badgeProgressInfo.max ? 100 : (badgeProgressInfo.current / badgeProgressInfo.next) * 100;
-
-    const unreadCount = user ? getUnreadCount(user.id) : 0;
     const unreadNotifCount = user && user.notifications ? user.notifications.filter(n => !n.read).length : 0;
     
     const allListings = [...(urgentList || []), ...(mateList || []), ...(vetList || []), ...(sitterList || [])];
     const displayedListings = (viewUser && allListings.length > 0) 
-        ? allListings.filter(item => item.ownerId && String(item.ownerId).trim() === String(viewUser.id).trim())
+        ? allListings.filter(item => (item.ownerId || item.owner_id) && String(item.ownerId || item.owner_id).trim() === String(viewUser.id).trim())
         : [];
 
-    const userPosts = posts.filter(p => String(p.userId) === String(viewUser.id));
-    const savedPostsList = posts.filter(p => savedPostIds.includes(p.id));
     const myOrders = orders.filter(o => String(o.user_id || o.userId) === String(viewUser.id));
     const myFavoriteProducts = products.filter(p => favorites.some(fav => (typeof fav === 'object' ? (fav.userId === viewUser.id && fav.productId === p.id) : fav === p.id)));
 
     const getLocalizedStatus = (status) => { if (!status) return t.order_preparing; if (status.includes('Onaylandı') || status.includes('Confirmed')) return t.order_confirmed; if (status.includes('Hazırlanıyor') || status.includes('Preparing')) return t.order_preparing; if (status.includes('Kargoya') || status.includes('Shipped')) return t.order_shipped; if (status.includes('Teslim') || status.includes('Delivered')) return t.order_delivered; if (status.includes('İptal') || status.includes('Cancelled')) return t.order_cancelled; return status; };
-    const getStatusColor = (status) => { if (!status) return '#6C5CE7'; if (status.includes('İptal') || status.includes('Cancelled')) return '#FF4D4D'; if (status.includes('Teslim') || status.includes('Delivered')) return '#00E5FF'; if (status.includes('Kargo') || status.includes('Shipped')) return '#5B4BC4'; return '#6C5CE7'; };
-    const getLocalizedCategoryName = (catName) => { if (!catName) return ''; if (activeLang === 'TR') return catName; if (catName.includes('Eş')) return 'Find Mate'; if (catName.includes('Sahiplendirme')) return 'Adoption'; if (catName.includes('Veteriner')) return 'Vet Clinics'; if (catName.includes('Bakıcı')) return 'Pet Sitter'; return catName; };
+    const getStatusColor = (status) => { if (!status) return PITO_COLORS.primary; if (status.includes('İptal') || status.includes('Cancelled')) return PITO_COLORS.error; if (status.includes('Teslim') || status.includes('Delivered')) return PITO_COLORS.success; if (status.includes('Kargo') || status.includes('Shipped')) return PITO_COLORS.primaryDark; return PITO_COLORS.primary; };
+    
+    const getLocalizedCategoryName = (catName) => { if (!catName) return ''; if (language === 'TR') return catName; if (catName.includes('Eş')) return 'Find Mate'; if (catName.includes('Sahiplendirme')) return 'Adoption'; if (catName.includes('Veteriner')) return 'Vet Clinics'; if (catName.includes('Bakıcı')) return 'Pet Sitter'; return catName; };
 
     const handleLogout = () => { Alert.alert(t.logoutTitle, t.logoutMsg, [{ text: t.cancel, style: "cancel" }, { text: t.yesExit, style: "destructive", onPress: () => { logout(); navigation.reset({ index: 0, routes: [{ name: 'Login' }] }); }}]); };
     const handleSwitchAccount = () => { setAccountMenuVisible(false); logout(); navigation.reset({ index: 0, routes: [{ name: 'Login' }] }); };
@@ -236,38 +189,83 @@ const ProfileScreen = ({ navigation, route }) => {
         Alert.alert(t.removeFollowerTitle, t.removeFollowerMsg, [{ text: t.cancel, style: "cancel" }, { text: t.remove, style: "destructive", onPress: () => { removeFollower(followerId); const updatedList = userListData.filter(u => u.id !== followerId); setUserListData(updatedList); }}]);
     };
 
-    const handleDelete = (id) => { 
-        Alert.alert(t.deleteAdTitle, t.deleteAdMsg, [
-            { text: t.cancel, style: "cancel" }, 
-            { text: t.delete, style: "destructive", onPress: async () => {
-                await deleteListing(id); 
-                if (fetchListings) fetchListings(); 
-            }} 
-        ]); 
+    const ownsListing = item => !!user?.id && isMyProfile &&
+        String(item?.owner_id || item?.ownerId || '') === String(user.id);
+
+    const runListingAction = async (item, action, actorId) => {
+        const runtime = profileRuntime.current;
+        const id = String(item?.id || '');
+        if (!id || !ownsListing(item) || !runtime.live || runtime.userId !== actorId) return;
+        const lockKey = `${actorId}:${id}`;
+        if (listingLocks.current.has(lockKey)) return;
+        listingLocks.current.add(lockKey);
+        setPendingListings(previous => ({ ...previous, [id]: true }));
+        try {
+            const result = action === 'delete'
+                ? await deleteListing(item.id)
+                : await updateListing(item.id, { isFound: !Boolean(item.is_found) });
+            if (!runtime.live || runtime.userId !== actorId) return;
+            if (!result?.success) {
+                Alert.alert(language === 'TR' ? 'İşlem tamamlanamadı' : 'Action failed',
+                    language === 'TR' ? 'İşlem doğrulanamadı. Bağlantını ve ilanın hâlâ yayında olduğunu kontrol edip tekrar dene.' : 'The action could not be confirmed. Check your connection and listing, then retry.');
+                return;
+            }
+            if (action === 'delete') setEditingListing(previous => String(previous?.id) === id ? null : previous);
+        } catch {
+            if (runtime.live && runtime.userId === actorId) Alert.alert('Pito', language === 'TR' ? 'İşlem tamamlanamadı. Lütfen tekrar dene.' : 'The action failed. Please try again.');
+        } finally {
+            listingLocks.current.delete(lockKey);
+            if (runtime.live && runtime.userId === actorId) setPendingListings(previous => {
+                const next = { ...previous }; delete next[id]; return next;
+            });
+        }
     };
 
-    const handleMarkAsFound = (item) => {
-        const currentStatus = item.is_found; 
-        const newStatus = !currentStatus;
-        
-        const statusText = item.category.includes('Eş') || item.category.includes('Mate') ? t.mateFound : t.homeFound;
-        const confirmMsg = `${t.statusMsg} \n(${newStatus ? statusText : t.active})`;
-
-        Alert.alert(t.statusTitle, confirmMsg, [
-            { text: t.cancel, style: "cancel" }, 
-            { text: t.yes, onPress: async () => { 
-                if(updateListing) { 
-                    await updateListing(item.id, { isFound: newStatus }); 
-                    if (fetchListings) fetchListings(); 
-                } 
-            }}
+    const handleDelete = id => {
+        const item = displayedListings.find(row => String(row.id) === String(id));
+        if (!ownsListing(item) || pendingListings[String(id)]) return;
+        const actorId = user.id;
+        Alert.alert(t.deleteAdTitle, t.deleteAdMsg, [
+            { text: t.cancel, style: 'cancel' },
+            { text: t.delete, style: 'destructive', onPress: () => runListingAction(item, 'delete', actorId) },
         ]);
+    };
+
+    const handleMarkAsFound = item => {
+        if (!ownsListing(item) || pendingListings[String(item.id)]) return;
+        const actorId = user.id;
+        const statusText = /Eş|Mate/.test(item.category || '') ? t.mateFound : t.homeFound;
+        Alert.alert(t.statusTitle, `${t.statusMsg}\n(${item.is_found ? t.active : statusText})`, [
+            { text: t.cancel, style: 'cancel' },
+            { text: t.yes, onPress: () => runListingAction(item, 'status', actorId) },
+        ]);
+    };
+
+    const handleEditListing = item => {
+        if (!ownsListing(item) || pendingListings[String(item.id)]) return;
+        setEditingListing(item);
+    };
+
+    const handleListingSaved = async saved => {
+        const actorId = user?.id;
+        if (!saved?.id || !ownsListing(saved) || !profileRuntime.current.live || profileRuntime.current.userId !== actorId) return;
+        // Kalıcı bir yerel kopya tutma: kartlar ortak ListingContext verisini izlesin.
+        // Gerçek kayıt başarısı EditListingModal içinde doğrulanmalıdır.
+        setEditingListing(null);
+        try {
+            const result = await fetchListings();
+            if (result?.success === false && !result.stale && profileRuntime.current.live && profileRuntime.current.userId === actorId) {
+                Alert.alert('Pito', language === 'TR' ? 'Değişiklik kaydedildi; liste henüz yenilenemedi. Tekrar dene düğmesiyle listeyi yenileyebilirsin.' : 'Changes were saved, but the list could not refresh. Tap Retry.');
+            }
+        } catch {
+            if (profileRuntime.current.live && profileRuntime.current.userId === actorId) Alert.alert('Pito', language === 'TR' ? 'Liste yenilenemedi. Lütfen tekrar dene.' : 'Could not refresh the list. Please retry.');
+        }
     };
 
     const navigateToAdd = (val) => {
         setModalVisible(false);
         let backendCategoryName = val;
-        if (val === 'Find Mate') backendCategoryName = 'Eş Arayanlar'; else if (val === 'Adopt') backendCategoryName = 'Sahiplendirme'; else if (val === 'Vet Clinics') backendCategoryName = 'Veteriner Klinikleri'; else if (val === 'Pet Sitter') backendCategoryName = 'Bakıcı'; else if (activeLang === 'TR') backendCategoryName = val;
+        if (val === 'Find Mate') backendCategoryName = 'Eş Arayanlar'; else if (val === 'Adopt') backendCategoryName = 'Sahiplendirme'; else if (val === 'Vet Clinics') backendCategoryName = 'Veteriner Klinikleri'; else if (val === 'Pet Sitter') backendCategoryName = 'Bakıcı'; else if (language === 'TR') backendCategoryName = val;
         navigation.navigate('AddListing', { category: backendCategoryName });
     };
 
@@ -283,270 +281,235 @@ const ProfileScreen = ({ navigation, route }) => {
         return date.toLocaleDateString();
     };
 
-    const renderListingRightActions = (id) => ( 
-        <TouchableOpacity style={styles.deleteAction} onPress={() => handleDelete(id)}>
-            <Ionicons name="trash-outline" size={24} color="white" />
-            <Text style={styles.actionText}>{t.delete}</Text>
-        </TouchableOpacity> 
-    );
-    
-    const renderListingLeftActions = (item) => { 
-        if (item.category.includes('Veteriner') || item.category.includes('Bakıcı')) return null; 
-        
-        const label = item.category.includes('Eş') ? t.mateFound : t.homeFound; 
-        const actionLabel = item.is_found ? t.undo : label; 
+    const renderFollowerRightActions = (followerId) => ( <TouchableOpacity activeOpacity={0.7} style={styles.deleteAction} onPress={() => handleRemoveFollower(followerId)}><Ionicons name="person-remove-outline" size={24} color={PITO_COLORS.white} /><Text style={styles.actionTextDelete}>{t.remove}</Text></TouchableOpacity> );
+    const renderNotificationRightActions = (id) => ( <TouchableOpacity activeOpacity={0.7} style={styles.deleteAction} onPress={() => deleteNotification(id)}><Ionicons name="trash-outline" size={24} color={PITO_COLORS.white} /><Text style={styles.actionTextDelete}>{t.delete}</Text></TouchableOpacity> );
 
-        return ( 
-            <TouchableOpacity style={styles.foundAction} onPress={() => handleMarkAsFound(item)}>
-                <Ionicons name={item.is_found ? "refresh-circle-outline" : "checkmark-circle-outline"} size={24} color="white" />
-                <Text style={styles.actionText}>{actionLabel}</Text>
-            </TouchableOpacity> 
-        ); 
-    };
+    const renderListingItem = ({ item: sourceItem }) => {
+        const item = sourceItem;
+        const isPending = !!pendingListings[String(item.id)];
+        const foundLabel = item.category.includes('Eş') ? t.mateFound : t.homeFound;
+        const actionLabel = item.is_found ? t.undo : foundLabel;
 
-    const renderFollowerRightActions = (followerId) => ( <TouchableOpacity style={styles.deleteAction} onPress={() => handleRemoveFollower(followerId)}><Ionicons name="person-remove-outline" size={24} color="white" /><Text style={styles.actionText}>{t.remove}</Text></TouchableOpacity> );
-    const renderNotificationRightActions = (id) => ( <TouchableOpacity style={styles.deleteAction} onPress={() => deleteNotification(id)}><Ionicons name="trash-outline" size={24} color="white" /><Text style={styles.actionText}>{t.delete}</Text></TouchableOpacity> );
-
-    const renderListingItem = ({ item }) => (
-        <Swipeable 
-            renderRightActions={() => isMyProfile ? renderListingRightActions(item.id) : null} 
-            renderLeftActions={() => isMyProfile ? renderListingLeftActions(item) : null} 
-        >
+        return (
             <TouchableOpacity 
-                style={[styles.card, { backgroundColor: theme.cardBg, opacity: item.is_found ? 0.7 : 1 }]} 
+                style={[styles.card, { backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.cardBg, opacity: item.is_found ? 0.7 : 1, flexDirection: 'column', alignItems: 'stretch' }]} 
                 onPress={() => navigation.navigate('ListingDetail', { item })} 
                 activeOpacity={0.9}
             >
-                <Image source={{ uri: item.img }} style={styles.cardImage} />
-                
-                {item.is_found && (
-                    <View style={styles.foundOverlay}>
-                        <Text style={styles.foundText}>
-                            {item.category.includes('Eş') ? t.mateFound : t.homeFound}
-                        </Text>
-                    </View>
-                )}
-
-                <View style={styles.cardInfo}>
-                    <Text style={[styles.cardName, { color: theme.text }]} numberOfLines={1}>{item.name}</Text>
-                    <Text style={[styles.cardSub, { color: theme.subText }]} numberOfLines={1}>{getLocalizedCategoryName(item.category)}</Text>
+                {/* Üst Kısım: Resim ve Bilgiler */}
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Image source={{ uri: item.img }} style={styles.cardImage} />
                     
-                    <View style={[styles.statusBadge, { backgroundColor: item.is_found ? '#6C5CE7' : 'rgba(108, 92, 231, 0.1)' }]}>
-                        <Text style={[styles.statusText, { color: item.is_found ? 'white' : '#6C5CE7' }]}>
-                            {item.is_found ? t.completed : t.active}
-                        </Text>
+                    {item.is_found && (
+                        <View style={styles.foundOverlay}>
+                            <Text style={styles.foundText}>
+                                {item.category.includes('Eş') ? t.mateFound : t.homeFound}
+                            </Text>
+                        </View>
+                    )}
+
+                    <View style={styles.cardInfo}>
+                        <Text style={[styles.cardName, { color: theme.text }]} numberOfLines={1}>{item.name}</Text>
+                        <Text style={[styles.cardSub, { color: theme.subText }]} numberOfLines={1}>{getLocalizedCategoryName(item.category)}</Text>
+                        
+                        <View style={[styles.statusBadge, { backgroundColor: item.is_found ? PITO_COLORS.primary : 'rgba(197, 160, 89, 0.1)' }]}>
+                            <Text style={[styles.statusText, { color: item.is_found ? PITO_COLORS.navyBg : PITO_COLORS.primary }]}>
+                                {item.is_found ? t.completed : t.active}
+                            </Text>
+                        </View>
                     </View>
                 </View>
+
+                {/* Alt Kısım: Butonlar */}
+                {isMyProfile && (
+                    <View style={[styles.cardActionRow, { opacity: isPending ? 0.5 : 1, flexWrap: 'wrap', gap: 8, borderTopColor: isDarkMode ? PITO_COLORS.navyLight : '#eee' }]}>
+                        <TouchableOpacity activeOpacity={0.7} style={[styles.cardActionBtn, { backgroundColor: 'rgba(197,160,89,0.12)', paddingHorizontal: 12 }]} disabled={isPending} onPress={() => handleEditListing(item)}><Ionicons name="create-outline" size={18} color={PITO_COLORS.primary} /><Text style={[styles.cardActionBtnText, { color: theme.text }]}>{language === 'EN' ? 'Edit' : 'Düzenle'}</Text></TouchableOpacity>
+                        {!item.category.includes('Veteriner') && !item.category.includes('Bakıcı') && (
+                            <TouchableOpacity activeOpacity={0.7} 
+                                style={[styles.cardActionBtn, { backgroundColor: item.is_found ? (isDarkMode ? PITO_COLORS.navyLight : '#eee') : PITO_COLORS.primary, flex: 1, marginRight: 10 }]} 
+                                disabled={isPending} onPress={() => handleMarkAsFound(item)}
+                            >
+                                <Ionicons name={item.is_found ? "refresh-outline" : "checkmark-circle-outline"} size={18} color={item.is_found ? theme.text : PITO_COLORS.navyBg} />
+                                <Text style={[styles.cardActionBtnText, { color: item.is_found ? theme.text : PITO_COLORS.navyBg }]}>{actionLabel}</Text>
+                            </TouchableOpacity>
+                        )}
+                        <TouchableOpacity activeOpacity={0.7} 
+                            style={[styles.cardActionBtn, { backgroundColor: 'rgba(255, 71, 87, 0.1)', flex: item.category.includes('Veteriner') || item.category.includes('Bakıcı') ? 1 : 0.5 }]} 
+                            disabled={isPending} onPress={() => handleDelete(item.id)}
+                        >
+                            <Ionicons name="trash-outline" size={18} color={PITO_COLORS.error} />
+                            <Text style={[styles.cardActionBtnText, { color: PITO_COLORS.error }]}>{isPending ? (language === 'TR' ? 'Bekleyin…' : 'Please wait…') : t.delete}</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
             </TouchableOpacity>
-        </Swipeable>
-    );
+        );
+    };
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+        <SafeAreaView style={[styles.container, { backgroundColor: isDarkMode ? PITO_COLORS.navyBg : theme.background }]}>
             
-            {/* HEADER */}
-            <View style={[styles.header, { backgroundColor: theme.cardBg, borderBottomColor: theme.border }]}>
-                {isMyProfile ? (
-                    <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.iconBtn}><Ionicons name="settings-outline" size={24} color={theme.icon} /></TouchableOpacity>
-                ) : (
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.iconBtn}><Ionicons name="arrow-back" size={24} color={theme.icon} /></TouchableOpacity>
-                )}
-                
-                <TouchableOpacity onPress={() => isMyProfile && setAccountMenuVisible(true)} activeOpacity={0.7} style={{flexDirection:'row', alignItems:'center'}}>
-                    <Text style={[styles.headerTitle, { color: theme.text }]}>{viewUser.username ? `@${viewUser.username}` : viewUser.fullname}</Text>
-                    {isMyProfile && <Ionicons name="chevron-down" size={16} color={theme.text} style={{marginLeft:5}} />}
+            <View style={[styles.header, { backgroundColor: isDarkMode ? PITO_COLORS.navyBg : theme.background }]}>
+                <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.goBack()} style={styles.iconBtn}>
+                    <Ionicons name="arrow-back" size={24} color={theme.text} />
                 </TouchableOpacity>
 
-                <View style={{ flexDirection: 'row' }}>
+                <View style={styles.headerBrand}><Ionicons name="paw" size={23} color={PITO_COLORS.primary} /><Text style={[styles.headerTitle, { color: theme.text }]}>{t.myProfile}</Text></View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     {isMyProfile && (
                         <>
-                            <TouchableOpacity style={styles.iconBtn} onPress={handleNotificationPress}>
-                                <Ionicons name="notifications-outline" size={24} color={theme.icon} />
+                            <TouchableOpacity activeOpacity={0.7} style={styles.iconBtn} onPress={handleNotificationPress}>
+                                <Ionicons name="notifications" size={26} color={PITO_COLORS.primary} />
                                 {unreadNotifCount > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{unreadNotifCount}</Text></View>}
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('ChatList')}>
-                                <Ionicons name="paper-plane-outline" size={24} color={theme.icon} />
-                                {unreadCount > 0 && <View style={styles.badge}><Text style={styles.badgeText}>{unreadCount}</Text></View>}
+                            <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.navigate('Settings')} style={styles.iconBtn}>
+                                <Ionicons name="options-outline" size={26} color={theme.text} />
                             </TouchableOpacity>
                         </>
                     )}
-                    {!isMyProfile && <View style={{ width: 40 }} />}
                 </View>
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 50 }}>
                 
-                {/* PROFİL KARTI */}
-                <View style={[styles.profileSection, { backgroundColor: theme.cardBg }]}>
-                    <View style={styles.avatarContainer}>
-                        {viewUser.avatar ? (
-                            <Image 
-                                key={viewUser.avatar} 
-                                source={{ uri: `${viewUser.avatar}?t=${new Date().getTime()}` }} 
-                                style={styles.avatar} 
-                            />
-                        ) : (
-                            <View style={[styles.avatar, {backgroundColor: '#6C5CE7', justifyContent:'center', alignItems:'center'}]}>
-                                <Text style={styles.avatarText}>{viewUser.fullname?.charAt(0)}</Text>
-                            </View>
-                        )}
-                        
-                        {viewUser.isPremium && (
-                            <View style={styles.premiumBadgeAvatar}><Ionicons name="checkmark-circle" size={22} color="white" /></View>
-                        )}
-
-                        {/* ✅ ROZET PROFİL RESMİNİN ETRAFINA (SOL ALTA) EKLENDİ */}
-                        {displayBadge && (
-                            <View style={[styles.avatarBadge, { backgroundColor: theme.cardBg, borderColor: displayBadge.color }]}>
-                                <Ionicons name={displayBadge.icon} size={20} color={displayBadge.color} />
-                            </View>
-                        )}
+                {/* Identity: compact avatar and text, with a full-width edit action. */}
+                <View style={styles.profileSection}>
+                    <View style={styles.identityRow}>
+                        <View style={styles.avatarContainer}>
+                            {viewUser.avatar ? <Image source={{ uri: viewUser.avatar }} style={styles.avatar} /> : <View style={[styles.avatar, styles.avatarFallback]}><Text style={styles.avatarText}>{viewUser.fullname?.charAt(0)}</Text></View>}
+                            {viewUser.isPremium && <View style={styles.premiumBadgeAvatar}><Ionicons name="checkmark-circle" size={19} color={PITO_COLORS.white} /></View>}
+                        </View>
+                        <View style={styles.identityText}>
+                            <View style={styles.nameRow}><Text style={[styles.userName, { color: theme.text }]}>{viewUser.fullname}</Text>{viewUser.is_founder && <Ionicons name="checkmark-circle" size={20} color={PITO_COLORS.primary} />}</View>
+                            {!!viewUser.bio && <Text style={[styles.userBio, { color: theme.subText }]}>{viewUser.bio}</Text>}
+                        </View>
                     </View>
-                    
-                    <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-                        <Text style={[styles.userName, { color: theme.text }]}>{viewUser.fullname}</Text>
-                        
-                        {/* 👑 DİNAMİK KURUCU ROZETİ (Supabase + Liste Kontrolü) 👑 */}
-                        {(viewUser.is_founder || KURUCU_EMAILLER.includes(viewUser.email)) && (
-                            <Ionicons 
-                                name="checkmark-circle" 
-                                size={22} 
-                                color="#00E5FF" 
-                                style={{ marginLeft: 6, marginTop: 4 }} 
-                            />
-                        )}
-                    </View>
-
-                    <Text style={[styles.userEmail, { color: theme.subText }]}>{viewUser.username ? `@${viewUser.username}` : viewUser.email}</Text>
-                    {viewUser.bio && <Text style={[styles.userBio, { color: theme.text }]}>{viewUser.bio}</Text>}
-                    
-                    {isMyProfile && (
-                        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                            <TouchableOpacity style={styles.editBtnModern} onPress={() => navigation.navigate('EditProfile')} onPressIn={onPressIn} onPressOut={onPressOut} activeOpacity={0.9}>
-                                <Ionicons name="create-outline" size={18} color="white" style={{marginRight:5}} />
-                                <Text style={styles.editBtnTextModern}>{t.editProfile}</Text>
-                            </TouchableOpacity>
-                        </Animated.View>
-                    )}
+                    {isMyProfile && <Animated.View style={{ transform: [{ scale: scaleAnim }], width: '100%' }}>
+                        <TouchableOpacity style={styles.editBtnModern} onPress={() => navigation.navigate('EditProfile')} onPressIn={onPressIn} onPressOut={onPressOut} activeOpacity={0.75}>
+                            <Ionicons name="create-outline" size={19} color={PITO_COLORS.primaryDark} /><Text style={styles.editBtnTextModern}>{t.editProfile}</Text>
+                        </TouchableOpacity>
+                    </Animated.View>}
                 </View>
 
-                {/* TAB MENÜSÜ */}
-                <View style={[styles.tabBar, { borderBottomColor: theme.border }]}>
-                    <TouchableOpacity style={[styles.tabItem, activeTab === 'listings' && { borderBottomColor: '#6C5CE7', borderBottomWidth: 3 }]} onPress={() => setActiveTab('listings')}>
-                        <Ionicons name="grid" size={24} color={activeTab === 'listings' ? '#6C5CE7' : theme.subText} />
-                        <Text style={[styles.tabText, {color: activeTab === 'listings' ? '#6C5CE7' : theme.subText}]}>{t.tabListings}</Text>
+                {/* YENİLENMİŞ AŞI KARNESİ BUTONU */}
+                {isMyProfile && (
+                    <TouchableOpacity 
+                        style={[styles.vaccineBtn, { backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.cardBg, borderColor: isDarkMode ? PITO_COLORS.navyLight : theme.border }]} 
+                        onPress={() => navigation.navigate('VaccineReport')}
+                        activeOpacity={0.8}
+                    >
+                        <View style={styles.vaccineIconBox}>
+                            <Ionicons name="document-text" size={24} color={PITO_COLORS.navyBg} />
+                        </View>
+                        <View style={{ flex: 1, marginLeft: 15 }}>
+                            <Text style={{ fontSize: 16, fontWeight: 'bold', color: theme.text }}>{t.vaccineCard}</Text>
+                            <Text style={{ fontSize: 12, color: theme.subText }}>{t.vaccineDesc}</Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={20} color={PITO_COLORS.primary} />
                     </TouchableOpacity>
-                    <TouchableOpacity style={[styles.tabItem, activeTab === 'petsgram' && { borderBottomColor: '#6C5CE7', borderBottomWidth: 3 }]} onPress={() => setActiveTab('petsgram')}>
-                        <Ionicons name="videocam" size={24} color={activeTab === 'petsgram' ? '#6C5CE7' : theme.subText} />
-                        <Text style={[styles.tabText, {color: activeTab === 'petsgram' ? '#6C5CE7' : theme.subText}]}>{t.tabPetsgram}</Text>
+                )}
+
+                {/* YENİLENMİŞ TABS */}
+                <View style={[styles.tabBar, { borderColor: isDarkMode ? PITO_COLORS.navyLight : theme.border }]}>
+                    <TouchableOpacity activeOpacity={0.7} style={[styles.tabItem, activeTab === 'listings' && { backgroundColor: PITO_COLORS.primary }]} onPress={() => setActiveTab('listings')}>
+                        <Ionicons name="grid" size={24} color={activeTab === 'listings' ? '#FFFFFF' : theme.subText} />
+                        <Text style={[styles.tabText, {color: activeTab === 'listings' ? '#FFFFFF' : theme.subText}]}>{t.tabListings}</Text>
                     </TouchableOpacity>
                     {isMyProfile && (
-                        <TouchableOpacity style={[styles.tabItem, activeTab === 'shop' && { borderBottomColor: '#6C5CE7', borderBottomWidth: 3 }]} onPress={() => { setActiveTab('shop'); setShopSubTab(null); }}>
-                            <Ionicons name="bag-handle" size={24} color={activeTab === 'shop' ? '#6C5CE7' : theme.subText} />
-                            <Text style={[styles.tabText, {color: activeTab === 'shop' ? '#6C5CE7' : theme.subText}]}>{t.tabShop}</Text>
+                        <TouchableOpacity activeOpacity={0.7} style={[styles.tabItem, activeTab === 'shop' && { backgroundColor: PITO_COLORS.primary }]} onPress={() => { setActiveTab('shop'); setShopSubTab(null); }}>
+                            <Ionicons name="bag-handle" size={24} color={activeTab === 'shop' ? '#FFFFFF' : theme.subText} />
+                            <Text style={[styles.tabText, {color: activeTab === 'shop' ? '#FFFFFF' : theme.subText}]}>{t.tabShop}</Text>
                         </TouchableOpacity>
                     )}
                 </View>
 
-                {/* İÇERİK ALANI */}
+                {activeTab === 'listings' && listingError && (
+                    <View style={{ marginHorizontal: 20, marginVertical: 12, padding: 14, borderRadius: 14, backgroundColor: theme.cardBg }}>
+                        <Text style={{ color: theme.subText }}>{language === 'TR' ? 'İlanlar yenilenemedi. Bağlantını kontrol edip tekrar dene.' : 'Could not refresh listings. Check your connection and retry.'}</Text>
+                        <TouchableOpacity disabled={listingsLoading} onPress={() => fetchListings()} style={{ paddingTop: 10 }}>
+                            <Text style={{ color: PITO_COLORS.primary, fontWeight: '700' }}>{language === 'TR' ? 'Tekrar dene' : 'Retry'}</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+                {/* İLANLAR LİSTESİ */}
                 {activeTab === 'listings' ? (
                     <View>
-                        {isMyProfile && displayedListings.length > 0 && <Text style={styles.hintText}>{t.swipeHint}</Text>}
                         {displayedListings.length === 0 ? (
-                            <View style={styles.emptyContainer}><Text style={[styles.emptyText, {color:theme.subText}]}>{t.noListings}</Text></View>
+                            <View style={[styles.emptyContainer, { backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.cardBg, borderColor: theme.border }]}>
+                                <View style={styles.emptyIllustration}>
+                                    <View style={styles.emptyHalo}><Ionicons name="paw" size={49} color={PITO_COLORS.primary} /></View>
+                                    <Ionicons name="leaf-outline" size={29} color="#D5BF91" style={styles.emptyLeafLeft} />
+                                    <Ionicons name="leaf-outline" size={24} color="#D5BF91" style={styles.emptyLeafRight} />
+                                    <View style={styles.emptyGround} />
+                                </View>
+                                <Text style={[styles.emptyText, { color: theme.text }]}>{t.noListings}</Text>
+                                <Text style={[styles.emptyCaption, { color: theme.subText }]}>{language === 'TR' ? 'Yeni hikâyeler burada başlayacak.' : 'New stories will begin here.'}</Text>
+                            </View>
                         ) : (
                             <GestureHandlerRootView>
-                                <FlatList data={displayedListings} renderItem={renderListingItem} keyExtractor={item => item.id} scrollEnabled={false} contentContainerStyle={{paddingHorizontal: 20}} />
+                                <FlatList data={displayedListings} extraData={pendingListings} renderItem={renderListingItem} keyExtractor={item => String(item.id)} scrollEnabled={false} contentContainerStyle={{paddingHorizontal: 20, paddingTop: 15}} />
                             </GestureHandlerRootView>
                         )}
                     </View>
-                ) : activeTab === 'petsgram' ? (
-                    userPosts.length === 0 ? (
-                        <View style={styles.emptyContainer}><Text style={[styles.emptyText, {color:theme.subText}]}>{t.noPosts}</Text></View>
-                    ) : (
-                        <View style={styles.gridContainer}>
-                            {userPosts.map((post) => (
-                                <GridItem key={post.id} post={post} navigation={navigation} />
-                            ))}
-                        </View>
-                    )
                 ) : (
-                    // SHOP İÇERİĞİ
+                    // MAĞAZA İŞLEMLERİ (SHOP) EKRANI
                     <View style={{padding: 20}}>
                         {!shopSubTab ? (
                             <View>
-                                <TouchableOpacity style={[styles.shopOptionCard, {backgroundColor: theme.cardBg}]} onPress={() => setShopSubTab('orders')} activeOpacity={0.8}>
-                                    <View style={[styles.iconCircle, {backgroundColor:'rgba(108, 92, 231, 0.1)'}]}><Ionicons name="cube" size={26} color="#6C5CE7" /></View>
+                                <TouchableOpacity style={[styles.shopOptionCard, {backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.cardBg}]} onPress={() => setShopSubTab('orders')} activeOpacity={0.8}>
+                                    <View style={[styles.iconCircle, {backgroundColor: 'rgba(197, 160, 89, 0.15)'}]}><Ionicons name="cube" size={26} color={PITO_COLORS.primary} /></View>
                                     <Text style={[styles.shopOptionText, {color: theme.text}]}>{t.myOrders}</Text>
                                     <Ionicons name="chevron-forward" size={22} color={theme.subText} />
                                 </TouchableOpacity>
-                                <TouchableOpacity style={[styles.shopOptionCard, {backgroundColor: theme.cardBg}]} onPress={() => setShopSubTab('favorites')} activeOpacity={0.8}>
-                                    <View style={[styles.iconCircle, {backgroundColor:'rgba(253, 121, 168, 0.1)'}]}><Ionicons name="heart" size={26} color="#FD79A8" /></View>
+                                
+                                <TouchableOpacity style={[styles.shopOptionCard, {backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.cardBg}]} onPress={() => setShopSubTab('favorites')} activeOpacity={0.8}>
+                                    <View style={[styles.iconCircle, {backgroundColor: 'rgba(255, 71, 87, 0.15)'}]}><Ionicons name="heart" size={26} color={PITO_COLORS.error} /></View>
                                     <Text style={[styles.shopOptionText, {color: theme.text}]}>{t.myFavs}</Text>
                                     <Ionicons name="chevron-forward" size={22} color={theme.subText} />
                                 </TouchableOpacity>
                                 
-                                {/* ✅ BAĞIŞ VE ROZETLER İLERLEME ÇUBUĞU (donation_count kullanıldı) */}
-                                <TouchableOpacity style={[styles.shopOptionCard, {backgroundColor: theme.cardBg}]} onPress={() => navigation.navigate('Badges')} activeOpacity={0.8}>
-                                    <View style={[styles.iconCircle, {backgroundColor:'rgba(253, 203, 110, 0.1)'}]}><Ionicons name="trophy" size={26} color="#FDCB6E" /></View>
-                                    <View style={{flex:1}}>
-                                        <Text style={[styles.shopOptionText, {color: theme.text}]}>{t.donationPoints}</Text>
-                                        <Text style={{fontSize:12, color:theme.subText}}>{t.totalPoints} {user?.donation_count || 0} {t.points}</Text>
-                                        
-                                        {/* Progress Bar (Gelişim Çubuğu) */}
-                                        <View style={{marginTop: 8, height: 6, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 3, overflow: 'hidden', width: '90%'}}>
-                                            <View style={{width: `${badgeProgressPercent}%`, height: '100%', backgroundColor: '#FDCB6E'}} />
-                                        </View>
-                                        <Text style={{fontSize: 10, color: theme.subText, marginTop: 4, fontWeight: 'bold'}}>
-                                            {badgeProgressInfo.max ? t.maxBadge : `${t.nextBadge} (${badgeProgressInfo.name}): ${badgeProgressInfo.current} / ${badgeProgressInfo.next}`}
-                                        </Text>
-                                    </View>
-                                    <Ionicons name="chevron-forward" size={22} color={theme.subText} />
-                                </TouchableOpacity>
-                                
-                                <TouchableOpacity style={[styles.shopOptionCard, {backgroundColor: theme.cardBg}]} onPress={() => navigation.navigate('Shop')} activeOpacity={0.8}>
-                                    <View style={[styles.iconCircle, {backgroundColor:'rgba(0, 229, 255, 0.1)'}]}><Ionicons name="storefront" size={26} color="#00E5FF" /></View>
+                                <TouchableOpacity style={[styles.shopOptionCard, {backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.cardBg}]} onPress={() => navigation.navigate('Shop')} activeOpacity={0.8}>
+                                    <View style={[styles.iconCircle, {backgroundColor: 'rgba(0, 184, 148, 0.15)'}]}><Ionicons name="storefront" size={26} color={PITO_COLORS.success} /></View>
                                     <Text style={[styles.shopOptionText, {color: theme.text}]}>{t.goToShop}</Text>
                                     <Ionicons name="arrow-forward" size={22} color={theme.subText} />
                                 </TouchableOpacity>
 
-                                {/* ADMIN PANELİ BUTONU */}
-                                {user && (user.is_admin || user.is_founder || KURUCU_EMAILLER.includes(user.email)) && (
+                                {user && (user.is_admin || user.is_founder) && (
                                     <TouchableOpacity 
-                                        style={[styles.shopOptionCard, {backgroundColor: 'rgba(91, 75, 196, 0.05)', borderWidth: 1, borderColor: '#5B4BC4'}]} 
+                                        style={[styles.shopOptionCard, {backgroundColor: isDarkMode ? PITO_COLORS.navyLight : 'rgba(176, 141, 75, 0.05)', borderWidth: 1, borderColor: PITO_COLORS.primaryDark}]} 
                                         onPress={() => navigation.navigate('AdminPanel')} 
                                         activeOpacity={0.8}
                                     >
-                                        <View style={[styles.iconCircle, {backgroundColor:'rgba(91, 75, 196, 0.1)'}]}>
-                                            <Ionicons name="shield-checkmark" size={26} color="#5B4BC4" />
+                                        <View style={[styles.iconCircle, {backgroundColor:'rgba(176, 141, 75, 0.15)'}]}>
+                                            <Ionicons name="shield-checkmark" size={26} color={PITO_COLORS.primaryDark} />
                                         </View>
                                         <View style={{flex:1}}>
-                                            <Text style={[styles.shopOptionText, {color: '#5B4BC4'}]}>{t.adminPanel}</Text>
+                                            <Text style={[styles.shopOptionText, {color: PITO_COLORS.primaryDark}]}>{t.adminPanel}</Text>
                                             <Text style={{fontSize:12, color:theme.subText}}>{t.adminDesc}</Text>
                                         </View>
-                                        <Ionicons name="lock-open" size={22} color="#5B4BC4" />
+                                        <Ionicons name="lock-open" size={22} color={PITO_COLORS.primaryDark} />
                                     </TouchableOpacity>
                                 )}
-
                             </View>
                         ) : shopSubTab === 'orders' ? (
                             <View>
-                                <TouchableOpacity onPress={() => setShopSubTab(null)} style={{flexDirection:'row', alignItems:'center', marginBottom:15}}>
+                                <TouchableOpacity activeOpacity={0.7} onPress={() => setShopSubTab(null)} style={{flexDirection:'row', alignItems:'center', marginBottom:15}}>
                                     <Ionicons name="arrow-back" size={24} color={theme.text} />
                                     <Text style={{marginLeft:10, fontSize:18, fontWeight:'bold', color:theme.text}}>{t.myOrders}</Text>
                                 </TouchableOpacity>
-                                {myOrders.length === 0 ? <Text style={{textAlign:'center', color:theme.subText, marginTop:20}}>{t.noOrders}</Text> : (
+                                {myOrders.length === 0 ? <View style={[styles.shopEmpty, { backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.cardBg }]}><Ionicons name="cube-outline" size={38} color={PITO_COLORS.primary} /><Text style={[styles.emptyCaption, { color: theme.subText }]}>{t.noOrders}</Text></View> : (
                                     myOrders.map(order => {
                                         const statusColor = getStatusColor(order.status);
                                         return (
-                                            <TouchableOpacity key={order.id} style={[styles.orderCard, {backgroundColor: theme.cardBg, borderLeftColor: statusColor}]} onPress={() => handleOrderPress(order)}>
+                                            <TouchableOpacity activeOpacity={0.7} key={String(order.id)} style={[styles.orderCard, {backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.cardBg, borderLeftColor: statusColor}]} onPress={() => handleOrderPress(order)}>
                                                 <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:5}}>
                                                     <Text style={{fontWeight:'bold', color:theme.text, fontSize:16}}>{t.orderNo} {order.id.toString().slice(0,8)}...</Text>
                                                     <Text style={{color: statusColor, fontWeight:'bold', fontSize:12}}>{getLocalizedStatus(order.status)}</Text>
                                                 </View>
                                                 <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center'}}>
                                                     <Text style={{color:theme.subText, fontSize:12}}>{order.date ? new Date(order.date).toLocaleDateString() : ''}</Text>
-                                                    <Text style={{fontWeight:'bold', color:'#6C5CE7', fontSize:16}}>{order.totalPrice || order.total_price} {activeLang === 'AU' ? 'AUD' : 'TL'}</Text>
+                                                    <Text style={{fontWeight:'bold', color: PITO_COLORS.primary, fontSize:16}}>{order.totalPrice || order.total_price} {language === 'EN' ? 'AUD' : 'TL'}</Text>
                                                 </View>
                                             </TouchableOpacity>
                                         );
@@ -555,17 +518,17 @@ const ProfileScreen = ({ navigation, route }) => {
                             </View>
                         ) : (
                             <View>
-                                <TouchableOpacity onPress={() => setShopSubTab(null)} style={{flexDirection:'row', alignItems:'center', marginBottom:15}}>
+                                <TouchableOpacity activeOpacity={0.7} onPress={() => setShopSubTab(null)} style={{flexDirection:'row', alignItems:'center', marginBottom:15}}>
                                     <Ionicons name="arrow-back" size={24} color={theme.text} />
                                     <Text style={{marginLeft:10, fontSize:18, fontWeight:'bold', color:theme.text}}>{t.myFavs}</Text>
                                 </TouchableOpacity>
-                                {myFavoriteProducts.length === 0 ? <Text style={{textAlign:'center', color:theme.subText}}>{t.noFavs}</Text> : (
+                                {myFavoriteProducts.length === 0 ? <View style={[styles.shopEmpty, { backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.cardBg }]}><Ionicons name="heart-outline" size={38} color={PITO_COLORS.primary} /><Text style={[styles.emptyCaption, { color: theme.subText }]}>{t.noFavs}</Text></View> : (
                                     <View style={{flexDirection:'row', flexWrap:'wrap', justifyContent:'space-between'}}>
                                             {myFavoriteProducts.map(item => (
-                                                <TouchableOpacity key={item.id} style={[styles.favItem, {backgroundColor: theme.cardBg}]} onPress={() => navigation.navigate('ProductDetail', { product: item })}>
+                                                <TouchableOpacity activeOpacity={0.7} key={String(item.id)} style={[styles.favItem, {backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.cardBg}]} onPress={() => navigation.navigate('ProductDetail', { product: item })}>
                                                     <Image source={{ uri: item.img }} style={{width:'100%', height:120, borderRadius:10, marginBottom:5}} resizeMode="cover" />
                                                     <Text numberOfLines={1} style={{fontWeight:'bold', color:theme.text}}>{item.name}</Text>
-                                                    <Text style={{color:'#6C5CE7', fontWeight:'bold'}}>{item.price}</Text>
+                                                    <Text style={{color: PITO_COLORS.primary, fontWeight:'bold'}}>{item.price}</Text>
                                                 </TouchableOpacity>
                                             ))}
                                     </View>
@@ -576,22 +539,22 @@ const ProfileScreen = ({ navigation, route }) => {
                 )}
 
                 {isMyProfile && activeTab === 'listings' && (
-                    <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}><Text style={{color:'#FF4D4D', fontWeight:'bold'}}>{t.logout}</Text></TouchableOpacity>
+                    <TouchableOpacity activeOpacity={0.7} style={styles.logoutBtn} onPress={handleLogout}><Ionicons name="log-out-outline" size={19} color={PITO_COLORS.error} /><Text style={{color: PITO_COLORS.error, fontWeight:'600', fontSize: 13}}>{t.logout}</Text></TouchableOpacity>
                 )}
             </ScrollView>
 
-            {/* MODALLAR */}
-            {/* SİPARİŞ DETAY MODALI */}
-            <Modal visible={orderDetailVisible} animationType="slide" transparent={true} onRequestClose={() => setOrderDetailVisible(false)}>
+            <EditListingModal listing={editingListing} onClose={() => setEditingListing(null)} onSaved={handleListingSaved} />
+                <Modal visible={orderDetailVisible} animationType="slide" transparent={true} onRequestClose={() => setOrderDetailVisible(false)}>
                 <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, {backgroundColor: theme.cardBg, height: '70%'}]}>
+                    <View style={[styles.modalContent, {backgroundColor: isDarkMode ? PITO_COLORS.navyBg : theme.cardBg, height: '70%'}]}>
+                        <View style={styles.sheetHandle} />
                         <View style={styles.modalHeader}>
                             <Text style={[styles.modalTitle, {color: theme.text}]}>{t.orderDetail}</Text>
-                            <TouchableOpacity onPress={() => setOrderDetailVisible(false)}><Ionicons name="close" size={24} color={theme.icon}/></TouchableOpacity>
+                            <TouchableOpacity activeOpacity={0.7} onPress={() => setOrderDetailVisible(false)}><Ionicons name="close" size={24} color={theme.text}/></TouchableOpacity>
                         </View>
                         {selectedOrder && (
                             <ScrollView showsVerticalScrollIndicator={false}>
-                                <View style={{marginBottom:15, borderBottomWidth:1, borderBottomColor:'#eee', paddingBottom:10}}>
+                                <View style={{marginBottom:15, borderBottomWidth:1, borderBottomColor: isDarkMode ? PITO_COLORS.navyLight : '#eee', paddingBottom:10}}>
                                     <Text style={{color:theme.text, fontSize:16, fontWeight:'bold'}}>{t.orderNo} {selectedOrder.id.toString().slice(0,8)}</Text>
                                     <Text style={{color:theme.subText, fontSize:14}}>{new Date(selectedOrder.date).toLocaleDateString()}</Text>
                                     <Text style={{color: getStatusColor(selectedOrder.status), fontWeight:'bold', marginTop:5}}>{t.status} {getLocalizedStatus(selectedOrder.status)}</Text>
@@ -599,12 +562,12 @@ const ProfileScreen = ({ navigation, route }) => {
                                     <View style={{flexDirection:'row', alignItems:'center', marginTop:5}}>
                                         <Ionicons name="time-outline" size={14} color={theme.subText} style={{marginRight:5}} />
                                         <Text style={{fontSize:12, color:theme.subText}}>
-                                            {t.estDelivery} <Text style={{fontWeight:'bold', color:'#6C5CE7'}}>{getEstimatedDeliveryDate(selectedOrder.date)}</Text>
+                                            {t.estDelivery} <Text style={{fontWeight:'bold', color: PITO_COLORS.primary}}>{getEstimatedDeliveryDate(selectedOrder.date)}</Text>
                                         </Text>
                                     </View>
                                 </View>
 
-                                <View style={styles.userInfoSection}>
+                                <View style={[styles.userInfoSection, { backgroundColor: isDarkMode ? PITO_COLORS.navySurface : 'rgba(197, 160, 89, 0.05)' }]}>
                                     <Text style={[styles.sectionHeader, {color: theme.text}]}>{t.deliveryInfo}</Text>
                                     <Text style={[styles.infoText, {color: theme.subText}]}>
                                         {t.recipient} {selectedOrder.user_name || user.fullname || t.notSet}
@@ -618,19 +581,19 @@ const ProfileScreen = ({ navigation, route }) => {
                                 </View>
 
                                 {(selectedOrder.status === 'Kargoda' || selectedOrder.status === 'Shipped' || selectedOrder.status === 'Sipariş Kargoya Verildi') && (
-                                    <TouchableOpacity style={styles.cargoLinkBox} onPress={() => {}}>
-                                        <Text style={styles.cargoLinkText}>{t.cargoLinkText}</Text>
+                                    <TouchableOpacity activeOpacity={0.7} style={[styles.cargoLinkBox, { backgroundColor: 'rgba(0, 184, 148, 0.1)' }]} onPress={() => {}}>
+                                        <Text style={[styles.cargoLinkText, { color: PITO_COLORS.success }]}>{t.cargoLinkText}</Text>
                                     </TouchableOpacity>
                                 )}
-                                <View style={styles.divider} />
+                                <View style={[styles.divider, { backgroundColor: isDarkMode ? PITO_COLORS.navyLight : '#EEE' }]} />
                                 <Text style={{color:theme.text, fontWeight:'bold', marginBottom:10}}>{t.items}:</Text>
                                 {selectedOrder.items && selectedOrder.items.map((item, index) => (
                                     <View key={index} style={{flexDirection:'row', marginBottom:10, alignItems:'center'}}>
-                                            <Image source={{uri: item.img}} style={{width:50, height:50, borderRadius:5, marginRight:10, backgroundColor:'#eee'}} />
+                                            <Image source={{uri: item.img}} style={{width:50, height:50, borderRadius:12, marginRight:10, backgroundColor: isDarkMode ? PITO_COLORS.navyLight : '#eee'}} />
                                             <View><Text style={{color:theme.text, fontWeight:'600'}}>{item.name}</Text><Text style={{color:theme.subText}}>{item.price} x {item.quantity}</Text></View>
                                     </View>
                                 ))}
-                                <View style={{marginTop:20, borderTopWidth:1, borderTopColor:'#eee', paddingTop:10}}>
+                                <View style={{marginTop:20, borderTopWidth:1, borderTopColor: isDarkMode ? PITO_COLORS.navyLight : '#eee', paddingTop:10}}>
                                     <Text style={{color:theme.text, fontSize:18, fontWeight:'bold', textAlign:'right'}}>{t.total} {selectedOrder.totalPrice || selectedOrder.total_price}</Text>
                                 </View>
                             </ScrollView>
@@ -639,44 +602,10 @@ const ProfileScreen = ({ navigation, route }) => {
                 </View>
             </Modal>
 
-            {/* KAYDEDİLENLER MODALI */}
-            <Modal animationType="slide" transparent={true} visible={savedModalVisible} onRequestClose={() => setSavedModalVisible(false)}>
-                <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { backgroundColor: theme.cardBg, height: '80%' }]}>
-                        <View style={styles.modalHeader}>
-                            <Text style={[styles.modalTitle, { color: theme.text }]}>{t.saved}</Text>
-                            <TouchableOpacity onPress={() => setSavedModalVisible(false)}><Ionicons name="close" size={24} color={theme.icon} /></TouchableOpacity>
-                        </View>
-                        {savedPostsList.length === 0 ? (
-                            <View style={{flex:1, justifyContent:'center', alignItems:'center'}}>
-                                <Ionicons name="bookmark-outline" size={50} color={theme.subText} />
-                                <Text style={{marginTop:10, color:theme.subText}}>{t.noSavedPosts}</Text>
-                            </View>
-                        ) : (
-                            <FlatList 
-                                data={savedPostsList}
-                                keyExtractor={item => item.id}
-                                numColumns={3}
-                                renderItem={({item}) => (
-                                    <GridItem 
-                                        post={item} 
-                                        navigation={navigation} 
-                                        onPress={() => {
-                                            setSavedModalVisible(false);
-                                            navigation.navigate('Petsgram', { initialPostId: item.id });
-                                        }}
-                                    />
-                                )}
-                            />
-                        )}
-                    </View>
-                </View>
-            </Modal>
-
             <Modal transparent={true} visible={accountMenuVisible} onRequestClose={() => setAccountMenuVisible(false)}>
-                <TouchableOpacity style={styles.modalOverlay} onPress={() => setAccountMenuVisible(false)}>
-                    <View style={[styles.accountMenu, {backgroundColor: theme.cardBg}]}>
-                        <TouchableOpacity style={styles.menuItem} onPress={handleSwitchAccount}>
+                <TouchableOpacity activeOpacity={0.7} style={styles.modalOverlay} onPress={() => setAccountMenuVisible(false)}>
+                    <View style={[styles.accountMenu, {backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.cardBg}]}>
+                        <TouchableOpacity activeOpacity={0.7} style={styles.menuItem} onPress={handleSwitchAccount}>
                             <Ionicons name="people-outline" size={20} color={theme.text} />
                             <Text style={{marginLeft:10, color:theme.text}}>{t.switchAccount}</Text>
                         </TouchableOpacity>
@@ -684,30 +613,13 @@ const ProfileScreen = ({ navigation, route }) => {
                 </TouchableOpacity>
             </Modal>
 
-            <Modal animationType="slide" transparent={true} visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
-                <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { backgroundColor: theme.cardBg }]}>
-                        <View style={{flexDirection:'row', justifyContent:'space-between', marginBottom:20}}>
-                            <Text style={{fontSize:18, fontWeight:'bold', color:theme.text}}>{t.modalAdTitle}</Text>
-                            <TouchableOpacity onPress={() => setModalVisible(false)}><Ionicons name="close" size={24} color={theme.icon}/></TouchableOpacity>
-                        </View>
-                        {[{l:t.adMate, v:'Find Mate', c:'#FF6B6B', i:'heart'}, {l:t.adAdopt, v:'Adopt', c:'#4ECDC4', i:'paw'}, {l:t.adVet, v:'Vet Clinics', c:'#45B7D1', i:'medkit'}, {l:t.adSitter, v:'Pet Sitter', c:'#F7B731', i:'people'}].map((o,i)=>(
-                            <TouchableOpacity key={i} style={styles.optionBtn} onPress={() => navigateToAdd(o.v)}>
-                                <View style={[styles.iconBox, {backgroundColor:o.c+'20'}]}><Ionicons name={o.i} size={24} color={o.c}/></View>
-                                <Text style={[styles.optionText, {color: theme.text}]}>{o.l}</Text>
-                                <Ionicons name="chevron-forward" size={20} color={theme.subText} />
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-                </View>
-            </Modal>
-
             <Modal animationType="slide" transparent={true} visible={userListModalVisible} onRequestClose={() => setUserListModalVisible(false)}>
                 <GestureHandlerRootView style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { height: '60%', backgroundColor: theme.cardBg }]}>
+                    <View style={[styles.modalContent, { height: '60%', backgroundColor: isDarkMode ? PITO_COLORS.navyBg : theme.cardBg }]}>
+                        <View style={styles.sheetHandle} />
                         <View style={styles.modalHeader}>
                             <Text style={[styles.modalTitle, { color: theme.text }]}>{userListType === 'followers' ? t.followersTitle : t.followingTitle}</Text>
-                            <TouchableOpacity onPress={() => setUserListModalVisible(false)}><Ionicons name="close" size={24} color={theme.icon} /></TouchableOpacity>
+                            <TouchableOpacity activeOpacity={0.7} onPress={() => setUserListModalVisible(false)}><Ionicons name="close" size={24} color={theme.text} /></TouchableOpacity>
                         </View>
                         {isMyProfile && userListType === 'followers' && <Text style={{textAlign:'center', fontSize:10, color:theme.subText, marginBottom:5}}>{t.swipeUserHint}</Text>}
                         <FlatList 
@@ -717,9 +629,9 @@ const ProfileScreen = ({ navigation, route }) => {
                             ListEmptyComponent={<Text style={{textAlign:'center', marginTop:20, color: theme.subText}}>{t.nobody}</Text>}
                             renderItem={({ item }) => {
                                 const row = (
-                                    <TouchableOpacity style={[styles.userListItem, { borderBottomColor: theme.border, backgroundColor: theme.cardBg }]} onPress={() => { setUserListModalVisible(false); navigation.push('UserProfile', { userId: item.id, userName: item.fullname, userAvatar: item.avatar }); }}>
+                                    <TouchableOpacity activeOpacity={0.7} style={[styles.userListItem, { borderBottomColor: isDarkMode ? PITO_COLORS.navyLight : theme.border, backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.cardBg }]} onPress={() => { setUserListModalVisible(false); navigation.push('UserProfile', { userId: item.id, userName: item.fullname, userAvatar: item.avatar }); }}>
                                         <View style={{flexDirection:'row', alignItems:'center', flex:1}}>
-                                            <View style={styles.listAvatar}>{item.avatar ? <Image source={{uri: item.avatar}} style={{width:'100%', height:'100%'}} /> : <Text style={{color:'white', fontWeight:'bold'}}>{item.fullname?.charAt(0) || "?"}</Text>}</View>
+                                            <View style={[styles.listAvatar, { backgroundColor: PITO_COLORS.primary }]} >{item.avatar ? <Image source={{uri: item.avatar}} style={{width:'100%', height:'100%'}} /> : <Text style={{color: PITO_COLORS.navyBg, fontWeight:'bold'}}>{item.fullname?.charAt(0) || "?"}</Text>}</View>
                                             <Text style={[styles.listName, { color: theme.text }]}>{item.fullname}</Text>
                                         </View>
                                     </TouchableOpacity>
@@ -733,21 +645,22 @@ const ProfileScreen = ({ navigation, route }) => {
 
             <Modal animationType="fade" transparent={true} visible={notificationsVisible} onRequestClose={() => setNotificationsVisible(false)}>
                 <GestureHandlerRootView style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { height: '60%', backgroundColor: theme.cardBg }]}>
+                    <View style={[styles.modalContent, { height: '60%', backgroundColor: isDarkMode ? PITO_COLORS.navyBg : theme.cardBg }]}>
+                        <View style={styles.sheetHandle} />
                         <View style={styles.modalHeader}>
                             <Text style={[styles.modalTitle, { color: theme.text }]}>{t.notifications}</Text>
-                            <TouchableOpacity onPress={() => setNotificationsVisible(false)}><Ionicons name="close" size={24} color={theme.icon} /></TouchableOpacity>
+                            <TouchableOpacity activeOpacity={0.7} onPress={() => setNotificationsVisible(false)}><Ionicons name="close" size={24} color={theme.text} /></TouchableOpacity>
                         </View>
                         {user && user.notifications && user.notifications.length > 0 ? (
                             <FlatList 
                                 data={user.notifications}
-                                keyExtractor={(item) => item.id.toString()}
+                                keyExtractor={(item) => String(item.id)}
                                 renderItem={({ item }) => (
                                     <Swipeable renderRightActions={() => renderNotificationRightActions(item.id)}>
-                                            <TouchableOpacity style={[styles.notificationItem, { borderBottomColor: theme.border, backgroundColor: theme.cardBg }]} onPress={() => handleNotificationClick(item)}>
-                                                {!item.read && <View style={styles.unreadDot} />}
+                                            <TouchableOpacity activeOpacity={0.7} style={[styles.notificationItem, { borderBottomColor: isDarkMode ? PITO_COLORS.navyLight : theme.border, backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.cardBg }]} onPress={() => handleNotificationClick(item)}>
+                                                {!item.read && <View style={[styles.unreadDot, { backgroundColor: PITO_COLORS.primary }]} />}
                                                 <View style={{marginRight:15}}>
-                                                    {item.fromUserAvatar ? <Image source={{ uri: item.fromUserAvatar }} style={{width:40, height:40, borderRadius:20}} /> : <View style={{width:40, height:40, borderRadius:20, justifyContent:'center', alignItems:'center', backgroundColor:'rgba(108, 92, 231, 0.1)'}}><Ionicons name="notifications" size={20} color="#6C5CE7" /></View>}
+                                                    {item.fromUserAvatar ? <Image source={{ uri: item.fromUserAvatar }} style={{width:40, height:40, borderRadius:20, borderWidth: 1, borderColor: PITO_COLORS.primary}} /> : <View style={{width:40, height:40, borderRadius:20, justifyContent:'center', alignItems:'center', backgroundColor:'rgba(197, 160, 89, 0.1)'}}><Ionicons name="notifications" size={20} color={PITO_COLORS.primary} /></View>}
                                                 </View>
                                                 <View style={{ flex: 1 }}>
                                                     <Text style={{color: theme.text, fontSize:14, fontWeight: !item.read ? 'bold' : 'normal'}}>{item.message}</Text>
@@ -774,93 +687,147 @@ const ProfileScreen = ({ navigation, route }) => {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
-    header: { flexDirection: 'row', justifyContent: 'space-between', padding: 15, paddingTop: 50, alignItems: 'center' },
-    headerTitle: { fontSize: 18, fontWeight: 'bold' },
-    iconBtn: { padding: 8, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.05)', marginLeft: 5 },
-    badge: { position: 'absolute', top: 5, right: 5, backgroundColor: '#FFD700', borderRadius: 8, width: 16, height: 16, justifyContent: 'center', alignItems: 'center' },
-    badgeText: { color: 'black', fontSize: 10, fontWeight: 'bold' },
-    profileSection: { alignItems: 'center', padding: 25, borderRadius: 25, margin: 15, elevation: 4, shadowColor: '#000', shadowOffset:{width:0, height:3}, shadowOpacity:0.15 },
-    avatarContainer: { marginBottom: 15, shadowColor: '#000', shadowOffset:{width:0, height:4}, shadowOpacity:0.25, shadowRadius:6, position: 'relative' },
-    avatar: { width: 90, height: 90, borderRadius: 45 },
-    avatarText: { fontSize: 40, fontWeight: 'bold', color: 'white' },
-    premiumBadgeAvatar: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#00E5FF', borderRadius: 15, padding: 2, borderWidth: 2, borderColor: 'white' },
     
-    // ✅ ROZET İÇİN YENİ STİL BURADA
-    avatarBadge: {
-        position: 'absolute',
-        // Değerleri -5'ten -15'e (veya isteğine göre daha fazla) çekerek dışarı itiyoruz
-        bottom: -15, 
-        left: -15,   
-        borderRadius: 20,
-        padding: 6,
-        borderWidth: 2.5,
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 5,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.3,
-        shadowRadius: 3
-    },
+    
+    
+    badge: { position: 'absolute', top: 5, right: 5, backgroundColor: PITO_COLORS.error, borderRadius: 8, minWidth: 16, height: 16, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 2 },
+    badgeText: { color: 'white', fontSize: 10, fontWeight: 'bold' },
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
 
-    userName: { fontSize: 24, fontWeight: 'bold', marginTop: 5 },
+    
     userEmail: { fontSize: 14, marginTop: 2, marginBottom: 10 },
-    userBio: { textAlign: 'center', marginHorizontal: 20, marginTop: 10, fontStyle: 'italic', lineHeight: 20 },
-    editBtnModern: { flexDirection: 'row', alignItems: 'center', marginTop: 15, paddingVertical: 12, paddingHorizontal: 35, borderRadius: 25, backgroundColor: '#6C5CE7', shadowColor: '#6C5CE7', shadowOffset:{width:0, height:4}, shadowOpacity:0.3, shadowRadius:5 },
-    editBtnTextModern: { color: 'white', fontWeight: 'bold', fontSize: 14 },
-    crownIconBox: { width: 50, height: 50, borderRadius: 25, backgroundColor: 'rgba(255,215,0,0.2)', justifyContent: 'center', alignItems: 'center' },
-    tabBar: { flexDirection: 'row', marginTop: 20, borderBottomWidth: 1, borderBottomColor: '#eee' },
-    tabItem: { flex: 1, alignItems: 'center', paddingVertical: 15 },
-    tabText: { fontSize: 12, marginTop: 4, fontWeight: '600' },
-    emptyContainer: { alignItems: 'center', marginTop: 40 },
-    emptyText: { marginBottom: 10 },
+    
+    
+    
+    
+    
+    
+    
+    
     hintText: { textAlign: 'center', fontSize: 10, color: '#999', marginVertical: 10 },
     gridContainer: { flexDirection: 'row', flexWrap: 'wrap' },
     gridItem: { width: width / 3, height: width / 3, padding: 1 },
     gridImage: { width: '100%', height: '100%' },
-    gridOverlay: { position: 'absolute', bottom: 5, left: 5, flexDirection: 'row', alignItems: 'center', backgroundColor:'rgba(0,0,0,0.5)', padding:3, borderRadius:5 },
-    shopOptionCard: { flexDirection: 'row', alignItems: 'center', padding: 20, borderRadius: 20, marginBottom: 15, elevation: 3, shadowColor: '#000', shadowOffset:{width:0, height:3}, shadowOpacity:0.15 },
-    iconCircle: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
-    shopOptionText: { flex: 1, fontSize: 18, fontWeight: '600' },
-    orderCard: { padding: 15, borderRadius: 15, marginBottom: 15, borderLeftWidth: 5, borderLeftColor: '#6C5CE7', elevation: 2 },
-    trackCargoBtn: { backgroundColor: '#6C5CE7', padding: 12, borderRadius: 10, alignItems: 'center', marginTop: 15, flexDirection: 'row', justifyContent: 'center' },
-    favItem: { width: '48%', padding: 10, borderRadius: 15, marginBottom: 15, elevation: 3, shadowColor: '#000', shadowOffset:{width:0, height:2}, shadowOpacity:0.15 },
-    logoutBtn: { alignSelf: 'center', marginTop: 30, padding: 10 },
-    card: { flexDirection: 'row', borderRadius: 20, marginBottom: 15, padding: 15, alignItems: 'center', elevation: 3, marginHorizontal: 20, shadowColor: '#000', shadowOffset:{width:0, height:2}, shadowOpacity:0.15 },
-    cardImage: { width: 80, height: 80, borderRadius: 15, backgroundColor: '#EEE' },
-    cardInfo: { flex: 1, marginLeft: 15 },
-    cardName: { fontSize: 18, fontWeight: 'bold' },
-    cardSub: { fontSize: 13, marginTop: 4 },
-    deleteAction: { backgroundColor: '#FF4D4D', justifyContent: 'center', alignItems: 'center', width: 90, borderTopRightRadius: 20, borderBottomRightRadius: 20, height: 110, marginBottom: 15 },
-    foundAction: { backgroundColor: '#6C5CE7', justifyContent: 'center', alignItems: 'center', width: 110, borderTopLeftRadius: 20, borderBottomLeftRadius: 20, height: 110, marginBottom: 15 },
-    actionText: { color: 'white', fontWeight: 'bold', fontSize: 12, marginTop: 5 },
-    foundOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.7)', justifyContent: 'center', alignItems: 'center', zIndex: 10, borderRadius: 20 },
-    foundText: { color: '#6C5CE7', fontWeight: 'bold', fontSize: 18, borderWidth: 3, borderColor: '#6C5CE7', padding: 8, borderRadius: 8, transform: [{ rotate: '-15deg' }] },
+    gridOverlay: { position: 'absolute', bottom: 5, left: 5, flexDirection: 'row', alignItems: 'center', backgroundColor:'rgba(11, 19, 30, 0.6)', padding:3, borderRadius:5 },
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    deleteAction: { backgroundColor: PITO_COLORS.error, justifyContent: 'center', alignItems: 'center', width: 90, borderTopRightRadius: 20, borderBottomRightRadius: 20, height: 110, marginBottom: 15 },
+    foundAction: { backgroundColor: PITO_COLORS.primary, justifyContent: 'center', alignItems: 'center', width: 110, borderTopLeftRadius: 20, borderBottomLeftRadius: 20, height: 110, marginBottom: 15 },
+    actionTextDelete: { color: 'white', fontWeight: 'bold', fontSize: 12, marginTop: 5 },
+    actionTextFound: { color: PITO_COLORS.navyBg, fontWeight: 'bold', fontSize: 12, marginTop: 5 },
+    
+    
     statusBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, marginTop: 5 },
     statusText: { fontSize: 10, fontWeight: 'bold' },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-    modalContent: { borderTopLeftRadius: 30, borderTopRightRadius: 30, padding: 25 },
-    optionBtn: { flexDirection: 'row', alignItems: 'center', paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: '#eee' },
-    iconBox: { width: 45, height: 45, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
-    optionText: { flex: 1, fontSize: 16, fontWeight: '600' },
-    accountMenu: { position: 'absolute', top: 60, right: 20, width: 200, borderRadius: 15, padding: 15, elevation: 10 },
-    menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
-    userListItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15, borderBottomWidth: 1, paddingHorizontal: 20 },
-    listAvatar: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#6C5CE7', justifyContent: 'center', alignItems: 'center', marginRight: 15, overflow: 'hidden' },
-    listName: { fontSize: 16, fontWeight: '600' },
-    notificationItem: { flexDirection: 'row', padding: 15, borderBottomWidth: 1, alignItems: 'center', position: 'relative', backgroundColor: '#FFD700' },
-    unreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FFD700', position: 'absolute', top: 15, left: 5, zIndex: 10 }, 
-    userInfoSection: { backgroundColor: 'rgba(108, 92, 231, 0.05)', padding: 15, borderRadius: 10, marginBottom: 15 },
-    sectionHeader: { fontSize: 16, fontWeight: 'bold', marginBottom: 10 },
-    infoText: { fontSize: 14, marginBottom: 5 },
-    divider: { height: 1, backgroundColor: '#EEE', marginVertical: 15 },
-    cargoLinkBox: { backgroundColor: 'rgba(0, 229, 255, 0.1)', padding: 15, borderRadius: 10, marginBottom: 15, alignItems: 'center' },
-    cargoLinkText: { color: '#00E5FF', fontWeight: 'bold', textDecorationLine: 'underline' },
-    warningTitle: { fontSize: 20, fontWeight: 'bold', marginTop: 20 },
-    loginBtn: { backgroundColor: '#6C5CE7', paddingVertical: 15, paddingHorizontal: 50, borderRadius: 30, marginTop: 20 },
-    loginBtnText: { color: 'white', fontWeight: 'bold', fontSize: 18 },
-    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-    modalTitle: { fontSize: 20, fontWeight: 'bold' }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+     
+    
+    
+    
+    divider: { height: 1, marginVertical: 15 },
+    
+    
+    
+    
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 10 },
+    headerBrand: { flex: 1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7 },
+    headerTitle: { fontSize: 20, fontWeight: '800', letterSpacing: -0.5 },
+    iconBtn: { width: 40, height: 40, borderRadius: 14, backgroundColor: 'rgba(154,151,140,0.09)', marginLeft: 5, justifyContent: 'center', alignItems: 'center' },
+    profileSection: { paddingHorizontal: 20, paddingTop: 23, paddingBottom: 22 },
+    identityRow: { flexDirection: 'row', alignItems: 'center', gap: 17, marginBottom: 24 },
+    identityText: { flex: 1 },
+    nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    userName: { fontSize: 23, fontWeight: '800', letterSpacing: -0.7, flexShrink: 1, lineHeight: 29 },
+    avatarContainer: { position: 'relative', width: 92, height: 92 },
+    avatar: { width: 92, height: 92, borderRadius: 46, borderWidth: 3, borderColor: '#FFFFFF' },
+    avatarFallback: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#E9DAB9' },
+    avatarText: { fontSize: 35, fontWeight: '700', color: PITO_COLORS.navyBg },
+    premiumBadgeAvatar: { position: 'absolute', top: -2, right: -2, backgroundColor: PITO_COLORS.primary, borderRadius: 12, padding: 2, borderWidth: 2, borderColor: '#FFFFFF' },
+    userBio: { fontSize: 12, lineHeight: 19, marginTop: 8, fontStyle: 'italic' },
+    editBtnModern: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, paddingVertical: 14, borderRadius: 17, borderWidth: 1, borderColor: PITO_COLORS.primary, backgroundColor: 'rgba(197,160,89,0.035)' },
+    editBtnTextModern: { fontSize: 14, fontWeight: '700', color: PITO_COLORS.primaryDark },
+    vaccineBtn: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 20, marginBottom: 22, padding: 15, borderRadius: 22, borderWidth: 1, shadowColor: '#9A7C45', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.055, shadowRadius: 12 },
+    vaccineIconBox: { width: 45, height: 45, borderRadius: 14, backgroundColor: '#EADAB6', alignItems: 'center', justifyContent: 'center' },
+    tabBar: { flexDirection: 'row', marginHorizontal: 20, padding: 4, borderWidth: 1, borderRadius: 19, marginBottom: 7 },
+    tabItem: { flex: 1, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', paddingVertical: 14, paddingHorizontal: 5, borderRadius: 15 },
+    tabText: { fontSize: 10, fontWeight: '600', flexShrink: 1 },
+    emptyContainer: { alignItems: 'center', marginHorizontal: 20, marginTop: 14, paddingVertical: 30, paddingHorizontal: 20, borderRadius: 24, borderWidth: 1, minHeight: 240 },
+    emptyIllustration: { width: 170, height: 113, alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+    emptyHalo: { width: 94, height: 94, borderRadius: 47, backgroundColor: 'rgba(197,160,89,0.08)', alignItems: 'center', justifyContent: 'center' },
+    emptyLeafLeft: { position: 'absolute', bottom: 9, left: 16, transform: [{ rotate: '-35deg' }] },
+    emptyLeafRight: { position: 'absolute', bottom: 12, right: 16, transform: [{ rotate: '25deg' }] },
+    emptyGround: { position: 'absolute', bottom: 1, width: 150, height: 6, borderRadius: 20, backgroundColor: 'rgba(197,160,89,0.08)' },
+    emptyText: { fontSize: 16, fontWeight: '700', textAlign: 'center', lineHeight: 23 },
+    emptyCaption: { fontSize: 12, textAlign: 'center', lineHeight: 20, marginTop: 9 },
+    shopEmpty: { alignItems: 'center', padding: 32, borderRadius: 22, marginTop: 10 },
+    logoutBtn: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 25, paddingHorizontal: 20, paddingVertical: 13 },
+    shopOptionCard: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 19, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(197,160,89,0.16)' },
+    shopOptionText: { flex: 1, fontSize: 15, fontWeight: '700' },
+    iconCircle: { width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+    orderCard: { padding: 17, borderRadius: 18, marginBottom: 12, borderLeftWidth: 3 },
+    favItem: { width: '48%', padding: 12, borderRadius: 18, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(197,160,89,0.15)' },
+    card: { borderRadius: 20, marginBottom: 14, padding: 14, borderWidth: 1, borderColor: 'rgba(197,160,89,0.16)' },
+    cardImage: { width: 76, height: 76, borderRadius: 15, backgroundColor: '#EAE4D8' },
+    cardInfo: { flex: 1, marginLeft: 12 },
+    cardName: { fontSize: 16, fontWeight: '700' },
+    cardSub: { fontSize: 11, marginTop: 5 },
+    cardActionRow: { flexDirection: 'row', marginTop: 14, paddingTop: 13, borderTopWidth: 1 },
+    cardActionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 6, borderRadius: 12 },
+    cardActionBtnText: { fontWeight: '700', fontSize: 10, marginLeft: 5, flexShrink: 1, textAlign: 'center' },
+    foundOverlay: { position: 'absolute', top: 0, left: 0, width: 76, height: 76, backgroundColor: 'rgba(11,19,30,0.65)', justifyContent: 'center', alignItems: 'center', borderRadius: 15 },
+    foundText: { color: PITO_COLORS.cream, fontSize: 8, fontWeight: '800', textAlign: 'center', paddingHorizontal: 4 },
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(11,19,30,0.55)', justifyContent: 'flex-end' },
+    modalContent: { borderTopLeftRadius: 28, borderTopRightRadius: 28, paddingHorizontal: 22, paddingTop: 11, paddingBottom: 32 },
+    sheetHandle: { alignSelf: 'center', width: 36, height: 4, borderRadius: 3, backgroundColor: '#AFA897', opacity: 0.5, marginBottom: 21 },
+    modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+    modalTitle: { fontSize: 21, fontWeight: '800', letterSpacing: -0.5, flex: 1 },
+    optionBtn: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1 },
+    iconBox: { width: 42, height: 42, borderRadius: 13, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+    optionText: { flex: 1, fontSize: 14, fontWeight: '600' },
+    accountMenu: { position: 'absolute', bottom: 25, right: 20, left: 20, borderRadius: 21, padding: 20 },
+    menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
+    userListItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 13, borderBottomWidth: 0, borderRadius: 16, marginBottom: 8 },
+    listAvatar: { width: 43, height: 43, borderRadius: 15, justifyContent: 'center', alignItems: 'center', marginRight: 12, overflow: 'hidden' },
+    listName: { fontSize: 14, fontWeight: '600', flexShrink: 1 },
+    notificationItem: { flexDirection: 'row', alignItems: 'center', padding: 15, borderRadius: 17, borderBottomWidth: 0, marginBottom: 9, position: 'relative' },
+    unreadDot: { width: 6, height: 6, borderRadius: 3, position: 'absolute', top: 10, left: 8 },
+    userInfoSection: { padding: 17, borderRadius: 17, marginBottom: 17 },
+    sectionHeader: { fontSize: 15, fontWeight: '700', marginBottom: 11 },
+    infoText: { fontSize: 13, lineHeight: 21, marginBottom: 7 },
+    cargoLinkBox: { padding: 16, borderRadius: 15, marginBottom: 15, alignItems: 'center' },
+    cargoLinkText: { fontSize: 12, fontWeight: '600', textDecorationLine: 'underline' }
+
 });
 
 export default ProfileScreen;

@@ -1,52 +1,37 @@
-// supabase/functions/payment-process/index.ts
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// CORS Ayarları (Uygulamanın erişebilmesi için)
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+serve(async (req) => {
+  const payload = await req.json();
+  const newRecord = payload.record;
 
-// YENİ YÖNTEM: "Deno.serve" (Import gerektirmez, doğrudan çalışır)
-Deno.serve(async (req) => {
-  
-  // 1. Preflight (CORS) kontrolü
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+
+  const { data: userData } = await supabase
+    .from('users')
+    .select('expo_push_token')
+    .eq('id', newRecord.receiver_id)
+    .single();
+
+  if (!userData?.expo_push_token) {
+    return new Response("Kullanıcının token'ı yok.", { status: 200 });
   }
 
-  try {
-    console.log("🟢 İstek sunucuya ulaştı!"); // Loglarda bunu kesin görmeliyiz
+  const message = {
+    to: userData.expo_push_token,
+    sound: 'default',
+    title: 'Yeni Bir Mesajın Var 🐾',
+    body: newRecord.text || '📷 Bir fotoğraf gönderildi.',
+  };
 
-    // Gelen veriyi okumaya çalışalım
-    const body = await req.json();
-    console.log("📦 Gelen Sipariş Verisi:", body);
+  await fetch('https://exp.host/--/api/v2/push/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(message),
+  });
 
-    // --- SANAL İŞLEM (Mock) ---
-    // 1 saniye bekleyelim (Gerçekçilik için)
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    const fakeOrderId = "TEST-" + Math.floor(Math.random() * 1000000);
-    
-    const responseData = {
-      status: 'success',
-      orderId: fakeOrderId,
-      message: 'Ödeme başarıyla alındı (Modern Deno)'
-    };
-    // ---------------------------
-
-    console.log("✅ Cevap gönderiliyor:", responseData);
-
-    return new Response(JSON.stringify(responseData), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    })
-
-  } catch (error) {
-    console.error("🔴 Sunucu Hatası:", error.message);
-    
-    return new Response(JSON.stringify({ status: 'error', message: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400,
-    })
-  }
+  return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json" } });
 })
