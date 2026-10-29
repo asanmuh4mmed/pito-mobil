@@ -4,24 +4,35 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage'; 
 import { COLORS } from '../constants/colors';
 import { AuthContext } from '../context/AuthContext';
-import { supabase } from '../lib/supabase'; // Kendi yoluna göre ayarla
+import { supabase } from '../lib/supabase'; 
 
 const { width, height } = Dimensions.get('window');
+
+// --- PITO YENİ RENK PALETİ ---
+const PITO_COLORS = {
+    primary: '#C5A059', 
+    primaryDark: '#B08D4B', 
+    navyBg: '#0B131E', 
+    navySurface: '#1A2533', 
+    navyLight: '#243447',
+    cream: '#F5F5DC',
+    white: '#FFFFFF',
+    grayText: '#A0AAB5',
+};
 
 const BUTTON_TEXTS = {
     TR: { skip: "Geç", next: "İleri", start: "Keşfetmeye Başla" },
     AU: { skip: "Skip", next: "Next", start: "Start Exploring" }
 };
 
-// 7 SAYFALIK DEV YEDEK PLAN (Veritabanı bağlanana kadar bunlar görünür)
+// YEDEK PLAN (Oyunlar sekmesi çıkarıldı, renkler Pito Gold olarak ayarlandı)
 const FALLBACK_SLIDES = [
-    { id: '1', title_tr: "Pito'ya Hoş Geldin!", desc_tr: "Evcil dostunun en sevimli anlarını Petsgram'da paylaş, diğer hayvanseverlerle sosyalleş.", title_au: "Welcome to Pito!", desc_au: "Share your pet's cutest moments on Petsgram and socialize.", icon: "images", color: "#FF6B6B" },
-    { id: '2', title_tr: "Yapay Zeka VetBot", desc_tr: "7/24 yanınızda! Yapay zekaya fotoğraf gönderin, anında ırk ve duygu durumu analizi alın.", title_au: "AI VetBot", desc_au: "Send photos to AI and get instant breed and mood analysis.", icon: "hardware-chip", color: "#4ECDC4" },
-    { id: '3', title_tr: "Sahiplen & Eş Bul", desc_tr: "Yeni bir can dostu sahiplenin, kayıp ilanları açın veya minik dostunuza uygun bir eş bulun.", title_au: "Adopt & Find Mate", desc_au: "Adopt a new furry friend, post lost pet ads, or find a mate.", icon: "paw", color: "#F7B731" },
-    { id: '4', title_tr: "Sağlık ve Aşı Takibi", desc_tr: "Aşı takvimlerini oluşturun, sağlık raporlarını dijital ortamda güvenle saklayın ve bildirim alın.", title_au: "Vaccine Tracker", desc_au: "Create vaccine schedules and securely store health reports.", icon: "medical", color: "#3DC1D3" },
-    { id: '5', title_tr: "Mağaza ve Bağış", desc_tr: "İhtiyaçlarınızı karşılarken, sokaktaki canlar için mama kumbarasına destek olun.", title_au: "Shop & Donate", desc_au: "Fulfill needs while supporting the food bank for stray animals.", icon: "cart", color: "#26de81" },
-    { id: '6', title_tr: "Oyunlar ve Eğlence", desc_tr: "Oyunlarımızla eğlenin, liderlik tablosunda yükselerek puanlar toplayın ve bağışa dönüştürün.", title_au: "Games & Fun", desc_au: "Have fun with games, climb the leaderboard and collect points.", icon: "game-controller", color: "#a55eea" },
-    { id: '7', title_tr: "Rozetler ve Premium", desc_tr: "Görevleri tamamlayıp rozetler kazanın, Premium avantajlarıyla uygulamanın sınırlarını kaldırın.", title_au: "Badges & Premium", desc_au: "Earn badges and remove limits with Premium advantages.", icon: "trophy", color: "#fd9644" }
+    { id: '1', title_tr: "Pito'ya Hoş Geldin!", desc_tr: "Evcil dostunun en sevimli anlarını Petsgram'da paylaş, diğer hayvanseverlerle sosyalleş.", title_au: "Welcome to Pito!", desc_au: "Share your pet's cutest moments on Petsgram and socialize.", icon: "images", color: PITO_COLORS.primary },
+    { id: '2', title_tr: "Yapay Zeka VetBot", desc_tr: "7/24 yanınızda! Yapay zekaya fotoğraf gönderin, anında ırk ve duygu durumu analizi alın.", title_au: "AI VetBot", desc_au: "Send photos to AI and get instant breed and mood analysis.", icon: "hardware-chip", color: PITO_COLORS.primary },
+    { id: '3', title_tr: "Sahiplen & Eş Bul", desc_tr: "Yeni bir can dostu sahiplenin, kayıp ilanları açın veya minik dostunuza uygun bir eş bulun.", title_au: "Adopt & Find Mate", desc_au: "Adopt a new furry friend, post lost pet ads, or find a mate.", icon: "paw", color: PITO_COLORS.primary },
+    { id: '4', title_tr: "Sağlık ve Aşı Takibi", desc_tr: "Aşı takvimlerini oluşturun, sağlık raporlarını dijital ortamda güvenle saklayın ve bildirim alın.", title_au: "Vaccine Tracker", desc_au: "Create vaccine schedules and securely store health reports.", icon: "medical", color: PITO_COLORS.primary },
+    { id: '5', title_tr: "Mağaza ve Bağış", desc_tr: "İhtiyaçlarınızı karşılarken, sokaktaki canlar için mama kumbarasına destek olun.", title_au: "Shop & Donate", desc_au: "Fulfill needs while supporting the food bank for stray animals.", icon: "cart", color: PITO_COLORS.primary },
+    { id: '6', title_tr: "Rozetler ve Premium", desc_tr: "Görevleri tamamlayıp rozetler kazanın, Premium avantajlarıyla uygulamanın sınırlarını kaldırın.", title_au: "Badges & Premium", desc_au: "Earn badges and remove limits with Premium advantages.", icon: "trophy", color: PITO_COLORS.primary }
 ];
 
 const OnboardingScreen = ({ navigation }) => {
@@ -29,14 +40,13 @@ const OnboardingScreen = ({ navigation }) => {
     const activeLang = country?.code || 'TR';
     const t = BUTTON_TEXTS[activeLang];
 
-    const [slides, setSlides] = useState(FALLBACK_SLIDES); // Başlangıçta fallback dolu gelsin
+    const [slides, setSlides] = useState(FALLBACK_SLIDES); 
     const [loading, setLoading] = useState(true);
     const [currentIndex, setCurrentIndex] = useState(0);
     
     const scrollX = useRef(new Animated.Value(0)).current;
     const slidesRef = useRef(null);
 
-    // Veritabanından verileri çek
     useEffect(() => {
         const fetchSlides = async () => {
             try {
@@ -46,7 +56,6 @@ const OnboardingScreen = ({ navigation }) => {
                     .order('order_index', { ascending: true }); 
 
                 if (error) throw error;
-                // Veritabanında en az 6-7 slayt varsa onu kullan, yoksa fallback kalsın.
                 if (data && data.length > 5) {
                     setSlides(data);
                 }
@@ -73,7 +82,8 @@ const OnboardingScreen = ({ navigation }) => {
             slidesRef.current.scrollToIndex({ index: currentIndex + 1 });
         } else {
             await AsyncStorage.setItem('hasSeenOnboarding', 'true');
-            navigation.replace('Login'); 
+            // ✅ MİSAFİR MODU AKTİF: Login yerine doğrudan Home ekranına yönlendirme yapıldı
+            navigation.replace('Home'); 
         }
     };
 
@@ -83,22 +93,18 @@ const OnboardingScreen = ({ navigation }) => {
         }
     };
 
-    // Modern Tasarımlı Slayt İçeriği
     const SlideItem = ({ item, index }) => {
         const title = activeLang === 'TR' ? item.title_tr : item.title_au;
         const description = activeLang === 'TR' ? item.desc_tr : item.desc_au;
 
-        // --- ANİMASYONLAR (PARALLAX & SCALE) ---
         const inputRange = [(index - 1) * width, index * width, (index + 1) * width];
         
-        // İkonun Büyüyüp Küçülmesi
         const scale = scrollX.interpolate({
             inputRange,
             outputRange: [0.5, 1, 0.5],
             extrapolate: 'clamp',
         });
 
-        // Metnin Yavaşça Ekrana Girmesi
         const translateY = scrollX.interpolate({
             inputRange,
             outputRange: [50, 0, 50],
@@ -113,13 +119,13 @@ const OnboardingScreen = ({ navigation }) => {
 
         return (
             <View style={styles.slideContainer}>
-                {/* Arka Plandaki Soft Dekoratif Daire */}
-                <View style={[styles.bgBlob, { backgroundColor: item.color + '10' }]} />
+                {/* Lüks Marka Arka Plan Süsü */}
+                <View style={styles.bgBlob} />
 
                 <Animated.View style={[styles.imageContainer, { transform: [{ scale }] }]}>
-                    <View style={[styles.iconCircle, { backgroundColor: item.color + '20', borderColor: item.color + '40' }]}>
-                        <View style={[styles.innerCircle, { backgroundColor: item.color }]}>
-                            <Ionicons name={item.icon} size={80} color="white" />
+                    <View style={styles.iconCircle}>
+                        <View style={styles.innerCircle}>
+                            <Ionicons name={item.icon || 'star'} size={80} color={PITO_COLORS.navyBg} />
                         </View>
                     </View>
                 </Animated.View>
@@ -152,7 +158,7 @@ const OnboardingScreen = ({ navigation }) => {
 
                     const backgroundColor = scrollX.interpolate({
                         inputRange,
-                        outputRange: ['#ccc', COLORS.primary, '#ccc'],
+                        outputRange: [PITO_COLORS.navyLight, PITO_COLORS.primary, PITO_COLORS.navyLight],
                         extrapolate: 'clamp',
                     });
 
@@ -170,7 +176,7 @@ const OnboardingScreen = ({ navigation }) => {
     if (loading) {
         return (
             <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-                <ActivityIndicator size="large" color={COLORS.primary} />
+                <ActivityIndicator size="large" color={PITO_COLORS.primary} />
             </View>
         );
     }
@@ -217,7 +223,7 @@ const OnboardingScreen = ({ navigation }) => {
                         {currentIndex === slides.length - 1 ? t.start : t.next}
                     </Text>
                     {currentIndex !== slides.length - 1 && (
-                        <Ionicons name="arrow-forward" size={20} color="white" style={{ marginLeft: 5 }} />
+                        <Ionicons name="arrow-forward" size={20} color={PITO_COLORS.navyBg} style={{ marginLeft: 5 }} />
                     )}
                 </TouchableOpacity>
             </View>
@@ -228,7 +234,7 @@ const OnboardingScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FAFAFA', // Daha modern kırık beyaz arka plan
+        backgroundColor: PITO_COLORS.navyBg, 
     },
     bgBlob: {
         position: 'absolute',
@@ -236,6 +242,7 @@ const styles = StyleSheet.create({
         width: width * 1.5,
         height: width * 1.5,
         borderRadius: width,
+        backgroundColor: PITO_COLORS.navySurface,
         zIndex: -1,
     },
     slideContainer: {
@@ -257,6 +264,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         borderWidth: 2,
+        borderColor: 'rgba(197, 160, 89, 0.2)', // Soft Altın Çerçeve
+        backgroundColor: 'rgba(197, 160, 89, 0.05)', 
     },
     innerCircle: {
         width: 160,
@@ -264,11 +273,12 @@ const styles = StyleSheet.create({
         borderRadius: 80,
         justifyContent: 'center',
         alignItems: 'center',
-        shadowColor: "#000",
+        backgroundColor: PITO_COLORS.primary,
+        shadowColor: PITO_COLORS.primary,
         shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.2,
-        shadowRadius: 15,
-        elevation: 10,
+        shadowOpacity: 0.3,
+        shadowRadius: 20,
+        elevation: 15,
     },
     textContainer: {
         flex: 0.4,
@@ -278,14 +288,14 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 30,
         fontWeight: '900',
-        color: '#2d3436',
+        color: PITO_COLORS.cream,
         marginBottom: 15,
         textAlign: 'center',
         letterSpacing: 0.5,
     },
     description: {
         fontSize: 16,
-        color: '#636e72',
+        color: PITO_COLORS.grayText,
         textAlign: 'center',
         lineHeight: 26,
         paddingHorizontal: 25,
@@ -318,29 +328,29 @@ const styles = StyleSheet.create({
     skipText: {
         fontSize: 16,
         fontWeight: '700',
-        color: '#b2bec3',
+        color: PITO_COLORS.grayText,
     },
     nextButton: {
-        backgroundColor: COLORS.primary,
+        backgroundColor: PITO_COLORS.primary,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 15,
         paddingHorizontal: 25,
         borderRadius: 30,
-        shadowColor: COLORS.primary,
+        shadowColor: PITO_COLORS.primary,
         shadowOffset: { width: 0, height: 6 },
         shadowOpacity: 0.4,
         shadowRadius: 8,
         elevation: 6,
     },
     startButton: {
-        paddingHorizontal: 35, // Son slaytta buton daha geniş olsun
+        paddingHorizontal: 35, 
     },
     nextButtonText: {
         fontSize: 18,
-        fontWeight: '800',
-        color: 'white',
+        fontWeight: '900',
+        color: PITO_COLORS.navyBg,
         letterSpacing: 0.5,
     }
 });

@@ -1,7 +1,48 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '../lib/supabase'; // ✅ Supabase Bağlantısı
 import { AuthContext } from './AuthContext';
 import { Audio } from 'expo-av'; 
+
+// Only known product columns are sent. Omitted fields stay unchanged on updates.
+const has = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
+const money = value => {
+    const text = String(value ?? '').trim().replace(',', '.');
+    if (!/^\d+(\.\d{1,2})?$/.test(text)) throw new Error('Fiyat geçerli, pozitif bir tutar olmalı (ör. 149,90).');
+    const number = Number(text);
+    if (!Number.isFinite(number) || number <= 0) throw new Error('Fiyat sıfırdan büyük olmalı.');
+    return number;
+};
+const productPayload = (input, creating = false) => {
+    const out = {};
+    for (const key of ['name', 'description', 'category', 'colors', 'sizes']) {
+        if (has(input, key)) out[key] = input[key];
+    }
+    if (creating || has(input, 'name')) {
+        const names = typeof input.name === 'object' && input.name !== null ? Object.values(input.name) : [input.name];
+        if (!names.some(n => typeof n === 'string' && n.trim())) throw new Error('Ürün adı gerekli.');
+    }
+    if (creating || has(input, 'price')) out.price = money(input.price);
+    if (has(input, 'discountPrice') || has(input, 'discount_price')) {
+        const discount = has(input, 'discountPrice') ? input.discountPrice : input.discount_price;
+        out.discount_price = discount === '' || discount == null ? null : money(discount);
+    }
+    const fields = { isFeatured: 'is_featured', isBestSeller: 'is_best_seller', isNewArrival: 'is_new_arrival', isDiscount: 'is_discount', isLimited: 'is_limited', isEco: 'is_eco', targetRegion: 'target_region' };
+    for (const [ui, db] of Object.entries(fields)) {
+        if (has(input, ui)) out[db] = input[ui];
+        else if (has(input, db)) out[db] = input[db];
+    }
+    if (creating && !out.target_region) out.target_region = 'GLOBAL';
+    if (has(input, 'media')) {
+        if (!Array.isArray(input.media)) throw new Error('Ürün görselleri geçersiz.');
+        out.image_urls = input.media.map(m => m.uri);
+    } else if (has(input, 'image_urls')) out.image_urls = input.image_urls;
+    if (has(out, 'image_urls') && (!Array.isArray(out.image_urls) || out.image_urls.some(uri => typeof uri !== 'string' || !/^https?:\/\//i.test(uri)))) {
+        throw new Error('Görseller önce yüklenmeli; telefona ait yerel dosya adresleri ürün olarak kaydedilemez.');
+    }
+    return out;
+};
+const localizedText = (value, language) => value && typeof value === 'object'
+    ? String(value[language] || value.TR || value.AU || value.EN || '') : String(value ?? '');
 
 export const ShopContext = createContext();
 
@@ -13,6 +54,12 @@ export const ShopProvider = ({ children }) => {
     const [unreadOrderCount, setUnreadOrderCount] = useState(0);
     const [allProducts, setAllProducts] = useState([]);
     const [favorites, setFavorites] = useState([]); 
+
+    const catalogVersion = useRef(0);
+    const fetchSequence = useRef(0);
+    const pendingWrites = useRef(new Set());
+    const [productsLoading, setProductsLoading] = useState(false);
+    const [productsError, setProductsError] = useState(null);
 
     // 1. Uygulama açılınca ürünleri çek
     useEffect(() => {
@@ -34,7 +81,7 @@ export const ShopProvider = ({ children }) => {
     const playOrderSound = async () => {
         try {
             const { sound } = await Audio.Sound.createAsync(
-                require('../../assets/paw.mp3') 
+                require('../../assets/sounds/paw.mp3') 
             );
             await sound.playAsync();
         } catch (error) { 
@@ -43,26 +90,42 @@ export const ShopProvider = ({ children }) => {
     };
 
     // ✅ VERİTABANINDAN ÜRÜNLERİ ÇEK
-    const fetchProducts = async () => {
+    const fetchProducts = useCallback(async ({ throwOnError = false } = {}) => {
+        const request = ++fetchSequence.current;
+        const version = catalogVersion.current;
+        setProductsLoading(true);
         try {
-            const { data, error } = await supabase
-                .from('products')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
-            setAllProducts(data || []);
-        } catch (e) {
-            console.log("Ürün çekme hatası:", e.message);
+            // Pagination avoids silently dropping products beyond the server's row limit.
+            const rows = [];
+            const pageSize = 500;
+            for (let offset = 0; ; offset += pageSize) {
+                const { data, error } = await supabase.from('products').select('*')
+                    .order('created_at', { ascending: false }).order('id', { ascending: false })
+                    .range(offset, offset + pageSize - 1);
+                if (error) throw error;
+                rows.push(...(data || []));
+                if (!data || data.length < pageSize) break;
+            }
+            // A fetch started before a successful edit must not undo that edit.
+            if (request === fetchSequence.current && version === catalogVersion.current) {
+                setAllProducts([...new Map(rows.map(row => [String(row.id), row])).values()]);
+                setProductsError(null);
+            }
+            return { success: true };
+        } catch (error) {
+            if (request === fetchSequence.current) setProductsError(error.message);
+            if (throwOnError) throw error;
+            return { success: false, error: error.message };
+        } finally {
+            if (request === fetchSequence.current) setProductsLoading(false);
         }
-    };
+    }, []);
 
     // ✅ VERİTABANINDAN SİPARİŞLERİ ÇEK
-    const fetchOrders = async () => {
+    const fetchOrders = async ({ throwOnError = false } = {}) => {
         if (!user) return;
         try {
-            const ADMIN_EMAILS = ['admin@pito.com', 'asanmuh4mmed@gmail.com', 'petspito@gmail.com'];
-            const isAdmin = ADMIN_EMAILS.includes(user.email);
+            const isAdmin = user.is_admin === true;
 
             let query = supabase
                 .from('orders')
@@ -92,6 +155,7 @@ export const ShopProvider = ({ children }) => {
             setOrders(formattedOrders || []);
         } catch (e) {
             console.log("Sipariş çekme hatası:", e.message);
+            if (throwOnError) throw e;
         }
     };
 
@@ -113,81 +177,63 @@ export const ShopProvider = ({ children }) => {
         }
     };
 
-    // ✅ ÜRÜN EKLE (Admin)
-    const addProduct = async (newProduct) => {
-        try {
-            const { data, error } = await supabase
-                .from('products')
-                .insert([{
-                    name: newProduct.name,
-                    description: newProduct.description,
-                    price: parseFloat(newProduct.price),
-                    category: newProduct.category,
-                    image_urls: newProduct.media ? newProduct.media.map(m => m.uri) : [],
-                    stock: parseInt(newProduct.stock || 0),
-                    target_region: newProduct.targetRegion || 'GLOBAL'
-                }])
-                .select();
-
+    // Client guard complements (does not replace) products-table RLS policies.
+    const productWrite = async (key, operation) => {
+        if (user?.is_admin !== true) throw new Error('Bu işlem için yönetici yetkisi gerekli.');
+        if (pendingWrites.current.has(key)) throw new Error('Bu ürün için bir işlem zaten devam ediyor.');
+        pendingWrites.current.add(key);
+        try { return await operation(); }
+        finally { pendingWrites.current.delete(key); }
+    };
+    const mergeSavedProduct = row => {
+        catalogVersion.current += 1;
+        setAllProducts(previous => {
+            const exists = previous.some(p => String(p.id) === String(row.id));
+            return exists ? previous.map(p => String(p.id) === String(row.id) ? row : p) : [row, ...previous];
+        });
+    };
+    const addProduct = async newProduct => productWrite('create', async () => {
+        const payload = productPayload(newProduct, true);
+        if (payload.discount_price != null && payload.discount_price >= payload.price) throw new Error('İndirimli fiyat normal fiyattan düşük olmalı.');
+        const { data, error } = await supabase.from('products').insert([payload]).select('*').single();
+        if (error) throw error;
+        if (!data?.id) throw new Error('Ürün kaydı doğrulanamadı. Tekrar eklemeden önce listeyi yenileyin.');
+        mergeSavedProduct(data);
+        return data;
+    });
+    const updateProduct = async (id, updates) => productWrite(String(id), async () => {
+        if (id == null) throw new Error('Ürün kimliği gerekli.');
+        const payload = productPayload(updates);
+        if (!Object.keys(payload).length) throw new Error('Güncellenecek ürün alanı yok.');
+        // Read the current prices when a partial price update is requested.
+        if (has(payload, 'price') || has(payload, 'discount_price')) {
+            const { data: current, error } = await supabase.from('products').select('price,discount_price').eq('id', id).single();
             if (error) throw error;
-            
-            if (data) {
-                setAllProducts([data[0], ...allProducts]);
-            }
-        } catch (e) {
-            console.log("Ürün ekleme hatası:", e.message);
+            const price = payload.price ?? Number(current.price);
+            const discount = has(payload, 'discount_price') ? payload.discount_price : current.discount_price;
+            if (discount != null && Number(discount) >= price) throw new Error('İndirimli fiyat normal fiyattan düşük olmalı.');
         }
-    };
+        const { data, error } = await supabase.from('products').update(payload).eq('id', id).select('*').single();
+        if (error) throw error;
+        if (!data?.id) throw new Error('Güncelleme doğrulanamadı. Yetkinizi ve ürün kaydını kontrol edin.');
+        mergeSavedProduct(data);
+        return data;
+    });
+    const deleteProduct = async id => productWrite(String(id), async () => {
+        if (id == null) throw new Error('Ürün kimliği gerekli.');
+        const { data, error } = await supabase.from('products').delete().eq('id', id).select('id');
+        if (error) throw error;
+        if (!data?.some(row => String(row.id) === String(id))) throw new Error('Silme doğrulanamadı. Ürün bulunamadı veya silme yetkiniz yok.');
+        catalogVersion.current += 1;
+        setAllProducts(previous => previous.filter(p => String(p.id) !== String(id)));
+        return { success: true, id };
+    });
 
-    // ✅ ÜRÜN GÜNCELLE
-    const updateProduct = async (id, updatedData) => {
-        try {
-            let dataToSend = { ...updatedData };
-            if (updatedData.media) {
-                dataToSend.image_urls = updatedData.media.map(m => m.uri);
-                delete dataToSend.media;
-            }
-
-            const { error } = await supabase
-                .from('products')
-                .update(dataToSend)
-                .eq('id', id);
-
-            if (error) throw error;
-            setAllProducts(allProducts.map(p => p.id === id ? { ...p, ...updatedData } : p));
-        } catch (e) {
-            console.log("Güncelleme hatası:", e.message);
-        }
-    };
-
-    // ✅ ÜRÜN SİL
-    const deleteProduct = async (id) => {
-        try {
-            const { error } = await supabase
-                .from('products')
-                .delete()
-                .eq('id', id);
-
-            if (error) {
-                console.error("Supabase delete error:", error.message);
-                throw error;
-            }
-
-            setAllProducts(prevProducts => prevProducts.filter(p => p.id !== id));
-            console.log("Ürün başarıyla silindi:", id);
-        } catch (e) {
-            console.log("Silme hatası:", e.message);
-            alert("Ürün silinemedi: " + e.message);
-        }
-    };
-
-    // 🚀 SİPARİŞ OLUŞTUR (GÜVENLİK GÜNCELLEMESİ YAPILDI)
+    // 🚀 SİPARİŞ OLUŞTUR
     const addOrder = async (newOrder) => {
         try {
             console.log("Sipariş veritabanına işleniyor ve güvenlik doğrulaması yapılıyor...");
 
-            // 1. GÜVENLİK: İstemciden gelen fiyatlara güvenmiyoruz. 
-            // Ürün ID'lerini alıp gerçek fiyatları Supabase'den çekiyoruz.
             const productIds = newOrder.items.map(item => item.product_id || item.id);
             
             const { data: realProducts, error: productError } = await supabase
@@ -201,29 +247,25 @@ export const ShopProvider = ({ children }) => {
             let secureTotalPrice = 0;
             const secureOrderItemsData = [];
 
-            // 2. Sepetteki her ürünün gerçek fiyatını hesapla
             newOrder.items.forEach(item => {
-                const dbProduct = realProducts.find(p => p.id === (item.product_id || item.id));
+                const dbProduct = realProducts.find(p => String(p.id) === String(item.product_id || item.id));
                 if (!dbProduct) throw new Error(`Geçersiz ürün tespit edildi: ID ${item.product_id || item.id}`);
 
-                // İndirimli fiyatı varsa onu, yoksa normal fiyatı al
                 const rawPrice = dbProduct.discount_price || dbProduct.price;
                 let actualPrice = parseFloat(rawPrice);
 
                 const quantity = item.quantity || 1;
                 secureTotalPrice += (actualPrice * quantity);
 
-                // Veritabanı için güvenli detay satırını oluştur
                 secureOrderItemsData.push({
                     product_id: dbProduct.id,
                     product_name: typeof dbProduct.name === 'object' ? (dbProduct.name[activeLang] || dbProduct.name.TR) : dbProduct.name,
-                    price: actualPrice, // Telefondan geleni DEĞİL, veritabanından çekileni yazıyoruz!
+                    price: actualPrice, 
                     quantity: quantity,
                     image: dbProduct.image_urls && dbProduct.image_urls.length > 0 ? dbProduct.image_urls[0] : null
                 });
             });
 
-            // 3. Ana Siparişi Ekle (Güvenli Toplam Tutar İle)
             const { data: orderData, error: orderError } = await supabase
                 .from('orders')
                 .insert([{
@@ -231,7 +273,7 @@ export const ShopProvider = ({ children }) => {
                     full_name: newOrder.user_name || newOrder.userName, 
                     phone: newOrder.user_phone || newOrder.userPhone,
                     address: newOrder.user_address || newOrder.userAddress,
-                    total_price: secureTotalPrice, // ✅ GÜVENLİ TUTAR BURADA
+                    total_price: secureTotalPrice, 
                     status: 'Hazırlanıyor'
                 }])
                 .select()
@@ -239,7 +281,6 @@ export const ShopProvider = ({ children }) => {
 
             if (orderError) throw orderError;
 
-            // 4. Sipariş Detaylarını Ekle (order_id'yi iliştirerek)
             const finalItemsToInsert = secureOrderItemsData.map(item => ({
                 ...item,
                 order_id: orderData.id 
@@ -250,51 +291,42 @@ export const ShopProvider = ({ children }) => {
                 .insert(finalItemsToInsert);
 
             if (itemsError) {
-                // Detay eklenemezse ana siparişi silip işlemi iptal et (Rollback)
                 await supabase.from('orders').delete().eq('id', orderData.id);
                 throw itemsError;
             }
 
-            // 5. UI Güncelle (Kullanıcının gördüğü listeye ekle)
             const fullOrder = { ...orderData, items: finalItemsToInsert };
-            setOrders([fullOrder, ...orders]);
+            setOrders(previous => [fullOrder, ...previous]);
             setUnreadOrderCount(prev => prev + 1);
             
-            await playOrderSound(); 
+            // Checkout handles the optional success sound. 
 
-            return true; // Başarılı
-
+            return orderData.id; 
         } catch (e) {
             console.log("Sipariş oluşturma hatası:", e.message);
-            return false; // Başarısız
+            return false; 
         }
     };
 
     // ✅ SİPARİŞ DURUMU GÜNCELLE
     const updateOrder = async (orderId, updates) => {
-        try {
-            const { error } = await supabase
-                .from('orders')
-                .update(updates)
-                .eq('id', orderId);
-
-            if (error) throw error;
-
-            setOrders(orders.map(o => o.id === orderId ? { ...o, ...updates } : o));
-        } catch (e) {
-            console.log("Sipariş güncelleme hatası:", e);
-        }
+        if (user?.is_admin !== true) throw new Error('Yönetici yetkisi gerekli.');
+        const allowed = ['Sipariş Onaylandı', 'Sipariş Hazırlanıyor', 'Sipariş Kargoya Verildi', 'Sipariş Teslim Edildi', 'Sipariş İptal Edildi'];
+        if (!allowed.includes(updates?.status)) throw new Error('Geçersiz sipariş durumu.');
+        const { data, error } = await supabase.from('orders').update({ status: updates.status }).eq('id', orderId).select('id,status').single();
+        if (error) throw error;
+        if (!data?.id) throw new Error('Güncelleme doğrulanamadı. Veritabanı yetkilerini kontrol edin.');
+        setOrders(previous => previous.map(order => String(order.id) === String(orderId) ? { ...order, status: data.status } : order));
+        return data;
     };
 
-    // ✅ SİPARİŞ SİL
-    const deleteOrder = async (orderId) => {
-        try {
-            const { error } = await supabase.from('orders').delete().eq('id', orderId);
-            if (error) throw error;
-            setOrders(orders.filter(o => o.id !== orderId));
-        } catch (e) {
-            console.log("Sipariş silme hatası:", e);
-        }
+    const deleteOrder = async orderId => {
+        if (user?.is_admin !== true) throw new Error('Yönetici yetkisi gerekli.');
+        const { data, error } = await supabase.from('orders').delete().eq('id', orderId).select('id');
+        if (error) throw error;
+        if (!data?.some(order => String(order.id) === String(orderId))) throw new Error('Silme doğrulanamadı. Sipariş bulunamadı veya silme yetkisi yok.');
+        setOrders(previous => previous.filter(order => String(order.id) !== String(orderId)));
+        return { success: true, id: orderId };
     };
 
     // ✅ FAVORİ İŞLEMLERİ
@@ -361,26 +393,42 @@ export const ShopProvider = ({ children }) => {
         return orders.some(order => 
             order.user_id === userId && 
             Array.isArray(order.items) && 
-            order.items.some(item => item.product_id === productId || item.id === productId)
+            order.items.some(item => String(item.product_id) === String(productId) || String(item.id) === String(productId))
         );
     };
 
-    const localizedProducts = allProducts.map(p => ({
+    // ✅ UI İÇİN VERİ ÇEVİRİMİ (SNAKE_CASE -> CAMELCASE)
+    const localizedProducts = useMemo(() => allProducts.map(p => ({
         ...p,
-        name: (p.name && typeof p.name === 'object' && p.name[activeLang]) ? p.name[activeLang] : p.name,
-        description: (p.description && typeof p.description === 'object' && p.description[activeLang]) ? p.description[activeLang] : p.description,
+        name: localizedText(p.name, activeLang),
+        rawName: p.name,
+        description: localizedText(p.description, activeLang),
+        rawDescription: p.description,
         img: p.image_urls && p.image_urls.length > 0 ? p.image_urls[0] : null,
-        targetRegion: p.target_region || 'GLOBAL' 
-    }));
+        targetRegion: p.target_region || 'GLOBAL',
+        
+        discountPrice: p.discount_price !== undefined ? p.discount_price : p.discountPrice,
+        isFeatured: p.is_featured ?? p.isFeatured,
+        isBestSeller: p.is_best_seller ?? p.isBestSeller,
+        isNewArrival: p.is_new_arrival ?? p.isNewArrival,
+        isDiscount: p.is_discount ?? p.isDiscount,
+        isLimited: p.is_limited ?? p.isLimited,
+        isEco: p.is_eco ?? p.isEco,
+        colors: p.colors || [],
+        sizes: p.sizes || []
+    })), [allProducts, activeLang]);
 
     return (
         <ShopContext.Provider value={{ 
-            products: localizedProducts, 
+            products: localizedProducts,
+            productsLoading,
+            productsError, 
             addProduct, 
             updateProduct, 
             deleteProduct, 
             fetchProducts, 
-            orders, 
+            orders,
+            fetchOrders,
             addOrder, 
             updateOrder, 
             deleteOrder, 

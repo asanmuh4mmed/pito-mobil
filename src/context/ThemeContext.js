@@ -1,15 +1,15 @@
 import React, { createContext, useState, useEffect } from 'react';
-import { useColorScheme } from 'react-native';
+// useColorScheme'e artık ihtiyacımız yok, sildik.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
-  // Telefonun kendi ayarını varsayılan olarak al (Karanlık mı Aydınlık mı?)
-  const deviceTheme = useColorScheme(); 
-  const [isDarkMode, setIsDarkMode] = useState(deviceTheme === 'dark');
+  // 1. DİKKAT: Başlangıç değerini doğrudan 'true' (Karanlık Mod) yapıyoruz.
+  // Bu sayede uygulama ekrana gelir gelmez beyaz patlaması yapmaz, siyah başlar.
+  const [isDarkMode, setIsDarkMode] = useState(true);
 
-  // Renk Paleti
+  // Senin belirlediğin Renk Paleti (Aynen korundu)
   const theme = {
     background: isDarkMode ? '#121212' : '#F8F9FA',
     cardBg: isDarkMode ? '#1E1E1E' : '#FFFFFF',
@@ -28,8 +28,15 @@ export const ThemeProvider = ({ children }) => {
   const loadTheme = async () => {
     try {
       const storedTheme = await AsyncStorage.getItem('theme');
+      
       if (storedTheme !== null) {
+        // Eğer kullanıcı daha önceden ayarlardan değiştirip kaydettiyse, onun tercihini uygula
         setIsDarkMode(storedTheme === 'dark');
+      } else {
+        // 2. İLK GİRİŞ: Hafızada kayıt yoksa (uygulamayı ilk yükleyişiyse)
+        // Karanlık modu varsayılan yap ve hafızaya kaydet.
+        setIsDarkMode(true);
+        await AsyncStorage.setItem('theme', 'dark');
       }
     } catch (e) {
       console.log("Tema yükleme hatası", e);

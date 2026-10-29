@@ -1,71 +1,91 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import * as Notifications from 'expo-notifications'; // 🔔 BİLDİRİM KÜTÜPHANESİ EKLENDİ
+import React, { createContext, useState, useEffect, useContext, useRef } from 'react';
+import * as Notifications from 'expo-notifications';
+import * as FileSystem from 'expo-file-system/legacy'; 
 import { supabase } from '../lib/supabase'; 
 import { AuthContext } from './AuthContext'; 
 import { playSound } from '../utils/SoundManager';
+import { sendPushNotification } from '../utils/sendPushNotification';
 
-// --- BİLDİRİM AYARLARI (Uygulama açıkken bildirimin nasıl görüneceği) ---
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true, // Ekranın üstünden düşsün
-    shouldPlaySound: true, // Expo'nun kendi sesi (SoundManager ile de destekliyoruz)
+    shouldShowAlert: true, 
+    shouldPlaySound: true, 
     shouldSetBadge: true,
   }),
 });
+
+// React Native uploads must use the image bytes rather than a Blob.
+const decodeChatImage = (base64) => {
+  const binary = atob(base64.replace(/^data:[^,]*,/, '').replace(/\s/g, ''));
+  if (!binary.length) throw new Error('Fotoğraf dosyası boş.');
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+};
+
+const getChatImageFormat = (buffer, asset, uri) => {
+  const bytes = new Uint8Array(buffer);
+  if (bytes[0] === 0xFF && bytes[1] === 0xD8) return { ext: 'jpg', mime: 'image/jpeg' };
+  if (bytes[0] === 0x89 && bytes[1] === 0x50) return { ext: 'png', mime: 'image/png' };
+  if (bytes[0] === 0x47 && bytes[1] === 0x49) return { ext: 'gif', mime: 'image/gif' };
+  const header = String.fromCharCode(...bytes.slice(0, 16));
+  if (header.startsWith('RIFF') && header.slice(8, 12) === 'WEBP') return { ext: 'webp', mime: 'image/webp' };
+  if (header.includes('ftyphei') || header.includes('ftypmif1')) return { ext: 'heic', mime: 'image/heic' };
+  const extension = (asset?.fileName || uri).split('?')[0].split('.').pop().toLowerCase();
+  const formats = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', heic: 'image/heic', heif: 'image/heif' };
+  const ext = Object.keys(formats).find(key => formats[key] === asset?.mimeType) || extension;
+  if (!formats[ext]) throw new Error('Fotoğraf formatı belirlenemedi. JPG veya PNG seçin.');
+  return { ext, mime: formats[ext] };
+};
 
 export const ChatContext = createContext();
 
 export const ChatProvider = ({ children }) => {
   const { user } = useContext(AuthContext);
   const [conversations, setConversations] = useState([]);
+  const deletedThroughRef = useRef({});
+  const accountIdRef = useRef(user?.id);
+  accountIdRef.current = user?.id;
+  useEffect(() => { deletedThroughRef.current = {}; }, [user?.id]);
 
-  // 🔄 1. Uygulama açıldığında bildirim izni al, mesajları çek ve dinlemeyi başlat
   useEffect(() => {
     if (!user) {
       setConversations([]);
       return;
     }
 
-    // Bildirim izni isteme
     requestNotificationPermissions();
-
     fetchMessages();
 
-    // 📡 CANLI DİNLEME (Realtime)
     const channel = supabase
-      .channel('db-messages')
+      .channel('public-messages-channel') 
       .on('postgres_changes', { 
-        event: '*', 
+        event: 'INSERT', 
         schema: 'public', 
         table: 'messages' 
       }, (payload) => {
         
-        // ✨ YENİ: EĞER BİZE YENİ BİR MESAJ GELDİYSE BİLDİRİM GÖSTER VE SES ÇAL
-        if (payload.eventType === 'INSERT') {
-            const newMessage = payload.new;
-            // Eğer mesajı gönderen biz değilsek ve alıcı bizsek
-            if (newMessage.sender_id !== user.id && newMessage.receiver_id === user.id) {
-                // Sesi çal (Yeni noti.mp3 sesini kullanıyoruz)
-                playSound('noti');
-                
-                // Üstten düşen lokal bildirimi tetikle
-                triggerLocalNotification(
-                    "PITO'dan Yeni Mesaj 🐾", 
-                    newMessage.image ? "📷 Fotoğraf gönderdi." : newMessage.text
-                );
-            }
+        const newMessage = payload.new;
+        
+        if (newMessage.sender_id !== user.id && newMessage.receiver_id === user.id) {
+            playSound('noti');
+            triggerLocalNotification(
+                "PITO'dan Yeni Mesaj 🐾", 
+                newMessage.image ? "📷 Fotoğraf gönderdi." : newMessage.text
+            );
         }
 
-        fetchMessages(); // Listeyi tazele
+        fetchMessages(); 
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log("Supabase Realtime Durumu:", status); 
+      });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user]);
+  }, [user?.id]);
 
-  // 🔔 BİLDİRİM İZNİ VE GÖNDERME FONKSİYONLARI
   const requestNotificationPermissions = async () => {
     const { status } = await Notifications.requestPermissionsAsync();
     if (status !== 'granted') {
@@ -80,13 +100,22 @@ export const ChatProvider = ({ children }) => {
         body: body,
         sound: true, 
       },
-      trigger: null, // null demek "hemen şimdi göster" demek
+      trigger: null, 
     });
   };
 
-  // ✅ VERİTABANINDAN MESAJLARI ÇEK VE SOHBET LİSTESİ OLUŞTUR
   const fetchMessages = async () => {
+    const requestedUserId = user?.id;
+    if (!requestedUserId) return;
     try {
+      const { data: hiddenRooms, error: hiddenError } = await supabase
+        .from('chat_history_deletions').select('room_id, deleted_through').eq('user_id', requestedUserId);
+      if (hiddenError) throw hiddenError;
+      if (accountIdRef.current !== requestedUserId) return;
+      for (const row of hiddenRooms || []) {
+        const previous = deletedThroughRef.current[row.room_id];
+        if (!previous || Date.parse(row.deleted_through) > Date.parse(previous)) deletedThroughRef.current[row.room_id] = row.deleted_through;
+      }
       const { data, error } = await supabase
         .from('messages')
         .select(`
@@ -101,7 +130,10 @@ export const ChatProvider = ({ children }) => {
 
       const chats = {};
       
+      if (accountIdRef.current !== requestedUserId) return;
       data.forEach(msg => {
+        const cutoff = deletedThroughRef.current[msg.room_id];
+        if (cutoff && Date.parse(msg.created_at) <= Date.parse(cutoff)) return;
         if (!chats[msg.room_id]) {
           const isSender = msg.sender_id === user.id;
           const partner = isSender ? msg.receiver : msg.sender;
@@ -147,97 +179,88 @@ export const ChatProvider = ({ children }) => {
     }
   };
 
-  // 📤 MESAJ GÖNDER
-  const sendMessage = async (chatId, sender, receiver, text, listingId, listingName, image = null, type = 'text', relatedId = null) => {
-    if (!user) return;
-
-    // Kendi gönderdiğimiz mesajlarda da ses çalıyoruz (Yeni noti.mp3 sesini kullanıyoruz)
+  const sendMessage = async (chatId, sender, receiver, text, listingId, listingName, image = null, type = 'text', relatedId = null, imageAsset = null) => {
+    if (!user || !sender?.id || !receiver?.id) return { success: false, error: 'Mesaj için giriş yapmalısınız.' };
     playSound('noti');
-
     const room_id = chatId || [sender.id, receiver.id].sort().join('_');
-    
     const tempMessage = {
-      id: Date.now(), 
-      text: text || '',
-      image: image, 
-      type: image ? 'image' : 'text',
-      senderId: sender.id,
-      createdAt: new Date().toISOString(),
-      isRead: false,
-      reactions: []
+      id: `pending_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      text: text || '', image, type: image ? 'image' : 'text', senderId: sender.id,
+      createdAt: new Date().toISOString(), isRead: false, reactions: [], status: 'sending'
     };
-
-    setConversations(prev => {
-      const updated = [...prev];
-      const chatIndex = updated.findIndex(c => c.id === room_id);
-
-      if (chatIndex > -1) {
-        updated[chatIndex].messages.push(tempMessage);
-        updated[chatIndex].lastMessage = image ? '📷 Fotoğraf' : text;
-        updated[chatIndex].lastMessageDate = tempMessage.createdAt;
-      } else {
-        updated.push({
-          id: room_id,
-          participants: [
-            { id: sender.id, name: sender.fullname, avatar: sender.avatar },
-            { id: receiver.id, name: receiver.fullname, avatar: receiver.avatar }
-          ],
-          messages: [tempMessage],
-          lastMessage: image ? '📷 Fotoğraf' : text,
-          lastMessageDate: tempMessage.createdAt
-        });
-      }
-      return updated.sort((a, b) => new Date(b.lastMessageDate) - new Date(a.lastMessageDate));
-    });
-
+    const participants = [
+      { id: sender.id, name: sender.fullname, avatar: sender.avatar },
+      { id: receiver.id, name: receiver.fullname, avatar: receiver.avatar }
+    ];
+    const updateRoom = (prev, messages) => {
+      const cutoff = deletedThroughRef.current[room_id];
+      if (cutoff) messages = messages.filter(message => Date.parse(message.createdAt) > Date.parse(cutoff));
+      if (!messages.length) return prev.filter(chat => chat.id !== room_id);
+      const existing = prev.find(chat => chat.id === room_id);
+      const last = messages[messages.length - 1];
+      const room = { ...existing, id: room_id, participants: existing?.participants || participants,
+        messages, lastMessage: last ? (last.image ? '📷 Fotoğraf' : last.text || '') : '',
+        lastMessageDate: last?.createdAt || '' };
+      return [...prev.filter(chat => chat.id !== room_id), room]
+        .sort((a, b) => new Date(b.lastMessageDate || 0) - new Date(a.lastMessageDate || 0));
+    };
+    setConversations(prev => updateRoom(prev, [...(prev.find(chat => chat.id === room_id)?.messages || []), tempMessage]));
+    let insertedMsg;
+    let finalImageUrl = image;
     try {
-      let finalImageUrl = image;
-
-      if (image && image.startsWith('file://')) {
-          const ext = image.split('.').pop() || 'jpeg';
-          const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-          
-          const response = await fetch(image);
-          const blob = await response.blob();
-
-          const { error: uploadError } = await supabase
-              .storage
-              .from('chat-images')
-              .upload(fileName, blob, {
-                  contentType: `image/${ext === 'png' ? 'png' : 'jpeg'}`,
-              });
-
-          if (uploadError) {
-              console.log("Resim yüklenemedi:", uploadError);
-              throw uploadError;
-          }
-
-          const { data: publicUrlData } = supabase.storage.from('chat-images').getPublicUrl(fileName);
-          finalImageUrl = publicUrlData.publicUrl;
+      if (image && !/^https?:\/\//i.test(image)) {
+        const base64 = imageAsset?.base64 || await FileSystem.readAsStringAsync(image, { encoding: FileSystem.EncodingType.Base64 });
+        const bytes = decodeChatImage(base64);
+        const format = getChatImageFormat(bytes, imageAsset, image);
+        const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}.${format.ext}`;
+        const { error: uploadError } = await supabase.storage.from('chat-images')
+          .upload(fileName, bytes, { contentType: format.mime, upsert: false });
+        if (uploadError) throw uploadError;
+        const { data } = supabase.storage.from('chat-images').getPublicUrl(fileName);
+        if (!data?.publicUrl) throw new Error('Fotoğraf adresi oluşturulamadı.');
+        finalImageUrl = data.publicUrl;
       }
-
-      const { error } = await supabase
-        .from('messages')
-        .insert([{
-          room_id: room_id,
-          sender_id: sender.id,
-          receiver_id: receiver.id,
-          text: text || '',
-          image: finalImageUrl, 
-          is_read: false
-        }]);
-
-      if (error) throw error;
+      const result = await supabase.from('messages').insert([{
+        room_id, sender_id: sender.id, receiver_id: receiver.id,
+        text: text || '', image: finalImageUrl, is_read: false
+      }]).select().single();
+      if (result.error) throw result.error;
+      if (!result.data) throw new Error('Mesaj kaydedilemedi.');
+      insertedMsg = result.data;
+      const savedMessage = { ...tempMessage, id: insertedMsg.id, image: finalImageUrl,
+        createdAt: insertedMsg.created_at || tempMessage.createdAt, status: 'sent' };
+      // New objects are essential: memoized message rows must receive changed props.
+      setConversations(prev => {
+        const messages = (prev.find(chat => chat.id === room_id)?.messages || [])
+          .filter(message => message.id !== tempMessage.id && String(message.id) !== String(insertedMsg.id));
+        return updateRoom(prev, [...messages, savedMessage].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)));
+      });
+    } catch (e) {
+      console.error('Mesaj veya fotoğraf gönderilemedi:', e);
+      setConversations(prev => {
+        const messages = (prev.find(chat => chat.id === room_id)?.messages || []).filter(message => message.id !== tempMessage.id);
+        if (!messages.length) return prev.filter(chat => chat.id !== room_id);
+        return updateRoom(prev, messages);
+      });
+      return { success: false, error: e.message || 'Mesaj gönderilemedi.' };
+    }
+    // A notification error must not turn an already saved message into a failure.
+    try {
+      const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-message-push', {
+        body: { message_id: insertedMsg.id },
+      });
+      if (pushError || pushResult?.success === false) {
+        console.log('Mesaj kaydedildi; bildirim sunucusu gönderimi doğrulayamadı.');
+      }
 
     } catch (e) {
-      console.log("Mesaj gönderme hatası:", e);
+      console.log('Mesaj kaydedildi; bildirim gönderilemedi:', e);
     }
+    return { success: true, message: insertedMsg };
   };
 
-  // ❤️ MESAJ REAKSİYONU
   const reactToMessage = async (chatId, messageId, reactionType = '🐾') => {
     if (reactionType === '🐾') playSound('paw');
-
     try {
       console.log("Reaksiyon gönderildi:", messageId);
     } catch (e) {
@@ -245,9 +268,10 @@ export const ChatProvider = ({ children }) => {
     }
   };
 
-  // 🗑️ MESAJ SİL
   const deleteMessage = async (chatId, messageId) => {
     if (!user) return;
+
+    const prevConversations = [...conversations];
 
     setConversations(prev => prev.map(chat => {
         if (chat.id === chatId) {
@@ -257,34 +281,45 @@ export const ChatProvider = ({ children }) => {
     }));
 
     try {
-      await supabase
+      const { error } = await supabase
         .from('messages')
         .delete()
         .eq('id', messageId)
         .eq('sender_id', user.id); 
+        
+      if (error) {
+          console.error("Supabase silme hatası:", error.message);
+          setConversations(prevConversations); 
+          throw error;
+      }
     } catch (e) {
-      console.log("Mesaj silme hatası:", e);
+      console.log("Mesaj silme işlemi başarısız:", e);
     }
   };
 
-  // 🗑️ SOHBETİ SİL
   const deleteConversation = async (chatId) => {
-    if (!user) return;
-
-    setConversations(prev => prev.filter(c => c.id !== chatId));
-
+    const requestedUserId = user?.id;
+    if (!requestedUserId) return { success: false, error: 'Giriş yapmalısınız.' };
     try {
-      await supabase
-        .from('messages')
-        .delete()
-        .eq('room_id', chatId)
-        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
-    } catch (e) {
-      console.log("Sohbet silme hatası:", e);
+      const { data: cutoff, error } = await supabase.rpc('delete_my_chat_history', { p_room_id: String(chatId) });
+      if (error) throw error;
+      if (!cutoff || !Number.isFinite(Date.parse(cutoff))) throw new Error('Silme onayı alınamadı.');
+      if (accountIdRef.current === requestedUserId) {
+        deletedThroughRef.current[chatId] = cutoff;
+        setConversations(prev => prev.map(chat => {
+          if (String(chat.id) !== String(chatId)) return chat;
+          const messages = chat.messages.filter(message => Date.parse(message.createdAt) > Date.parse(cutoff));
+          const last = messages[messages.length - 1];
+          return { ...chat, messages, lastMessage: last ? (last.image ? '📷 Fotoğraf' : last.text || '') : '', lastMessageDate: last?.createdAt || '' };
+        }).filter(chat => chat.messages.length > 0));
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('Sohbet silinemedi:', error);
+      return { success: false, error: error.message || 'Sohbet silinemedi.' };
     }
   };
 
-  // 👀 OKUNDU OLARAK İŞARETLE
   const markAsRead = async (chatId, currentUserId) => {
     setConversations(prev => prev.map(chat => {
         if (chat.id === chatId) {
@@ -308,7 +343,6 @@ export const ChatProvider = ({ children }) => {
     }
   };
 
-  // 🔔 OKUNMAMIŞ SAYISI
   const getUnreadCount = (currentUserId) => {
     if (!currentUserId) return 0;
     let count = 0;

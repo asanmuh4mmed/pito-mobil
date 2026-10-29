@@ -1,22 +1,38 @@
 import React, { useEffect, useRef, useContext } from 'react';
-import { View, Text, StyleSheet, Animated, StatusBar, Image } from 'react-native';
+import { View, Text, StyleSheet, Animated, StatusBar } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage'; 
 import { AuthContext } from '../context/AuthContext'; 
+import { Ionicons } from '@expo/vector-icons';
+
+// --- PITO YENİ RENK PALETİ ---
+const PITO_COLORS = {
+    primary: '#C5A059', 
+    primaryDark: '#B08D4B', 
+    navyBg: '#0B131E', 
+    navySurface: '#1A2533', 
+    navyLight: '#243447',
+    cream: '#F5F5DC',
+    white: '#FFFFFF',
+    grayText: '#A0AAB5',
+    error: '#FF4757',
+    success: '#00B894'
+};
 
 const SplashScreen = ({ navigation }) => {
-  const { country } = useContext(AuthContext) || { country: { code: 'TR' } };
+  // ✅ GLOBAL DİL STATE'İ EKLENDİ
+  const { language } = useContext(AuthContext) || { language: 'TR' };
+  
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.8)).current;
+  const scaleAnim = useRef(new Animated.Value(0.85)).current;
 
   // --- DİL SEÇİMİ ---
-  const activeLang = country?.code || 'TR';
-  const sloganText = activeLang === 'TR' ? "Can Dostlarını Bul" : "Find Your Best Friends";
+  const sloganText = language === 'EN' ? "FIND YOUR BEST FRIENDS" : "CAN DOSTLARINI BUL";
 
   useEffect(() => {
-    // 1. Splash Animasyonlarını Başlat
+    // 1. Splash Animasyonlarını Başlat (Daha yumuşak ve modern geçiş)
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 1500, useNativeDriver: true }),
-      Animated.spring(scaleAnim, { toValue: 1, friction: 6, tension: 40, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 1200, useNativeDriver: true }),
+      Animated.spring(scaleAnim, { toValue: 1, friction: 7, tension: 40, useNativeDriver: true }),
     ]).start();
 
     // 2. Kullanıcının İlk Girişi mi Kontrol Et
@@ -25,10 +41,10 @@ const SplashScreen = ({ navigation }) => {
             const hasSeenOnboarding = await AsyncStorage.getItem('hasSeenOnboarding');
             
             if (hasSeenOnboarding === 'true') {
-                // Önceden tanıtımı geçmiş -> Direkt Login veya Home'a gönder
-                navigation.replace('Login'); 
+                // Önceden tanıtımı geçmiş -> Direkt Ana Sayfaya (Home) gönder
+                navigation.replace('Home'); 
             } else {
-                // İlk defa giriyor -> 7 sayfalık modern Tanıtım Ekranına gönder
+                // İlk defa giriyor -> Tanıtım Ekranına gönder
                 navigation.replace('Onboarding');
             }
         } catch (error) {
@@ -37,10 +53,10 @@ const SplashScreen = ({ navigation }) => {
         }
     };
 
-    // 4 Saniyelik Görsel Şölen Süresi
+    // Bekleme Süresi (Daha akıcı bir deneyim için 3 saniyeye çekildi)
     const timer = setTimeout(() => {
       checkAppStatus(); 
-    }, 4000);
+    }, 3000);
 
     return () => clearTimeout(timer);
   }, []);
@@ -49,29 +65,25 @@ const SplashScreen = ({ navigation }) => {
     <View style={styles.container}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-      {/* --- ARKA PLAN FOTOĞRAFI --- */}
-      <Image
-        source={{ uri: 'https://i.pinimg.com/736x/32/27/d2/3227d213df471d313717e925aa1353ca.jpg' }}
-        style={styles.backgroundImage}
-        resizeMode="cover"
-      />
-
-      {/* Siyah Yarı Saydam Perde */}
-      <View style={styles.overlay} />
-
       {/* --- PİTO LOGO VE SLOGAN --- */}
       <Animated.View style={[styles.logoContainer, { opacity: fadeAnim, transform: [{ scale: scaleAnim }] }]}>
-        <Text style={styles.title}>P İ T O</Text>
+        
+        {/* Modern ve Lüks İkon Kutusu */}
+        <View style={styles.iconBox}>
+            <Ionicons name="paw" size={60} color={PITO_COLORS.primary} />
+        </View>
+
+        <Text style={styles.title}>P I T O</Text>
         <Text style={styles.slogan}>{sloganText}</Text>
       </Animated.View>
 
       {/* --- FOOTER: POWERED BY OXPİ --- */}
-      <View style={styles.footer}>
-        <Text style={styles.poweredBy}>Powered by</Text>
+      <Animated.View style={[styles.footer, { opacity: fadeAnim }]}>
+        <Text style={styles.poweredBy}>POWERED BY</Text>
         <View style={styles.brandContainer}>
             <Text style={styles.brandName}>OXPİ</Text>
         </View>
-      </View>
+      </Animated.View>
     </View>
   );
 };
@@ -79,39 +91,44 @@ const SplashScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: 'black',
+    backgroundColor: PITO_COLORS.navyBg, // Premium Pito Laciverti
     justifyContent: 'center', 
     alignItems: 'center' 
-  },
-  backgroundImage: {
-    ...StyleSheet.absoluteFillObject, 
-    width: '100%',
-    height: '100%',
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)', 
   },
   logoContainer: { 
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 80 
+    marginBottom: 50 
+  },
+  iconBox: {
+    width: 120,
+    height: 120,
+    backgroundColor: PITO_COLORS.navySurface,
+    borderRadius: 40, // Squircle hissiyatı veren yumuşak modern köşeler
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 30,
+    borderWidth: 1.5,
+    borderColor: 'rgba(197, 160, 89, 0.4)', // Yarı şeffaf altın sarısı çerçeve
+    elevation: 20,
+    shadowColor: PITO_COLORS.primary, // Altın rengi dış ışıma (glow) efekti
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 25
   },
   title: { 
-    fontSize: 60, 
+    fontSize: 52, 
     fontWeight: '900',
-    color: '#FFFFFF', 
-    letterSpacing: 10,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: -1, height: 1 },
-    textShadowRadius: 10
+    color: PITO_COLORS.cream, 
+    letterSpacing: 16,
+    marginLeft: 16 // Harf aralığından kaynaklı sağa kaymayı ortalar
   },
   slogan: {
-    color: '#EEE',
-    fontSize: 16,
-    letterSpacing: 2,
-    marginTop: 5,
-    fontWeight: '300'
+    color: PITO_COLORS.primaryDark,
+    fontSize: 14,
+    letterSpacing: 5,
+    marginTop: 15,
+    fontWeight: '700',
   },
   footer: {
     position: 'absolute',
@@ -119,10 +136,11 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   poweredBy: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
-    marginBottom: 5,
-    fontStyle: 'italic'
+    color: PITO_COLORS.grayText,
+    fontSize: 11,
+    marginBottom: 6,
+    fontWeight: '700',
+    letterSpacing: 2,
   },
   brandContainer: {
     flexDirection: 'row',
@@ -130,10 +148,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center'
   },
   brandName: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: 'bold',
-    letterSpacing: 2
+    color: PITO_COLORS.primary,
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: 4,
+    marginLeft: 4
   }
 });
 

@@ -15,7 +15,6 @@ const soundFiles = {
 
     // 🎮 OYUN SESLERİ (TÜM OYUNLAR İÇİN BİRLEŞTİRİLDİ)
     jump: require('../../assets/sounds/jump.mp3'),         // Uçan Pito - Zıplama
-    score: require('../../assets/sounds/score.mp3'),       // Uçan Pito & Mamaları Yakala - Puan/Yıldız Alma
     gamewin: require('../../assets/sounds/gamewin.mp3'),   // Uçan Pito & Mamaları Yakala - Seviye Atlama
     gameover: require('../../assets/sounds/gameover.mp3'), // Tüm Oyunlar - Yanma / Süre Bitişi
     card_flip: require('../../assets/sounds/card_flip.mp3'), // Pati Eşleştirme - Kart Çevirme

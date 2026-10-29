@@ -11,24 +11,192 @@ export const SocialProvider = ({ children }) => {
     const [savedPostIds, setSavedPostIds] = useState([]); 
     const [loading, setLoading] = useState(true);
 
-    // 1. Verileri Çek
+    const [communityPosts, setCommunityPosts] = useState([]);
+
     useEffect(() => {
         fetchPosts();
+        fetchCommunityPosts(); 
         if (user) {
             fetchSavedPosts();
         }
     }, [user]);
 
-    // ✅ POSTLARI ÇEK
+    // =====================================
+    // 🌍 PİTO DÜNYASI (YAZILI GÖNDERİLER) BÖLÜMÜ
+    // =====================================
+
+    const fetchCommunityPosts = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('community_posts')
+                .select(`
+                    *,
+                    users:pito_public_profiles ( id, fullname, avatar, username )
+                `)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setCommunityPosts(data || []);
+        } catch (e) {
+            console.log("Community Post çekme hatası:", e.message);
+        }
+    };
+
+    const addCommunityPost = async (content) => {
+        if (!user || !content.trim()) return false;
+        try {
+            const newPostData = {
+                user_id: user.id,
+                content: content,
+            };
+            
+            const { data, error } = await supabase
+                .from('community_posts')
+                .insert([newPostData])
+                .select(`*, users:pito_public_profiles ( id, fullname, avatar, username )`)
+                .single();
+                
+            if (error) throw error;
+            setCommunityPosts(prev => [data, ...prev]);
+            return true; 
+        } catch (e) {
+            console.log("Community Post ekleme hatası:", e.message);
+            return false;
+        }
+    };
+
+    const deleteCommunityPost = async (postId) => {
+        if (!user) return false;
+        try {
+            // Hızlı bir kullanıcı deneyimi için önce ekrandan anında kaldırıyoruz
+            setCommunityPosts(prevPosts => prevPosts.filter(post => post.id !== postId));
+            
+            // Arka planda veritabanından siliyoruz (Sadece gönderi sahibi silebilir)
+            const { error } = await supabase
+                .from('community_posts')
+                .delete()
+                .eq('id', postId)
+                .eq('user_id', user.id);
+
+            if (error) throw error;
+            return true;
+        } catch (e) {
+            console.log("Community Post silme hatası:", e.message);
+            // Hata olursa ekranı eski haline getirmek için listeyi tekrar çekiyoruz
+            fetchCommunityPosts(); 
+            return false;
+        }
+    };
+
+    const toggleCommunityLike = async (postId) => {
+        if (!user) return false;
+        playSound('paw'); 
+
+        try {
+            const post = communityPosts.find(p => p.id === postId);
+            if (!post) return;
+
+            const currentLikedBy = post.liked_by || [];
+            const isLiked = currentLikedBy.includes(user.id);
+            
+            if (isLiked) {
+                await supabase.from('community_likes').delete().eq('user_id', user.id).eq('post_id', postId);
+                await supabase.rpc('decrement_community_likes', { p_id: postId, u_id: user.id }); 
+            } else {
+                const { error: likeError } = await supabase.from('community_likes').insert({ user_id: user.id, post_id: postId });
+                if (likeError) throw likeError;
+                const { error: countError } = await supabase.rpc('increment_community_likes', { p_id: postId, u_id: user.id });
+                if (countError) throw countError; 
+                
+                if (post.user_id !== user.id) {
+                    void sendNotification('community', 'like', postId);
+                }
+            }
+
+            setCommunityPosts(prevPosts => prevPosts.map(p => {
+                if (p.id === postId) {
+                    const newLikedBy = isLiked 
+                        ? (p.liked_by || []).filter(id => id !== user.id) 
+                        : [...(p.liked_by || []), user.id];
+                    
+                    return { 
+                        ...p, 
+                        likes_count: isLiked ? Math.max((p.likes_count || 0) - 1, 0) : (p.likes_count || 0) + 1,
+                        liked_by: newLikedBy
+                    };
+                }
+                return p;
+            }));
+
+            return !isLiked; 
+        } catch (error) {
+            console.error("Community Beğeni Hatası:", error);
+            return false;
+        }
+    };
+
+    // ✨ YENİ EKLENEN: Bir gönderinin yorumlarını çekme fonksiyonu
+    const fetchCommunityComments = async (postId) => {
+        try {
+            const { data, error } = await supabase
+                .from('community_comments')
+                .select(`
+                    *,
+                    users:pito_public_profiles ( id, fullname, avatar, username )
+                `)
+                .eq('post_id', postId)
+                .order('created_at', { ascending: true }); // Eskiden yeniye sıralı
+
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            console.error("Yorumları çekme hatası:", error);
+            return [];
+        }
+    };
+
+    const addCommunityComment = async (postId, text) => {
+        if (!user || !text.trim()) return false;
+        try {
+            const { data, error } = await supabase
+                .from('community_comments')
+                .insert([{ user_id: user.id, post_id: postId, content: text }])
+                .select(`*, users:pito_public_profiles ( id, fullname, avatar, username )`)
+                .single();
+
+            if (error) throw error;
+
+            await supabase.rpc('increment_community_comments', { p_id: postId });
+
+            setCommunityPosts(prevPosts => prevPosts.map(p => {
+                if (p.id === postId) {
+                    return { ...p, comments_count: (p.comments_count || 0) + 1 };
+                }
+                return p;
+            }));
+
+            const post = communityPosts.find(p => p.id === postId);
+            if (post && post.user_id !== user.id) {
+                void sendNotification('community', 'comment', postId, data.id);
+            }
+
+            return data;
+        } catch (e) {
+            console.error("Community Yorum Hatası:", e);
+            return false;
+        }
+    };
+
+    // =====================================
+    // 📸 PETSGRAM BÖLÜMÜ (Mevcut Olanlar)
+    // =====================================
+
     const fetchPosts = async () => {
         try {
             setLoading(true);
             const { data, error } = await supabase
                 .from('posts')
-                .select(`
-                    *,
-                    users ( fullname, avatar, id )
-                `)
+                .select(`*, users:pito_public_profiles ( fullname, avatar, id )`)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -55,7 +223,6 @@ export const SocialProvider = ({ children }) => {
         }
     };
 
-    // ✅ KAYDEDİLENLERİ ÇEK
     const fetchSavedPosts = async () => {
         if (!user) return;
         try {
@@ -65,92 +232,24 @@ export const SocialProvider = ({ children }) => {
                 .eq('user_id', user.id);
 
             if (error) throw error;
-
-            const ids = data.map(item => item.post_id);
-            setSavedPostIds(ids);
+            setSavedPostIds(data.map(item => item.post_id));
         } catch (e) {
             console.log("Bookmark hatası:", e.message);
         }
     };
 
-    // ❤️ BİLDİRİM GÖNDERME YARDIMCI FONKSİYONU (HEM DB HEM PUSH NOTIFICATION)
-    const sendNotification = async (receiverId, type, message) => {
-        // Eğer kişi kendi gönderisini beğenirse/yorumlarsa bildirim gitmesin
-        // Not: Test için kendi kendine bildirim atmak istersen bu satırı yorum satırı yapabilirsin
-        if (!user || user.id === receiverId) return;
-
-        const newNotification = {
-            id: Date.now().toString(), 
-            type: type, 
-            message: message,
-            fromUserId: user.id,
-            fromUser: user.fullname || user.username,
-            fromUserAvatar: user.avatar,
-            read: false, 
-            date: new Date().toISOString()
-        };
-
+    const sendNotification = async (source, kind, postId, commentId = null) => {
         try {
-            // 1. ADIM: Bildirimi veritabanına ve zil ikonuna kaydet (RPC Fonksiyonumuz)
-            const { error: dbError } = await supabase.rpc('add_user_notification', {
-                target_user_id: receiverId,
-                notif_obj: newNotification
+            const { data, error } = await supabase.functions.invoke('send-social-push', {
+                body: { source, kind, post_id: postId, ...(commentId != null ? { comment_id: commentId } : {}) },
             });
-
-            if (dbError) throw dbError;
-            console.log("Bildirim RPC ile veritabanına eklendi!");
-
-           // 2. ADIM: UZAKTAN BİLDİRİM (PUSH NOTIFICATION) GÖNDERME 
-            // Bildirimi alacak olan kullanıcının cihaz token'ını VE BİLDİRİM AYARINI çekiyoruz
-            const { data: receiverData, error: tokenError } = await supabase
-                .from('users')
-                .select('expo_push_token, notification_settings') // ✨ YENİ: Ayarları da çektik
-                .eq('id', receiverId)
-                .single();
-
-            if (tokenError) {
-                console.log("Kullanıcı verisi çekilirken hata:", tokenError.message);
-                return;
-            }
-
-            const pushToken = receiverData?.expo_push_token;
-            // ✨ YENİ: Kullanıcı bildirimleri ayarlardan kapattıysa false döner (varsayılanı true kabul ediyoruz)
-            const isNotificationsEnabled = receiverData?.notification_settings?.enabled !== false;
-
-            // Hem token varsa HEM DE bildirim ayarı açıksa Push at
-            if (pushToken && isNotificationsEnabled) {
-                const response = await fetch('https://exp.host/--/api/v2/push/send', {
-                    method: 'POST',
-                    headers: {
-                        Accept: 'application/json',
-                        'Accept-encoding': 'application/json',
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        to: pushToken,
-                        sound: 'default',
-                        title: "Petsgram'dan Yeni Bildirim 🐾",
-                        body: message,
-                        data: { type: type, fromUser: user.username }, 
-                    }),
-                });
-                
-                const pushResult = await response.json();
-                console.log("Push Bildirimi sonucu:", pushResult);
-            } else {
-                console.log("Karşı tarafın cihaz Token'ı yok veya bildirimleri KAPALI. Sadece zil ikonuna eklendi.");
-            }
-
-        } catch (error) {
-            console.log("Genel bildirim gönderme hatası:", error);
-        }
+            if (error || data?.success === false) console.log('İşlem kaydedildi; sosyal bildirim doğrulanamadı.');
+        } catch { console.log('İşlem kaydedildi; sosyal bildirim gönderilemedi.'); }
     };
 
-    // ❤️ BEĞENİ (LIKE) 
     const toggleLike = async (postId) => {
         if (!user) return;
         playSound('paw'); 
-
         const userIdStr = String(user.id);
         const postIndex = posts.findIndex(p => p.id === postId);
         if (postIndex === -1) return;
@@ -159,41 +258,23 @@ export const SocialProvider = ({ children }) => {
         const currentLikes = post.likedBy || [];
         const isLiked = currentLikes.includes(userIdStr);
         
-        let newLikedBy;
-        let newLikeCount;
+        let newLikedBy = isLiked ? currentLikes.filter(id => id !== userIdStr) : [...currentLikes, userIdStr];
+        
 
-        if (isLiked) {
-            newLikedBy = currentLikes.filter(id => id !== userIdStr);
-        } else {
-            newLikedBy = [...currentLikes, userIdStr];
-            
-            // ✨ BEĞENİ YAPILDIĞINDA BİLDİRİM FONKSİYONUNU TETİKLE
-            const notifMessage = `${user.fullname || user.username} gönderini beğendi. ❤️`;
-            sendNotification(post.userId, 'like', notifMessage);
-        }
-        newLikeCount = newLikedBy.length;
 
         const updatedPosts = [...posts];
-        updatedPosts[postIndex] = { ...post, likedBy: newLikedBy, likes: newLikeCount };
+        updatedPosts[postIndex] = { ...post, likedBy: newLikedBy, likes: newLikedBy.length };
         setPosts(updatedPosts);
 
         try {
-            await supabase
-                .from('posts')
-                .update({ 
-                    liked_by: newLikedBy,
-                    likes: newLikeCount 
-                })
-                .eq('id', postId);
-        } catch (e) {
-            console.log("Like DB hatası:", e);
-        }
+            const { error } = await supabase.from('posts').update({ liked_by: newLikedBy, likes: newLikedBy.length }).eq('id', postId);
+            if (error) throw error;
+            if (!isLiked) void sendNotification('posts', 'like', postId);
+        } catch (e) { console.log("Like DB hatası:", e); }
     };
 
-    // 💬 YORUM EKLEME
     const addComment = async (postId, commentObject) => {
         if (!user) return; 
-
         const postIndex = posts.findIndex(p => p.id === postId);
         if (postIndex === -1) return;
 
@@ -204,71 +285,37 @@ export const SocialProvider = ({ children }) => {
         updatedPosts[postIndex] = { ...post, comments: updatedComments };
         setPosts(updatedPosts);
 
-        // ✨ YORUM YAPILDIĞINDA BİLDİRİM FONKSİYONUNU TETİKLE
-        const notifMessage = `${user.fullname || user.username} gönderine yorum yaptı: "${commentObject.text.substring(0, 20)}${commentObject.text.length > 20 ? '...' : ''}"`;
-        sendNotification(post.userId, 'comment', notifMessage);
+
 
         try {
-            await supabase
-                .from('posts')
-                .update({ comments: updatedComments })
-                .eq('id', postId);
-        } catch (e) {
-            console.log("Yorum DB hatası:", e);
-        }
+            const { error } = await supabase.from('posts').update({ comments: updatedComments }).eq('id', postId);
+            if (error) throw error;
+            void sendNotification('posts', 'comment', postId, commentObject.id);
+        } catch (e) { console.log("Yorum DB hatası:", e); }
     };
 
-    // 🔖 KAYDETME (BOOKMARK)
     const toggleSave = async (postId) => {
         if (!user) return;
-
         const isSaved = savedPostIds.includes(postId);
-        
-        if (isSaved) {
-            setSavedPostIds(prev => prev.filter(id => id !== postId));
-        } else {
-            setSavedPostIds(prev => [...prev, postId]);
-        }
-
+        setSavedPostIds(prev => isSaved ? prev.filter(id => id !== postId) : [...prev, postId]);
         try {
-            if (isSaved) {
-                await supabase
-                    .from('bookmarks')
-                    .delete()
-                    .eq('user_id', user.id)
-                    .eq('post_id', postId);
-            } else {
-                await supabase
-                    .from('bookmarks')
-                    .insert({ user_id: user.id, post_id: postId });
-            }
-        } catch (e) {
-            console.log("Bookmark DB hatası:", e);
-        }
+            if (isSaved) await supabase.from('bookmarks').delete().eq('user_id', user.id).eq('post_id', postId);
+            else await supabase.from('bookmarks').insert({ user_id: user.id, post_id: postId });
+        } catch (e) { console.log("Bookmark DB hatası:", e); }
     };
 
-    // ➕ YENİ POST EKLE 
-    const addPost = (newPost) => {
-        setPosts(prev => [newPost, ...prev]);
-    };
+    const addPost = (newPost) => setPosts(prev => [newPost, ...prev]);
 
-    // 🗑️ POST SİLME
     const deletePost = async (postId) => {
         try {
             setPosts(prev => prev.filter(p => p.id !== postId));
-            const { error } = await supabase.from('posts').delete().eq('id', postId);
-            if (error) throw error;
-        } catch (e) {
-            console.log("Post silme hatası:", e);
-            fetchPosts(); 
-        }
+            await supabase.from('posts').delete().eq('id', postId);
+        } catch (e) { fetchPosts(); }
     };
 
-    // ❤️ YORUM BEĞENİSİ
     const toggleCommentLike = async (postId, commentId) => {
         if (!user) return;
         const currentUserId = String(user.id);
-        
         const postIndex = posts.findIndex(p => p.id === postId);
         if (postIndex === -1) return;
 
@@ -277,11 +324,7 @@ export const SocialProvider = ({ children }) => {
             if (c.id === commentId) {
                 const currentLikes = c.likedBy || [];
                 const isLiked = currentLikes.includes(currentUserId);
-                let newLikes;
-                
-                if (isLiked) newLikes = currentLikes.filter(id => id !== currentUserId);
-                else newLikes = [...currentLikes, currentUserId];
-                
+                let newLikes = isLiked ? currentLikes.filter(id => id !== currentUserId) : [...currentLikes, currentUserId];
                 return { ...c, likedBy: newLikes, likes: newLikes.length };
             }
             return c;
@@ -292,26 +335,16 @@ export const SocialProvider = ({ children }) => {
         setPosts(updatedPosts);
 
         try {
-            await supabase
-                .from('posts')
-                .update({ comments: updatedComments })
-                .eq('id', postId);
-        } catch (e) {
-            console.log("Yorum like hatası:", e);
-        }
+            const { error } = await supabase.from('posts').update({ comments: updatedComments }).eq('id', postId);
+            if (error) throw error;
+            void sendNotification('posts', 'comment', postId, commentObject.id);
+        } catch (e) { console.log("Yorum like hatası:", e); }
     };
 
     return (
         <SocialContext.Provider value={{ 
-            posts, 
-            savedPostIds, 
-            addPost, 
-            deletePost, 
-            toggleSave, 
-            toggleLike, 
-            addComment,
-            toggleCommentLike,
-            loading 
+            posts, savedPostIds, addPost, deletePost, toggleSave, toggleLike, addComment, toggleCommentLike, loading,
+            communityPosts, fetchCommunityPosts, addCommunityPost, deleteCommunityPost, toggleCommunityLike, addCommunityComment, fetchCommunityComments // ✨ EKLENDİ
         }}>
             {children}
         </SocialContext.Provider>

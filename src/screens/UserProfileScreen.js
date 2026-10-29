@@ -1,5 +1,6 @@
 import React, { useContext, useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, ScrollView, TouchableOpacity, FlatList, Dimensions, Alert, Animated, Easing, Modal, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthContext } from '../context/AuthContext';
 import { ThemeContext } from '../context/ThemeContext';
@@ -7,13 +8,25 @@ import { supabase } from '../lib/supabase';
 
 const { width } = Dimensions.get('window');
 
+// --- PITO YENİ RENK PALETİ ---
+const PITO_COLORS = {
+    primary: '#C5A059', 
+    primaryDark: '#B08D4B', 
+    navyBg: '#0B131E', 
+    navySurface: '#1A2533', 
+    navyLight: '#243447',
+    cream: '#F5F5DC',
+    white: '#FFFFFF',
+    grayText: '#A0AAB5',
+    error: '#FF4757',
+    success: '#00B894'
+};
+
 const TRANSLATIONS = {
     TR: {
         listings: "İlanlar",
-        petsgram: "Petsgram",
         message: "Mesaj Gönder",
         noListings: "İlan yok.",
-        noPosts: "Henüz fotoğraf yok.",
         member: "Pito Üyesi",
         loginTitle: "Giriş Yap",
         loginMsg: "Bu işlem için giriş yapmalısınız.",
@@ -30,14 +43,11 @@ const TRANSLATIONS = {
         blockedDesc: "Bu profil görüntülenemiyor.",
         reported: "Bildirildi",
         reportMsg: "Kullanıcı şikayeti alındı. İnceleme başlatılacaktır.",
-        badgeBronze: "Bronz Pati", badgeSilver: "Gümüş Pati", badgeGold: "Altın Pati", badgeDiamond: "Elmas Pati"
     },
     AU: {
         listings: "Listings",
-        petsgram: "Petsgram",
         message: "Send Message",
         noListings: "No listings.",
-        noPosts: "No photos yet.",
         member: "Pito Member",
         loginTitle: "Login",
         loginMsg: "Please login first.",
@@ -54,7 +64,6 @@ const TRANSLATIONS = {
         blockedDesc: "This profile cannot be viewed.",
         reported: "Reported",
         reportMsg: "User report received. Investigation will start.",
-        badgeBronze: "Bronze Paw", badgeSilver: "Silver Paw", badgeGold: "Gold Paw", badgeDiamond: "Diamond Paw"
     }
 };
 
@@ -62,23 +71,20 @@ const UserProfileScreen = ({ navigation, route }) => {
   const { userId, userName, userAvatar } = route.params || {};
   
   const { user, country } = useContext(AuthContext); 
-  const { theme } = useContext(ThemeContext);
+  const { theme: appTheme, isDarkMode } = useContext(ThemeContext);
+  const theme = isDarkMode ? appTheme : { ...appTheme, background: '#F8F5EF', cardBg: '#FFFFFF', text: '#142239', subText: '#727989', border: '#EAE4D8' };
 
-  const [activeTab, setActiveTab] = useState('listings');
   const [menuVisible, setMenuVisible] = useState(false);
-  
   const [isBlocked, setIsBlocked] = useState(false); 
   const [blockedByMe, setBlockedByMe] = useState(false); 
   
   const [userListings, setUserListings] = useState([]);
-  const [userPosts, setUserPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [targetUser, setTargetUser] = useState({
       id: userId,
       fullname: userName || 'Kullanıcı',
       avatar: userAvatar,
       isPremium: false,
-      donation_points: 0,
       is_founder: false
   });
 
@@ -95,16 +101,6 @@ const UserProfileScreen = ({ navigation, route }) => {
       }
   }, [userId]);
 
-  const calculateDynamicBadge = (points) => {
-      const p = points || 0;
-      if (p >= 50) return { name: t.badgeDiamond, icon: 'diamond', color: '#00cec9' };
-      if (p >= 15) return { name: t.badgeGold, icon: 'star', color: '#f1c40f' };
-      if (p >= 5) return { name: t.badgeSilver, icon: 'medal', color: '#bdc3c7' };
-      if (p >= 1) return { name: t.badgeBronze, icon: 'paw', color: '#e17055' };
-      return null; 
-  };
-
-  const displayBadge = targetUser.activeBadge || calculateDynamicBadge(targetUser.donation_points);
 
   const checkBlockStatus = async () => {
       try {
@@ -130,7 +126,7 @@ const UserProfileScreen = ({ navigation, route }) => {
           setLoading(true);
 
           const { data: userData } = await supabase
-              .from('users')
+              .from('pito_public_profiles')
               .select('*')
               .eq('id', userId)
               .single();
@@ -144,14 +140,6 @@ const UserProfileScreen = ({ navigation, route }) => {
               .order('created_at', { ascending: false });
 
           setUserListings(listingsData || []);
-
-          const { data: postsData } = await supabase
-              .from('posts')
-              .select('*')
-              .eq('user_id', userId)
-              .order('created_at', { ascending: false });
-
-          setUserPosts(postsData || []);
 
       } catch (error) {
           console.log("Kullanıcı veri hatası:", error);
@@ -249,57 +237,64 @@ const UserProfileScreen = ({ navigation, route }) => {
 
   if (isBlocked) {
       return (
-          <View style={[styles.container, { backgroundColor: '#F3E5F5', justifyContent: 'center', alignItems: 'center' }]}>
-              <View style={[styles.header, { backgroundColor: 'white', position:'absolute', top:0, width:'100%', borderBottomWidth: 1, borderBottomColor: '#E0E0E0' }]}>
+          <SafeAreaView style={[styles.container, { backgroundColor: isDarkMode ? PITO_COLORS.navyBg : theme.background, }]}>
+              <View style={[styles.header, { backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.cardBg, width:'100%', borderBottomWidth: 1, borderBottomColor: isDarkMode ? PITO_COLORS.navyLight : theme.border }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#3700B3" />
+                    <Ionicons name="arrow-back" size={24} color={theme.text} />
                 </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: '#3700B3' }]}>{t.blockedUser}</Text>
+                <Text style={[styles.headerTitle, { color: theme.text }]}>{t.blockedUser}</Text>
                 <View style={{width:24}} />
               </View>
               
-              <Ionicons name="ban-outline" size={80} color="#999" />
-              <Text style={{ marginTop: 20, fontSize: 18, fontWeight: 'bold', color: '#3700B3' }}>{t.blockedUser}</Text>
-              <Text style={{ marginTop: 10, color: '#666', marginBottom: 30 }}>{t.blockedDesc}</Text>
+              <View style={styles.blockedContent}>
+              <View style={styles.emptyIcon}><Ionicons name="ban-outline" size={40} color={PITO_COLORS.primary} /></View>
+              <Text style={{ marginTop: 20, fontSize: 18, fontWeight: 'bold', color: theme.text }}>{t.blockedUser}</Text>
+              <Text style={{ marginTop: 10, color: theme.subText, marginBottom: 30 }}>{t.blockedDesc}</Text>
 
               {blockedByMe && (
-                  <TouchableOpacity style={styles.unblockButton} onPress={handleUnblockUser}>
-                      <Text style={styles.unblockButtonText}>{t.unblock}</Text>
+                  <TouchableOpacity style={[styles.unblockButton, { backgroundColor: PITO_COLORS.primary }]} onPress={handleUnblockUser}>
+                      <Text style={[styles.unblockButtonText, { color: PITO_COLORS.navyBg }]}>{t.unblock}</Text>
                   </TouchableOpacity>
               )}
-          </View>
+              </View>
+          </SafeAreaView>
       );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: '#F3E5F5' }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: isDarkMode ? PITO_COLORS.navyBg : theme.background }]}>
       
       {/* HEADER */}
-      <View style={[styles.header, { backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#E0E0E0' }]}>
+      <View style={[styles.header, { backgroundColor: isDarkMode ? PITO_COLORS.navyBg : theme.background }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#3700B3" />
+          <Ionicons name="arrow-back" size={24} color={theme.text} />
         </TouchableOpacity>
         
-        <Text style={[styles.headerTitle, { color: '#3700B3' }]} numberOfLines={1}>
+        <Text style={[styles.headerTitle, { color: theme.text }]} numberOfLines={1}>
             {targetUser.fullname}
         </Text>
 
         {!isMe ? (
-            <TouchableOpacity onPress={() => setMenuVisible(true)} style={{padding:5}}>
-                <Ionicons name="ellipsis-vertical" size={24} color="#3700B3" />
+            <TouchableOpacity onPress={() => setMenuVisible(true)} style={styles.backButton} accessibilityRole="button" accessibilityLabel={t.menu}>
+                <Ionicons name="ellipsis-vertical" size={24} color={theme.text} />
             </TouchableOpacity>
         ) : (
-            <View style={{width: 24}} /> 
+            <View style={{width: 44}} /> 
         )}
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 30 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 30 }} showsVerticalScrollIndicator={false}>
+        <View style={styles.cover}>
+          <View style={styles.coverTop}><Text style={styles.coverBrand}>Pito</Text><Ionicons name="paw" size={23} color={PITO_COLORS.primary} /></View>
+          <Text style={styles.coverCaption}>{activeLang === 'TR' ? 'Küçük patiler, güzel karşılaşmalar.' : 'Little paws, lovely connections.'}</Text>
+          <Ionicons name="paw-outline" size={110} color="rgba(197,160,89,0.13)" style={styles.coverPaw} />
+        </View>
         {/* PROFİL KARTI */}
-        <View style={[styles.profileCard, { backgroundColor: 'white' }]}>
-            <Image source={{ uri: targetUser.avatar || 'https://placekitten.com/200/200' }} style={styles.avatar} />
+        <View style={[styles.profileCard, { backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.cardBg }]}>
+            {targetUser.avatar ? <Image source={{ uri: targetUser.avatar }} style={[styles.avatar, { borderColor: theme.cardBg }]} /> : <View style={[styles.avatar, styles.avatarPlaceholder, { borderColor: theme.cardBg }]}><Ionicons name="person-outline" size={38} color={PITO_COLORS.primary} /></View>}
             
-            <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
-                <Text style={[styles.userName, { color: '#3700B3' }]}>{targetUser.fullname}</Text>
+            <View style={styles.nameRow}>
+                <Text style={[styles.userName, { color: theme.text }]}>{targetUser.fullname}</Text>
                 
                 {targetUser.is_founder && (
                     <Ionicons 
@@ -310,31 +305,19 @@ const UserProfileScreen = ({ navigation, route }) => {
                     />
                 )}
 
-                {targetUser.isPremium && <Ionicons name="checkmark-circle" size={22} color="#6200EE" style={{ marginLeft: 5 }} />}
+                {targetUser.isPremium && <Ionicons name="checkmark-circle" size={22} color={PITO_COLORS.primary} style={{ marginLeft: 5 }} />}
                 
-                {displayBadge && (
-                    <View style={{marginLeft: 8, paddingHorizontal: 8, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', backgroundColor: displayBadge.color + '20', borderRadius: 12, marginTop: 4}}>
-                        <Ionicons name={displayBadge.icon} size={14} color={displayBadge.color} />
-                        <Text style={{fontSize: 10, fontWeight: 'bold', color: displayBadge.color, marginLeft: 4}}>{displayBadge.name}</Text>
-                    </View>
-                )}
+
             </View>
 
-            <Text style={{color: '#7E57C2', marginBottom: 15, marginTop: 5}}>{t.member}</Text>
+            <Text style={{color: theme.subText, marginBottom: 3, marginTop: 8, fontSize: 12}}>{t.member}</Text>
 
-            <View style={styles.statsRow}>
+            <View style={[styles.statsRow, { borderTopColor: isDarkMode ? PITO_COLORS.navyLight : theme.border }]}>
                 <View style={styles.stat}>
-                    <Text style={[styles.statNum, {color:'#3700B3'}]}>
+                    <Text style={[styles.statNum, {color: theme.text}]}>
                         {loading ? '-' : userListings.length}
                     </Text>
-                    <Text style={styles.statLabel}>{t.listings}</Text>
-                </View>
-                <View style={{width: 1, height: 30, backgroundColor: '#E0E0E0'}} />
-                <View style={styles.stat}>
-                    <Text style={[styles.statNum, {color:'#3700B3'}]}>
-                        {loading ? '-' : userPosts.length}
-                    </Text>
-                    <Text style={styles.statLabel}>Petsgram</Text>
+                    <Text style={[styles.statLabel, { color: theme.subText }]}>{t.listings}</Text>
                 </View>
             </View>
 
@@ -344,13 +327,13 @@ const UserProfileScreen = ({ navigation, route }) => {
                         <TouchableOpacity 
                             style={[
                                 styles.modernButton, 
-                                { backgroundColor: '#6200EE', borderColor: '#7E57C2' }
+                                { backgroundColor: PITO_COLORS.primary, borderColor: PITO_COLORS.primaryDark }
                             ]} 
                             onPress={handleMessagePress}
                             activeOpacity={0.9}
                         >
-                            <Ionicons name="chatbubble-ellipses" size={20} color="white" style={{marginRight: 8}} />
-                            <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>
+                            <Ionicons name="chatbubble-ellipses" size={20} color={PITO_COLORS.navyBg} style={{marginRight: 8}} />
+                            <Text style={{ color: PITO_COLORS.navyBg, fontWeight: 'bold', fontSize: 16 }}>
                                 {t.message}
                             </Text>
                         </TouchableOpacity>
@@ -359,130 +342,115 @@ const UserProfileScreen = ({ navigation, route }) => {
             )}
         </View>
 
-        <View style={styles.tabContainer}>
-            <TouchableOpacity onPress={() => setActiveTab('listings')} style={[styles.tabBtn, activeTab==='listings' && styles.activeTab]}>
-                <Ionicons name="list" size={20} color={activeTab==='listings' ? '#6200EE' : '#999'} />
-                <Text style={{color: activeTab==='listings' ? '#6200EE' : '#999', marginLeft:5, fontWeight: activeTab==='listings' ? 'bold' : 'normal'}}>{t.listings}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setActiveTab('petsgram')} style={[styles.tabBtn, activeTab==='petsgram' && styles.activeTab]}>
-                <Ionicons name="grid" size={20} color={activeTab==='petsgram' ? '#6200EE' : '#999'} />
-                <Text style={{color: activeTab==='petsgram' ? '#6200EE' : '#999', marginLeft:5, fontWeight: activeTab==='petsgram' ? 'bold' : 'normal'}}>{t.petsgram}</Text>
-            </TouchableOpacity>
+        <View style={styles.sectionHeader}>
+          <View><Text style={[styles.sectionTitle, { color: theme.text }]}>{t.listings}</Text><Text style={[styles.sectionHint, { color: theme.subText }]}>{activeLang === 'TR' ? 'Bu profilin paylaştığı ilanlar' : 'Listings shared by this member'}</Text></View>
+          <View style={styles.countPill}><Ionicons name="grid-outline" size={15} color={PITO_COLORS.primary} /><Text style={styles.countText}>{loading ? '—' : userListings.length}</Text></View>
         </View>
-
         {loading ? (
-            <ActivityIndicator size="large" color="#6200EE" style={{marginTop: 30}} />
+            <ActivityIndicator size="large" color={PITO_COLORS.primary} style={{marginTop: 30}} />
         ) : (
-            <>
-                {activeTab === 'listings' ? (
-                    <FlatList 
-                        data={userListings}
-                        keyExtractor={item => item.id.toString()}
-                        renderItem={({ item }) => (
-                            <TouchableOpacity 
-                              style={[styles.listingCard, { backgroundColor: 'white' }]}
-                              onPress={() => navigation.push('ListingDetail', { item })}
-                            >
-                              <Image source={{ uri: item.images ? item.images[0] : (item.img || 'https://via.placeholder.com/150') }} style={styles.listingImage} />
-                              <View style={styles.listingInfo}>
-                                <Text style={[styles.listingTitle, { color: '#3700B3' }]} numberOfLines={1}>{item.title || item.name}</Text>
-                                <Text style={[styles.listingCategory, { color: '#6200EE' }]}>{item.category || 'İlan'}</Text>
-                              </View>
-                            </TouchableOpacity>
-                        )}
-                        numColumns={2} 
-                        scrollEnabled={false}
-                        columnWrapperStyle={{ justifyContent: 'space-between' }}
-                        contentContainerStyle={styles.listContent}
-                        ListEmptyComponent={<View style={styles.emptyContainer}><Text style={{ color: '#999' }}>{t.noListings}</Text></View>}
-                    />
-                ) : (
-                    userPosts.length === 0 ? (
-                        <View style={styles.emptyContainer}><Text style={{ color: '#999' }}>{t.noPosts}</Text></View>
-                    ) : (
-                        <View style={styles.gridContainer}>
-                            {userPosts.map((post) => (
-                                <TouchableOpacity key={post.id} style={styles.gridItem} onPress={() => navigation.navigate('Petsgram', { initialPostId: post.id })}>
-                                    <Image source={{ uri: post.image }} style={styles.gridImage} resizeMode="cover" />
-                                    <View style={styles.gridOverlay}>
-                                            <Ionicons name="heart" size={10} color="white" />
-                                            <Text style={{color:'white', fontSize:10, marginLeft:2, fontWeight:'bold'}}>{post.likes || 0}</Text>
-                                    </View>
-                                </TouchableOpacity>
-                            ))}
-                        </View>
-                    )
-                )}
-            </>
+            <View style={{ marginTop: 10 }}>
+                <FlatList 
+                    data={userListings}
+                    keyExtractor={item => item.id.toString()}
+                    renderItem={({ item }) => (
+                        <TouchableOpacity 
+                          style={[styles.listingCard, { backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.cardBg }]}
+                          onPress={() => navigation.push('ListingDetail', { item })}
+                        >
+                          {(item.images?.[0] || item.img) ? <Image source={{ uri: item.images?.[0] || item.img }} style={styles.listingImage} resizeMode="cover" /> : <View style={[styles.listingImage, styles.avatarPlaceholder]}><Ionicons name="paw-outline" size={38} color={PITO_COLORS.primary} /></View>}
+                          <View style={styles.listingInfo}>
+                            <Text style={[styles.listingTitle, { color: theme.text }]} numberOfLines={1}>{item.title || item.name}</Text>
+                            <Text style={[styles.listingCategory, { color: PITO_COLORS.primary }]}>{item.category || 'İlan'}</Text>
+                          </View>
+                        </TouchableOpacity>
+                    )}
+                    numColumns={2} 
+                    scrollEnabled={false}
+                    columnWrapperStyle={{ justifyContent: 'space-between' }}
+                    contentContainerStyle={styles.listContent}
+                    ListEmptyComponent={<View style={[styles.emptyContainer, { backgroundColor: theme.cardBg, borderColor: theme.border }]}><View style={styles.emptyIcon}><Ionicons name="paw-outline" size={33} color={PITO_COLORS.primary} /></View><Text style={[styles.emptyTitle, { color: theme.text }]}>{t.noListings}</Text><Text style={[styles.emptyHint, { color: theme.subText }]}>{activeLang === 'TR' ? 'Paylaşılan ilanlar burada görünecek.' : 'Shared listings will appear here.'}</Text></View>}
+                />
+            </View>
         )}
       </ScrollView>
 
       <Modal visible={menuVisible} transparent={true} animationType="fade" onRequestClose={() => setMenuVisible(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setMenuVisible(false)}>
-            <View style={[styles.menuContainer, { backgroundColor: 'white' }]}>
-                <Text style={{color:'#999', fontSize:12, marginBottom:10, textAlign:'center'}}>{t.menu}</Text>
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFillObject} accessibilityLabel={t.cancel} onPress={() => setMenuVisible(false)} />
+            <SafeAreaView edges={['bottom']} style={[styles.menuContainer, { backgroundColor: isDarkMode ? PITO_COLORS.navySurface : theme.cardBg }]}>
+                <View style={styles.sheetHandle} /><Text style={[styles.sheetTitle, { color: theme.text }]}>{t.menu}</Text>
                 
                 <TouchableOpacity style={styles.menuItem} onPress={handleBlockUser}>
-                    <Ionicons name="ban-outline" size={22} color="#FF3B30" />
-                    <Text style={[styles.menuText, { color: '#FF3B30' }]}>{t.block}</Text>
+                    <Ionicons name="ban-outline" size={22} color={PITO_COLORS.error} />
+                    <Text style={[styles.menuText, { color: PITO_COLORS.error }]}>{t.block}</Text>
                 </TouchableOpacity>
                 
-                <View style={{height:1, backgroundColor:'#E0E0E0', marginVertical:5}} />
+                <View style={{height:1, backgroundColor: isDarkMode ? PITO_COLORS.navyLight : theme.border, marginVertical:5}} />
                 
                 <TouchableOpacity style={styles.menuItem} onPress={handleReportUser}>
-                    <Ionicons name="alert-circle-outline" size={22} color="#3700B3" />
-                    <Text style={[styles.menuText, { color: '#3700B3' }]}>{t.report}</Text>
+                    <Ionicons name="alert-circle-outline" size={22} color={PITO_COLORS.primary} />
+                    <Text style={[styles.menuText, { color: PITO_COLORS.primary }]}>{t.report}</Text>
                 </TouchableOpacity>
                 
-                <View style={{height:1, backgroundColor:'#E0E0E0', marginVertical:5}} />
+                <View style={{height:1, backgroundColor: isDarkMode ? PITO_COLORS.navyLight : theme.border, marginVertical:5}} />
 
                 <TouchableOpacity style={styles.menuItem} onPress={() => setMenuVisible(false)}>
-                    <Text style={[styles.menuText, { color: '#999', textAlign:'center', width:'100%' }]}>{t.cancel}</Text>
+                    <Text style={[styles.menuText, { color: theme.text, textAlign:'center', width:'100%' }]}>{t.cancel}</Text>
                 </TouchableOpacity>
-            </View>
-        </TouchableOpacity>
+            </SafeAreaView>
+        </View>
       </Modal>
 
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', padding: 15, paddingTop: 50, alignItems: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: 'bold', textTransform: 'lowercase' },
-  backButton: { padding: 5 },
-  profileCard: { alignItems: 'center', padding: 20, margin: 15, borderRadius: 25, elevation: 5, shadowColor: "#000", shadowOffset: {width:0, height:2}, shadowOpacity:0.1, shadowRadius:4 },
-  avatar: { width: 100, height: 100, borderRadius: 50, marginBottom: 15, borderWidth: 3, borderColor: '#6200EE' },
-  userName: { fontSize: 24, fontWeight: 'bold' },
-  statsRow: { flexDirection: 'row', justifyContent: 'center', alignItems:'center', width: '100%', marginVertical: 20, borderTopWidth: 1, borderTopColor: '#E0E0E0', paddingTop: 20 },
-  stat: { alignItems: 'center', marginHorizontal: 20 },
-  statNum: { fontWeight: 'bold', fontSize: 20 },
-  statLabel: { fontSize: 13, color: '#888', marginTop: 2 },
-  actionButtonsContainer: { flexDirection: 'row', marginTop: 15, width: '100%', alignItems: 'center', justifyContent: 'center' },
-  modernButton: { flexDirection: 'row', height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', elevation: 3, shadowColor: '#6200EE', shadowOffset: {width:0, height:4}, shadowOpacity:0.3, shadowRadius:5, paddingHorizontal: 40 },
-  tabContainer: { flexDirection: 'row', justifyContent: 'center', marginBottom: 10 },
-  tabBtn: { padding: 10, marginHorizontal: 20, borderBottomWidth: 3, borderBottomColor: 'transparent', flexDirection: 'row', alignItems: 'center' },
-  activeTab: { borderBottomColor: '#6200EE' },
-  listContent: { paddingHorizontal: 15, paddingBottom: 20 },
-  listingCard: { width: (width-40)/2, borderRadius: 15, marginBottom: 15, paddingBottom: 10, overflow:'hidden', elevation:2 },
-  listingImage: { width: '100%', height: 120 },
-  listingInfo: { padding: 8 },
-  listingTitle: { fontWeight:'bold', fontSize:14 },
-  listingCategory: { fontSize:12, fontWeight:'bold' },
-  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', padding: 2 },
-  gridItem: { width: (width/3)-4, height: (width/3)-4, margin: 2 },
-  gridImage: { width: '100%', height: '100%', borderRadius: 5 },
-  gridOverlay: { position: 'absolute', bottom: 5, left: 5, flexDirection: 'row', alignItems: 'center', backgroundColor:'rgba(0,0,0,0.5)', padding:3, borderRadius:5 },
-  emptyContainer: { alignItems: 'center', marginTop: 50 },
-  
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  menuContainer: { width: '80%', padding: 20, borderRadius: 20, elevation: 10 },
-  menuItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 15 },
-  menuText: { fontSize: 16, fontWeight: 'bold', marginLeft: 15 },
-
-  unblockButton: { backgroundColor: '#6200EE', paddingHorizontal: 30, paddingVertical: 15, borderRadius: 25 },
-  unblockButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 }
+  header: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 12, alignItems: 'center', gap: 12 },
+  headerTitle: { fontSize: 16, fontWeight: '700', flex: 1, textAlign: 'center' },
+  backButton: { width: 44, height: 44, borderRadius: 15, backgroundColor: 'rgba(197,160,89,0.1)', justifyContent: 'center', alignItems: 'center' },
+  cover: { backgroundColor: '#142239', marginHorizontal: 20, padding: 24, paddingBottom: 58, borderRadius: 26, overflow: 'hidden' },
+  coverTop: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  coverBrand: { fontSize: 29, fontWeight: '900', color: '#FFFFFF', letterSpacing: -1 },
+  coverCaption: { color: '#D7C6A4', fontSize: 12, marginTop: 8, maxWidth: '85%', lineHeight: 18 },
+  coverPaw: { position: 'absolute', right: -15, bottom: -25, transform: [{ rotate: '-20deg' }] },
+  profileCard: { alignItems: 'center', padding: 22, marginHorizontal: 20, marginTop: -24, borderRadius: 26, marginBottom: 24 },
+  avatar: { width: 90, height: 90, borderRadius: 30, marginTop: -53, marginBottom: 15, borderWidth: 5 },
+  avatarPlaceholder: { backgroundColor: '#EDE4D4', alignItems: 'center', justifyContent: 'center' },
+  nameRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'center', rowGap: 8, width: '100%' },
+  userName: { fontSize: 24, fontWeight: '800', textAlign: 'center', flexShrink: 1, letterSpacing: -0.6 },
+  statsRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', width: '100%', marginTop: 18, borderTopWidth: 1, paddingTop: 15 },
+  stat: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  statNum: { fontWeight: '800', fontSize: 21 },
+  statLabel: { fontSize: 13 },
+  actionButtonsContainer: { flexDirection: 'row', marginTop: 20, width: '100%', alignItems: 'center' },
+  modernButton: { flexDirection: 'row', minHeight: 52, borderRadius: 17, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingHorizontal: 22, marginBottom: 8 },
+  sectionTitle: { fontSize: 21, fontWeight: '800' },
+  sectionHint: { fontSize: 11, marginTop: 5 },
+  countPill: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(197,160,89,0.12)', paddingHorizontal: 12, paddingVertical: 9, borderRadius: 13 },
+  countText: { color: PITO_COLORS.primary, fontSize: 13, fontWeight: '800' },
+  listContent: { paddingHorizontal: 20, paddingBottom: 20 },
+  listingCard: { width: '48.2%', borderRadius: 21, marginBottom: 14, overflow: 'hidden' },
+  listingImage: { width: '100%', aspectRatio: 1 },
+  listingInfo: { padding: 13, gap: 6 },
+  listingTitle: { fontWeight: '800', fontSize: 15 },
+  listingCategory: { fontSize: 10, fontWeight: '700', lineHeight: 15 },
+  emptyContainer: { alignItems: 'center', padding: 28, marginTop: 4, borderWidth: 1, borderStyle: 'dashed', borderRadius: 24 },
+  emptyIcon: { width: 76, height: 76, borderRadius: 26, backgroundColor: 'rgba(197,160,89,0.12)', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  emptyTitle: { fontSize: 17, fontWeight: '700' },
+  emptyHint: { fontSize: 12, lineHeight: 19, textAlign: 'center', marginTop: 8 },
+  blockedContent: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(11,19,30,0.65)', justifyContent: 'flex-end' },
+  menuContainer: { width: '100%', paddingHorizontal: 24, paddingTop: 12, borderTopLeftRadius: 30, borderTopRightRadius: 30 },
+  sheetHandle: { width: 38, height: 4, borderRadius: 2, backgroundColor: '#9BA3AE', opacity: 0.4, alignSelf: 'center', marginBottom: 22 },
+  sheetTitle: { fontSize: 21, fontWeight: '800', marginBottom: 15 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', minHeight: 58, paddingVertical: 16 },
+  menuText: { fontSize: 15, fontWeight: '700', marginLeft: 12 },
+  unblockButton: { paddingHorizontal: 30, paddingVertical: 16, borderRadius: 18 },
+  unblockButtonText: { fontWeight: '700', fontSize: 15 }
 });
 
 export default UserProfileScreen;
